@@ -83,6 +83,7 @@ describe("LanguageSwitcher", () => {
   afterEach(() => {
     view?.unmount();
     view = null;
+    vi.restoreAllMocks();
   });
 
   test("refreshes the current route after the locale provider catches up", () => {
@@ -131,12 +132,24 @@ describe("LanguageSwitcher", () => {
   });
 
   test("keeps the pending refresh after remount when sessionStorage is blocked", () => {
-    // happy-dom 的 sessionStorage 是 Proxy 且原型并非全局 Storage,
-    // 实例级 spy 会被当成存储项写入而不生效,需在实际原型上拦截 setItem
-    const storagePrototype = Object.getPrototypeOf(window.sessionStorage) as Storage;
-    const setItemSpy = vi.spyOn(storagePrototype, "setItem").mockImplementation(() => {
+    // happy-dom 的 Storage Proxy 会绕过原型方法 spy，替换 window getter 才能模拟浏览器拒绝写入。
+    const storage = window.sessionStorage;
+    const setItemSpy = vi.fn(() => {
       throw new Error("blocked storage");
     });
+    const blockedStorage: Storage = {
+      clear: storage.clear.bind(storage),
+      getItem: storage.getItem.bind(storage),
+      key: storage.key.bind(storage),
+      get length() {
+        return storage.length;
+      },
+      removeItem: storage.removeItem.bind(storage),
+      setItem: setItemSpy,
+    };
+    const sessionStorageSpy = vi
+      .spyOn(window, "sessionStorage", "get")
+      .mockReturnValue(blockedStorage);
     const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     view = render(<LanguageSwitcher />);
@@ -150,6 +163,7 @@ describe("LanguageSwitcher", () => {
 
     expect(testState.router.push).toHaveBeenCalledWith("/settings/config", { locale: "en" });
     expect(testState.router.refresh).not.toHaveBeenCalled();
+    expect(setItemSpy).toHaveBeenCalledWith("cch.pendingLocaleRefresh", "en");
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       "Failed to persist pending locale refresh target:",
       expect.any(Error)
@@ -157,7 +171,7 @@ describe("LanguageSwitcher", () => {
 
     view.unmount();
     view = null;
-    setItemSpy.mockRestore();
+    sessionStorageSpy.mockRestore();
 
     testState.currentLocale = "en";
     view = render(<LanguageSwitcher />);
