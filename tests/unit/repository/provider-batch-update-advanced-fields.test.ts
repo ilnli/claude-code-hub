@@ -1,4 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
+import { PgDialect } from "drizzle-orm/pg-core";
 
 type BatchUpdateRow = {
   id: number;
@@ -30,6 +31,7 @@ function createDbMock(updatedRows: BatchUpdateRow[]) {
     },
     mocks: {
       updateMock,
+      updateWhereMock,
       updateSetPayloads,
       insertMock,
     },
@@ -52,10 +54,13 @@ async function arrange(updatedRows: BatchUpdateRow[] = []) {
     },
   }));
 
-  const { updateProvidersBatch } = await import("@/repository/provider");
+  const { restoreProviderCostMultiplier, updateProvidersBatch, updateUpstreamBillingProbeResult } =
+    await import("@/repository/provider");
 
   return {
+    restoreProviderCostMultiplier,
     updateProvidersBatch,
+    updateUpstreamBillingProbeResult,
     ...dbMock.mocks,
   };
 }
@@ -146,6 +151,77 @@ describe("provider repository - updateProvidersBatch advanced fields", () => {
         anthropicAdaptiveThinking,
       })
     );
+  });
+
+  test("updates upstream rate-follow fields for undo", async () => {
+    const { updateProvidersBatch, updateSetPayloads } = await arrange(updatedRows);
+
+    const result = await updateProvidersBatch([11, 22], {
+      costMultiplier: "1.5000",
+      rateFollowUpstream: true,
+      rateDefaultMultiplier: "1.2000",
+      rateMarkupType: "percent",
+      rateMarkupValue: "0.1000",
+    });
+
+    expect(result).toBe(2);
+    expect(updateSetPayloads[0]).toEqual(
+      expect.objectContaining({
+        costMultiplier: "1.5000",
+        rateFollowUpstream: true,
+        rateDefaultMultiplier: "1.2000",
+        rateMarkupType: "percent",
+        rateMarkupValue: "0.1000",
+      })
+    );
+  });
+
+  test("guards successful probe writes against concurrent provider changes", async () => {
+    const { updateUpstreamBillingProbeResult, updateWhereMock } = await arrange([]);
+    const expectedUpdatedAt = new Date("2026-08-02T12:00:00.000Z");
+
+    const wrote = await updateUpstreamBillingProbeResult(
+      11,
+      {
+        costMultiplier: 1.5,
+        upstreamRateMultiplier: 1.4,
+        syncedAt: new Date("2026-08-02T12:00:01.000Z"),
+      },
+      expectedUpdatedAt
+    );
+
+    expect(wrote).toBe(false);
+    const query = new PgDialect().sqlToQuery(updateWhereMock.mock.calls[0]?.[0] as never);
+    expect(query.sql).toContain('"providers"."rate_follow_upstream" = $2');
+    expect(query.sql).toContain('"providers"."deleted_at" is null');
+    expect(query.sql).toContain('"providers"."updated_at" >= $3');
+    expect(query.sql).toContain('"providers"."updated_at" < $4');
+    expect(query.params).toEqual([
+      11,
+      true,
+      expectedUpdatedAt.toISOString(),
+      "2026-08-02T12:00:00.001Z",
+    ]);
+  });
+
+  test("guards fallback restores against concurrent provider changes", async () => {
+    const { restoreProviderCostMultiplier, updateWhereMock } = await arrange([]);
+    const expectedUpdatedAt = new Date("2026-08-02T12:00:00.000Z");
+
+    const wrote = await restoreProviderCostMultiplier(11, 1.2, expectedUpdatedAt);
+
+    expect(wrote).toBe(false);
+    const query = new PgDialect().sqlToQuery(updateWhereMock.mock.calls[0]?.[0] as never);
+    expect(query.sql).toContain('"providers"."rate_follow_upstream" = $2');
+    expect(query.sql).toContain('"providers"."deleted_at" is null');
+    expect(query.sql).toContain('"providers"."updated_at" >= $3');
+    expect(query.sql).toContain('"providers"."updated_at" < $4');
+    expect(query.params).toEqual([
+      11,
+      true,
+      expectedUpdatedAt.toISOString(),
+      "2026-08-02T12:00:00.001Z",
+    ]);
   });
 
   test("does not include undefined advanced fields in set payload", async () => {

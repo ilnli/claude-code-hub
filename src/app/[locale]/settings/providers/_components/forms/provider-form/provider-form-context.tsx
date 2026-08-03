@@ -187,6 +187,11 @@ export function createInitialState(
           analysis.routing.costMultiplier.status === "uniform"
             ? analysis.routing.costMultiplier.value
             : 1.0,
+        // 批量编辑不支持修改上游倍率跟随配置，固定为默认值
+        rateFollowUpstream: false,
+        rateDefaultMultiplier: null,
+        rateMarkupType: "none",
+        rateMarkupValue: 0,
         cacheTtlPreference:
           analysis.routing.cacheTtlPreference.status === "uniform"
             ? analysis.routing.cacheTtlPreference.value
@@ -359,6 +364,10 @@ export function createInitialState(
         groupPriorities: {},
         weight: 1,
         costMultiplier: 1.0,
+        rateFollowUpstream: false,
+        rateDefaultMultiplier: null,
+        rateMarkupType: "none",
+        rateMarkupValue: 0,
         cacheTtlPreference: "inherit",
         swapCacheTtlBilling: false,
         codexReasoningEffortPreference: "inherit",
@@ -437,6 +446,10 @@ export function createInitialState(
       groupPriorities: sourceProvider?.groupPriorities ?? {},
       weight: sourceProvider?.weight ?? 1,
       costMultiplier: sourceProvider?.costMultiplier ?? 1.0,
+      rateFollowUpstream: sourceProvider?.rateFollowUpstream ?? false,
+      rateDefaultMultiplier: sourceProvider?.rateDefaultMultiplier ?? null,
+      rateMarkupType: sourceProvider?.rateMarkupType ?? "none",
+      rateMarkupValue: sourceProvider?.rateMarkupValue ?? 0,
       cacheTtlPreference: sourceProvider?.cacheTtlPreference ?? "inherit",
       swapCacheTtlBilling: sourceProvider?.swapCacheTtlBilling ?? false,
       codexReasoningEffortPreference: sourceProvider?.codexReasoningEffortPreference ?? "inherit",
@@ -552,6 +565,14 @@ export function providerFormReducer(
       return { ...state, routing: { ...state.routing, weight: action.payload } };
     case "SET_COST_MULTIPLIER":
       return { ...state, routing: { ...state.routing, costMultiplier: action.payload } };
+    case "SET_RATE_FOLLOW_UPSTREAM":
+      return { ...state, routing: { ...state.routing, rateFollowUpstream: action.payload } };
+    case "SET_RATE_DEFAULT_MULTIPLIER":
+      return { ...state, routing: { ...state.routing, rateDefaultMultiplier: action.payload } };
+    case "SET_RATE_MARKUP_TYPE":
+      return { ...state, routing: { ...state.routing, rateMarkupType: action.payload } };
+    case "SET_RATE_MARKUP_VALUE":
+      return { ...state, routing: { ...state.routing, rateMarkupValue: action.payload } };
     case "SET_CACHE_TTL_PREFERENCE":
       return { ...state, routing: { ...state.routing, cacheTtlPreference: action.payload } };
     case "SET_SWAP_CACHE_TTL_BILLING":

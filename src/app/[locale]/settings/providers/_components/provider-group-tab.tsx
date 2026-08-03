@@ -685,9 +685,11 @@ function GroupMembersPanel({
 
       <ProviderBatchActions
         selectedCount={selectedProviderIds.size}
+        selectedProviderIds={[...selectedProviderIds]}
         isVisible={isMultiSelectMode}
         onAction={handleBatchAction}
         onClose={handleExitMultiSelectMode}
+        onSynced={onSaved}
       />
 
       <ProviderBatchDialog

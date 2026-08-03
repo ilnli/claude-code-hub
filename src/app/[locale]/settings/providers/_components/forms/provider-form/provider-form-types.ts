@@ -18,6 +18,7 @@ import type {
   ProviderModelRedirectRule,
   ProviderType,
 } from "@/types/provider";
+import type { RateMarkupType } from "@/types/upstream-billing";
 import type { BatchSettingsAnalysis } from "../../batch-edit/analyze-batch-settings";
 
 // Form mode
@@ -60,6 +61,11 @@ export interface RoutingState {
   groupPriorities: Record<string, number>;
   weight: number;
   costMultiplier: number;
+  // 上游倍率跟随（套娃场景；批量编辑不支持修改）
+  rateFollowUpstream: boolean;
+  rateDefaultMultiplier: number | null;
+  rateMarkupType: RateMarkupType;
+  rateMarkupValue: number;
   cacheTtlPreference: "inherit" | "5m" | "1h";
   swapCacheTtlBilling: boolean;
   // Codex-specific
@@ -156,6 +162,10 @@ export type ProviderFormAction =
   | { type: "SET_GROUP_PRIORITIES"; payload: Record<string, number> }
   | { type: "SET_WEIGHT"; payload: number }
   | { type: "SET_COST_MULTIPLIER"; payload: number }
+  | { type: "SET_RATE_FOLLOW_UPSTREAM"; payload: boolean }
+  | { type: "SET_RATE_DEFAULT_MULTIPLIER"; payload: number | null }
+  | { type: "SET_RATE_MARKUP_TYPE"; payload: RateMarkupType }
+  | { type: "SET_RATE_MARKUP_VALUE"; payload: number }
   | { type: "SET_CACHE_TTL_PREFERENCE"; payload: "inherit" | "5m" | "1h" }
   | { type: "SET_SWAP_CACHE_TTL_BILLING"; payload: boolean }
   | { type: "SET_CODEX_REASONING_EFFORT"; payload: CodexReasoningEffortPreference }

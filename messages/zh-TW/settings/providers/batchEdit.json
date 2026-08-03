@@ -4,7 +4,8 @@
     "edit": "編輯",
     "test": "測試",
     "resetCircuit": "重設熔斷器",
-    "delete": "刪除"
+    "delete": "刪除",
+    "syncRate": "同步倍率"
   },
   "enterMode": "批次編輯",
   "selectionHint": "選擇供應商進行批次編輯",
@@ -106,5 +107,7 @@
     "label": "(混合值)",
     "tooltip": "選中的供應商有不同的值：",
     "andMore": "...還有 {count} 個"
-  }
+  },
+  "syncRateSummary": "同步完成：成功 {synced}，不支援 {unsupported}，失敗 {failed}，略過 {skipped}",
+  "syncRateFailed": "批次同步上游倍率失敗"
 }

@@ -285,6 +285,34 @@ export async function resetProviderCircuitsBatch(c: Context): Promise<Response> 
   );
 }
 
+export async function syncProviderUpstreamRate(c: Context): Promise<Response> {
+  const id = parseProviderIdWithSuffix(c, "upstream-rate:sync");
+  if (id instanceof Response) return id;
+  const existing = await findVisibleProvider(c, id);
+  if (existing instanceof Response) return existing;
+  if (!existing) return providerNotFound(c);
+  const { syncProviderUpstreamRateNow } = await import("@/actions/upstream-billing");
+  const result = await callAction(c, syncProviderUpstreamRateNow, [id] as never[], c.get("auth"));
+  return actionJson(c, result);
+}
+
+export async function syncProvidersUpstreamRateBatch(c: Context): Promise<Response> {
+  const body = await parseJson(c, ProviderIdsBodySchema);
+  if (body instanceof Response) return body;
+  const visibilityError = await ensureVisibleProviderIds(c, body.providerIds);
+  if (visibilityError) return visibilityError;
+  const { syncProvidersUpstreamRateBatch } = await import("@/actions/upstream-billing");
+  return actionJson(
+    c,
+    await callAction(
+      c,
+      syncProvidersUpstreamRateBatch,
+      [body.providerIds] as never[],
+      c.get("auth")
+    )
+  );
+}
+
 export async function getProviderLimit(c: Context): Promise<Response> {
   const id = Number(c.req.param("id"));
   const existing = await findVisibleProvider(c, id);
@@ -634,6 +662,12 @@ function sanitizeProvider(
     priority: provider.priority,
     groupPriorities: provider.groupPriorities,
     costMultiplier: provider.costMultiplier,
+    rateFollowUpstream: provider.rateFollowUpstream,
+    rateDefaultMultiplier: provider.rateDefaultMultiplier,
+    rateMarkupType: provider.rateMarkupType,
+    rateMarkupValue: provider.rateMarkupValue,
+    upstreamRateMultiplier: provider.upstreamRateMultiplier,
+    upstreamRateSyncedAt: provider.upstreamRateSyncedAt?.toISOString() ?? null,
     groupTag: provider.groupTag,
     providerType: provider.providerType as ProviderSummaryResponse["providerType"],
     providerVendorId: provider.providerVendorId,

@@ -43,6 +43,32 @@ describe("POST /api/admin/system-config", () => {
       maxDiscoveryRounds: 2,
       racingTotalTimeoutMs: 60_000,
     });
+    mocks.updateSystemSettings.mockResolvedValue({
+      upstreamBillingProbeEnabled: true,
+      upstreamBillingProbeIntervalMinutes: 15,
+    });
+  });
+
+  it("persists upstream billing probe settings", async () => {
+    const { POST } = await import("@/app/api/admin/system-config/route");
+    const response = await POST(
+      new Request("http://localhost/api/admin/system-config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          upstreamBillingProbeEnabled: true,
+          upstreamBillingProbeIntervalMinutes: 15,
+        }),
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.updateSystemSettings).toHaveBeenCalledWith(
+      expect.objectContaining({
+        upstreamBillingProbeEnabled: true,
+        upstreamBillingProbeIntervalMinutes: 15,
+      })
+    );
   });
 
   it("returns the stable Discovery window code for an invalid partial update", async () => {

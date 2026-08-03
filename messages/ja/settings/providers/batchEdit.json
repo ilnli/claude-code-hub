@@ -4,7 +4,8 @@
     "edit": "編集",
     "test": "テスト",
     "resetCircuit": "サーキットブレーカーをリセット",
-    "delete": "削除"
+    "delete": "削除",
+    "syncRate": "倍率を同期"
   },
   "enterMode": "一括編集",
   "selectionHint": "プロバイダーを選択して一括編集",
@@ -106,5 +107,7 @@
     "label": "(混合値)",
     "tooltip": "選択されたプロバイダーには異なる値があります：",
     "andMore": "...他 {count} 件"
-  }
+  },
+  "syncRateSummary": "同期完了: 成功 {synced}、非対応 {unsupported}、失敗 {failed}、スキップ {skipped}",
+  "syncRateFailed": "アップストリーム倍率の一括同期に失敗しました"
 }

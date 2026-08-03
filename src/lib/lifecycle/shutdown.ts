@@ -128,6 +128,18 @@ export async function runApplicationCleanup(
       "stopEndpointProbeScheduler"
     );
 
+    // 2b. 上游倍率探测调度器
+    await awaitQuiescenceBestEffort(
+      (async () => {
+        const { stopUpstreamBillingProbeScheduler } = await import(
+          "@/lib/upstream-billing/probe-scheduler"
+        );
+        await stopUpstreamBillingProbeScheduler();
+      })(),
+      stepMs,
+      "stopUpstreamBillingProbeScheduler"
+    );
+
     // 3. 公共状态重建调度器
     await awaitQuiescenceBestEffort(
       (async () => {

@@ -431,6 +431,33 @@
         "placeholder": "1"
       }
     },
+    "upstreamRate": {
+      "follow": {
+        "label": "跟隨上游倍率",
+        "desc": "定時探測上游 sub2api 的計費倍率並自動同步到成本倍數（需上游支援 GET /v1/sub2api/billing）"
+      },
+      "costAutoSync": "跟隨上游倍率已開啟，成本倍數由探測結果自動回寫（目前值即生效值）",
+      "defaultRate": {
+        "label": "預設倍率",
+        "desc": "探測失敗或上游不支援時的兜底倍率，開啟跟隨前必須設定",
+        "placeholder": "例如 1.0"
+      },
+      "markupType": {
+        "label": "加價方式",
+        "desc": "在上游倍率基礎上的加價規則",
+        "options": {
+          "none": "不加價",
+          "percent": "百分比（如 0.1 = +10%）",
+          "fixed": "固定值（如 0.01 = +0.01）"
+        }
+      },
+      "markupValue": {
+        "label": "加價數值",
+        "desc": "百分比方式填小數（0.1 表示 +10%），固定值方式直接加到倍率上",
+        "placeholder": "0"
+      },
+      "lastSync": "最近同步：上游倍率 {rate}，時間 {time}"
+    },
     "activeTime": {
       "title": "排程時間窗口",
       "description": "在指定時間窗口內自動啟用供應商",

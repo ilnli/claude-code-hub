@@ -20,6 +20,13 @@
       "actual": "Actual Service Tier（缺失時回退 Requested）"
     },
     "codexPriorityBillingSourcePlaceholder": "選擇 Codex Priority 計費來源",
+    "upstreamBillingProbeEnabled": "啟用上游倍率探測",
+    "upstreamBillingProbeEnabledDesc": "開啟後按設定間隔探測所有啟用「跟隨上游倍率」的供應商；關閉時不產生任何探測請求",
+    "upstreamBillingProbeIntervalRequired": "探測間隔（分鐘）",
+    "upstreamBillingProbeIntervalPlaceholder": "30",
+    "upstreamBillingProbeIntervalDesc": "每個供應商的探測週期，範圍 1-1440 分鐘，預設 30 分鐘",
+    "upstreamBillingProbeHint": "探測成功後，供應商的成本倍數會自動更新為「上游倍率 + 加價規則」計算結果；探測失敗時回退到該供應商設定的預設倍率",
+    "upstreamBillingProbeSaved": "上游倍率探測設定已儲存",
     "cleanupBatchSize": "批次大小",
     "cleanupBatchSizeDesc": "每批刪除的記錄數（範圍：1000-100000，建議 10000）",
     "cleanupBatchSizePlaceholder": "10000",
@@ -193,6 +200,10 @@
     "siteParams": {
       "description": "設定站台標題、貨幣顯示單位與儀表板統計展示策略。",
       "title": "站台參數"
+    },
+    "upstreamBillingProbe": {
+      "description": "套娃場景下自動跟隨上游 sub2api 的計費倍率",
+      "title": "上游倍率探測"
     }
   },
   "siteSettings": "站台參數",

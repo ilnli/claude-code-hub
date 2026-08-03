@@ -89,6 +89,8 @@ export async function saveSystemSettings(formData: {
   cleanupSchedule?: string;
   cleanupBatchSize?: number;
   enableClientVersionCheck?: boolean;
+  upstreamBillingProbeEnabled?: boolean;
+  upstreamBillingProbeIntervalMinutes?: number;
   verboseProviderError?: boolean;
   passThroughUpstreamErrorMessage?: boolean;
   enableHttp2?: boolean;
@@ -178,6 +180,8 @@ export async function saveSystemSettings(formData: {
       cleanupSchedule: validated.cleanupSchedule,
       cleanupBatchSize: validated.cleanupBatchSize,
       enableClientVersionCheck: validated.enableClientVersionCheck,
+      upstreamBillingProbeEnabled: validated.upstreamBillingProbeEnabled,
+      upstreamBillingProbeIntervalMinutes: validated.upstreamBillingProbeIntervalMinutes,
       verboseProviderError: validated.verboseProviderError,
       passThroughUpstreamErrorMessage: validated.passThroughUpstreamErrorMessage,
       enableHttp2: validated.enableHttp2,

@@ -147,6 +147,15 @@ export const SystemSettingsSchema = z
     cleanupSchedule: z.string().optional().describe("Cleanup cron schedule."),
     cleanupBatchSize: z.number().int().optional().describe("Cleanup batch size."),
     enableClientVersionCheck: z.boolean().describe("Whether client version checks are enabled."),
+    upstreamBillingProbeEnabled: z
+      .boolean()
+      .describe("Whether scheduled upstream billing-rate probing is enabled."),
+    upstreamBillingProbeIntervalMinutes: z
+      .number()
+      .int()
+      .min(1)
+      .max(1440)
+      .describe("Interval between scheduled upstream billing-rate probes in minutes."),
     verboseProviderError: z
       .boolean()
       .describe("Whether provider errors include extra diagnostics."),

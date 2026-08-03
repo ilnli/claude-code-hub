@@ -7,6 +7,7 @@ import { SettingsPageHeader } from "../_components/settings-page-header";
 import { AutoCleanupForm } from "./_components/auto-cleanup-form";
 import { SettingsConfigSkeleton } from "./_components/settings-config-skeleton";
 import { SystemSettingsForm } from "./_components/system-settings-form";
+import { UpstreamBillingProbeForm } from "./_components/upstream-billing-probe-form";
 
 export const dynamic = "force-dynamic";
 
@@ -108,6 +109,15 @@ async function SettingsConfigContent({ locale }: { locale: string }) {
         variant="default"
       >
         <AutoCleanupForm settings={settings} />
+      </Section>
+
+      <Section
+        title={t("config.section.upstreamBillingProbe.title")}
+        description={t("config.section.upstreamBillingProbe.description")}
+        icon="settings"
+        variant="default"
+      >
+        <UpstreamBillingProbeForm settings={settings} />
       </Section>
     </>
   );

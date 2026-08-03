@@ -31,6 +31,8 @@ import {
   ProviderUndoBodySchema,
   ProviderUnifiedTestSchema,
   ProviderUpdateSchema,
+  ProviderUpstreamRateBatchSyncResponseSchema,
+  ProviderUpstreamRateSyncResultSchema,
 } from "@/lib/api/v1/schemas/providers";
 import {
   applyBatchPatch,
@@ -55,6 +57,8 @@ import {
   resetProviderCircuitsBatch,
   resetProviderUsage,
   revealProviderKey,
+  syncProvidersUpstreamRateBatch,
+  syncProviderUpstreamRate,
   testProviderAnthropic,
   testProviderById,
   testProviderGemini,
@@ -388,6 +392,54 @@ providersRouter.openapi(
     },
   }),
   resetProviderCircuitsBatch as never
+);
+
+providersRouter.openapi(
+  createRoute({
+    method: "post",
+    path: "/providers/{id}/upstream-rate:sync",
+    middleware: requireAuth("admin"),
+    tags: ["Providers"],
+    summary: "Sync upstream billing rate now",
+    description:
+      "Probes the upstream sub2api-compatible billing endpoint once and writes back the effective cost multiplier (with markup) for one provider. Requires rate_follow_upstream enabled on the provider.",
+    "x-required-access": "admin",
+    security,
+    request: { params: ProviderIdParamSchema },
+    responses: {
+      200: {
+        description: "Upstream rate sync result.",
+        content: { "application/json": { schema: ProviderUpstreamRateSyncResultSchema } },
+      },
+      ...problemResponses,
+    },
+  }),
+  syncProviderUpstreamRate as never
+);
+
+providersRouter.openapi(
+  createRoute({
+    method: "post",
+    path: "/providers/upstream-rate:syncBatch",
+    middleware: requireAuth("admin"),
+    tags: ["Providers"],
+    summary: "Batch sync upstream billing rates",
+    description:
+      "Probes upstream billing endpoints for multiple providers and writes back effective cost multipliers. Providers without rate_follow_upstream enabled are reported as skipped.",
+    "x-required-access": "admin",
+    security,
+    request: {
+      body: { required: true, content: { "application/json": { schema: ProviderIdsBodySchema } } },
+    },
+    responses: {
+      200: {
+        description: "Batch upstream rate sync summary.",
+        content: { "application/json": { schema: ProviderUpstreamRateBatchSyncResponseSchema } },
+      },
+      ...problemResponses,
+    },
+  }),
+  syncProvidersUpstreamRateBatch as never
 );
 
 providersRouter.openapi(

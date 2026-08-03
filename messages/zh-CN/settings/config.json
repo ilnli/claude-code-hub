@@ -13,6 +13,10 @@
     "autoCleanup": {
       "title": "自动日志清理",
       "description": "定时自动清理历史日志数据，释放数据库存储空间。"
+    },
+    "upstreamBillingProbe": {
+      "title": "上游倍率探测",
+      "description": "套娃场景下自动跟随上游 sub2api 的计费倍率"
     }
   },
   "form": {
@@ -39,6 +43,13 @@
       "requested": "Requested Service Tier（默认）",
       "actual": "Actual Service Tier（缺失时回退 Requested）"
     },
+    "upstreamBillingProbeEnabled": "启用上游倍率探测",
+    "upstreamBillingProbeEnabledDesc": "开启后按设定间隔探测所有启用「跟随上游倍率」的供应商；关闭时不产生任何探测请求",
+    "upstreamBillingProbeIntervalRequired": "探测间隔（分钟）",
+    "upstreamBillingProbeIntervalPlaceholder": "30",
+    "upstreamBillingProbeIntervalDesc": "每个供应商的探测周期，范围 1-1440 分钟，默认 30 分钟",
+    "upstreamBillingProbeHint": "探测成功后，供应商的成本倍率会自动更新为「上游倍率 + 加价规则」计算结果；探测失败时回退到该供应商配置的默认倍率",
+    "upstreamBillingProbeSaved": "上游倍率探测设置已保存",
     "allowGlobalView": "允许查看全站使用量",
     "allowGlobalViewDesc": "关闭后，普通用户在仪表盘仅能查看自己密钥的使用统计。",
     "billNonSuccessfulRequests": "非成功请求按 Token 用量计费",

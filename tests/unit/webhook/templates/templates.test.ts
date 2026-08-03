@@ -115,6 +115,24 @@ describe("Message Templates", () => {
       expect(sectionsStr).toContain("99");
       expect(sectionsStr).toContain("https://custom-proxy.example.com/v1");
     });
+
+    it("should produce an upstream billing probe failure message", () => {
+      const data: CircuitBreakerAlertData = {
+        providerName: "Nested Provider",
+        providerId: 9,
+        failureCount: 3,
+        lastError: "missing resolved_rate_multiplier",
+        incidentSource: "upstream_billing",
+        fallbackApplied: true,
+        fallbackRate: 1.2,
+      };
+
+      const message = buildCircuitBreakerMessage(data);
+      expect(message.header.title).toContain("上游倍率探测失败");
+      const messageText = JSON.stringify(message);
+      expect(messageText).toContain("Nested Provider");
+      expect(messageText).toContain("已回退到默认倍率 1.2");
+    });
   });
 
   describe("buildCostAlertMessage", () => {

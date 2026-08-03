@@ -116,6 +116,7 @@ import type {
   ProviderStatisticsMap,
   ProviderType,
 } from "@/types/provider";
+import type { RateMarkupType } from "@/types/upstream-billing";
 import type { ActionResult } from "./types";
 
 type AutoSortResult = {
@@ -339,6 +340,12 @@ export async function getProviders(): Promise<ProviderDisplay[]> {
         priority: provider.priority,
         groupPriorities: provider.groupPriorities,
         costMultiplier: provider.costMultiplier,
+        rateFollowUpstream: provider.rateFollowUpstream,
+        rateDefaultMultiplier: provider.rateDefaultMultiplier,
+        rateMarkupType: provider.rateMarkupType,
+        rateMarkupValue: provider.rateMarkupValue,
+        upstreamRateMultiplier: provider.upstreamRateMultiplier,
+        upstreamRateSyncedAt: provider.upstreamRateSyncedAt,
         groupTag: provider.groupTag,
         providerType: provider.providerType,
         providerVendorId: provider.providerVendorId,
@@ -541,6 +548,10 @@ export async function addProvider(data: {
   weight?: number;
   priority?: number;
   cost_multiplier?: number;
+  rate_follow_upstream?: boolean;
+  rate_default_multiplier?: number | null;
+  rate_markup_type?: RateMarkupType;
+  rate_markup_value?: number;
   group_tag?: string | null;
   provider_type?: ProviderType;
   preserve_client_ip?: boolean;
@@ -633,6 +644,11 @@ export async function addProvider(data: {
     const payload = {
       ...validated,
       group_tag: normalizeProviderGroupTag(validated.group_tag),
+      // 开启跟随上游倍率但未显式配置默认倍率时，取当前成本倍率作为默认倍率
+      rate_default_multiplier:
+        validated.rate_follow_upstream && validated.rate_default_multiplier == null
+          ? validated.cost_multiplier
+          : (validated.rate_default_multiplier ?? null),
       limit_5h_usd: validated.limit_5h_usd ?? null,
       limit_5h_reset_mode: validated.limit_5h_reset_mode ?? "rolling",
       limit_daily_usd: validated.limit_daily_usd ?? null,
@@ -756,6 +772,10 @@ export async function editProvider(
     weight?: number;
     priority?: number;
     cost_multiplier?: number;
+    rate_follow_upstream?: boolean;
+    rate_default_multiplier?: number | null;
+    rate_markup_type?: RateMarkupType;
+    rate_markup_value?: number;
     group_tag?: string | null;
     group_priorities?: Record<string, number> | null;
     provider_type?: ProviderType;
@@ -858,6 +878,36 @@ export async function editProvider(
     const currentProvider = await findProviderById(providerId);
     if (!currentProvider) {
       return { ok: false, error: "供应商不存在" };
+    }
+
+    // 上游倍率跟随开关与默认倍率不变量处理
+    const nextRateFollowUpstream =
+      validated.rate_follow_upstream ?? currentProvider.rateFollowUpstream;
+    if (nextRateFollowUpstream) {
+      if (currentProvider.rateFollowUpstream && validated.rate_default_multiplier === null) {
+        return {
+          ok: false,
+          error: "跟随上游倍率开启时不能清空默认倍率",
+          errorCode: "PROVIDER_RATE_DEFAULT_MULTIPLIER_REQUIRED",
+        };
+      }
+
+      // 新开启跟随或修复历史缺失值时，以当前成本倍率作为默认倍率。
+      if (
+        payload.rate_default_multiplier === undefined ||
+        payload.rate_default_multiplier === null
+      ) {
+        payload.rate_default_multiplier = currentProvider.costMultiplier;
+      }
+    } else if (
+      validated.rate_follow_upstream !== undefined &&
+      validated.rate_follow_upstream !== currentProvider.rateFollowUpstream
+    ) {
+      // 关闭跟随：用默认倍率还原 cost_multiplier（探测期间它可能已被自动回写）
+      const restore = payload.rate_default_multiplier ?? currentProvider.rateDefaultMultiplier;
+      if (restore != null) {
+        payload.cost_multiplier = restore;
+      }
     }
 
     const preimageFields: Record<string, unknown> = {};
@@ -1468,6 +1518,10 @@ const SINGLE_EDIT_PREIMAGE_FIELD_TO_PROVIDER_KEY: Record<string, keyof Provider>
   weight: "weight",
   priority: "priority",
   cost_multiplier: "costMultiplier",
+  rate_follow_upstream: "rateFollowUpstream",
+  rate_default_multiplier: "rateDefaultMultiplier",
+  rate_markup_type: "rateMarkupType",
+  rate_markup_value: "rateMarkupValue",
   group_tag: "groupTag",
   group_priorities: "groupPriorities",
   provider_type: "providerType",
@@ -2546,7 +2600,12 @@ export async function undoProviderPatch(
 
       const updatesObj: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(providerPreimage)) {
-        if (key === "costMultiplier" && typeof value === "number") {
+        if (
+          (key === "costMultiplier" ||
+            key === "rateDefaultMultiplier" ||
+            key === "rateMarkupValue") &&
+          typeof value === "number"
+        ) {
           updatesObj[key] = value.toString();
         } else {
           updatesObj[key] = value;

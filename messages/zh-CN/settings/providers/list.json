@@ -41,7 +41,14 @@
   "actionResetCircuit": "重置熔断",
   "actionResetUsage": "重置用量",
   "actionDelete": "删除",
+  "actionSyncUpstreamRate": "立即同步倍率",
   "selectProvider": "选择 {name}",
   "schedule": "调度",
-  "proxyEnabled": "已启用代理"
+  "proxyEnabled": "已启用代理",
+  "syncRateTitle": "立即探测并同步上游倍率",
+  "syncRateSuccess": "上游倍率同步成功",
+  "syncRateSuccessDesc": "{name}：上游倍率 {upstreamRate}，生效倍率 {finalRate}",
+  "syncRateUnsupported": "上游不支持倍率探测",
+  "syncRateUnsupportedDesc": "{name} 的上游未实现 sub2api 探测协议，已回退为默认倍率",
+  "syncRateFailed": "同步上游倍率失败"
 }

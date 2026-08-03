@@ -103,6 +103,24 @@ export function toProvider(dbProvider: any): Provider {
     priority: dbProvider?.priority ?? 0,
     groupPriorities: dbProvider?.groupPriorities ?? null,
     costMultiplier: dbProvider?.costMultiplier ? parseFloat(dbProvider.costMultiplier) : 1.0,
+    rateFollowUpstream: dbProvider?.rateFollowUpstream ?? false,
+    rateDefaultMultiplier:
+      dbProvider?.rateDefaultMultiplier !== null && dbProvider?.rateDefaultMultiplier !== undefined
+        ? parseFloat(dbProvider.rateDefaultMultiplier)
+        : null,
+    rateMarkupType: dbProvider?.rateMarkupType ?? "none",
+    rateMarkupValue:
+      dbProvider?.rateMarkupValue !== null && dbProvider?.rateMarkupValue !== undefined
+        ? parseFloat(dbProvider.rateMarkupValue)
+        : 0,
+    upstreamRateMultiplier:
+      dbProvider?.upstreamRateMultiplier !== null &&
+      dbProvider?.upstreamRateMultiplier !== undefined
+        ? parseFloat(dbProvider.upstreamRateMultiplier)
+        : null,
+    upstreamRateSyncedAt: dbProvider?.upstreamRateSyncedAt
+      ? new Date(dbProvider.upstreamRateSyncedAt)
+      : null,
     groupTag: dbProvider?.groupTag ?? null,
     providerType: dbProvider?.providerType ?? "claude",
     preserveClientIp: dbProvider?.preserveClientIp ?? false,
@@ -264,6 +282,8 @@ export function toSystemSettings(dbSettings: any): SystemSettings {
     cleanupSchedule: dbSettings?.cleanupSchedule ?? "0 2 * * *",
     cleanupBatchSize: dbSettings?.cleanupBatchSize ?? 10000,
     enableClientVersionCheck: dbSettings?.enableClientVersionCheck ?? false,
+    upstreamBillingProbeEnabled: dbSettings?.upstreamBillingProbeEnabled ?? false,
+    upstreamBillingProbeIntervalMinutes: dbSettings?.upstreamBillingProbeIntervalMinutes ?? 30,
     verboseProviderError: dbSettings?.verboseProviderError ?? false,
     passThroughUpstreamErrorMessage: dbSettings?.passThroughUpstreamErrorMessage ?? true,
     enableHttp2: dbSettings?.enableHttp2 ?? false,

@@ -48,6 +48,8 @@ const settings: SystemSettings = {
   cleanupSchedule: "0 2 * * *",
   cleanupBatchSize: 10000,
   enableClientVersionCheck: true,
+  upstreamBillingProbeEnabled: false,
+  upstreamBillingProbeIntervalMinutes: 30,
   verboseProviderError: false,
   passThroughUpstreamErrorMessage: true,
   enableHttp2: false,
@@ -113,13 +115,20 @@ describe("v1 system config endpoints", () => {
       method: "PUT",
       pathname: "/api/v1/system/settings",
       headers: { Authorization: "Bearer admin-token" },
-      body: { siteTitle: "CCH Ops", timezone: "UTC" },
+      body: {
+        siteTitle: "CCH Ops",
+        timezone: "UTC",
+        upstreamBillingProbeEnabled: true,
+        upstreamBillingProbeIntervalMinutes: 15,
+      },
     });
     expect(updated.response.status).toBe(200);
     expect(updated.json).toMatchObject({ siteTitle: "CCH Ops", timezone: "UTC" });
     expect(saveSystemSettingsMock).toHaveBeenCalledWith({
       siteTitle: "CCH Ops",
       timezone: "UTC",
+      upstreamBillingProbeEnabled: true,
+      upstreamBillingProbeIntervalMinutes: 15,
     });
   });
 

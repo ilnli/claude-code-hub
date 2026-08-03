@@ -123,6 +123,33 @@
         "noGroups": "请先设置分组标签，才能配置分组优先级"
       }
     },
+    "upstreamRate": {
+      "follow": {
+        "label": "跟随上游倍率",
+        "desc": "定时探测上游 sub2api 的计费倍率并自动同步到成本倍率（需上游支持 GET /v1/sub2api/billing）"
+      },
+      "costAutoSync": "跟随上游倍率已开启，成本倍率由探测结果自动回写（当前值即生效值）",
+      "defaultRate": {
+        "label": "默认倍率",
+        "desc": "探测失败或上游不支持时的兜底倍率，开启跟随前必须配置",
+        "placeholder": "例如 1.0"
+      },
+      "markupType": {
+        "label": "加价方式",
+        "desc": "在上游倍率基础上的加价规则",
+        "options": {
+          "none": "不加价",
+          "percent": "百分比（如 0.1 = +10%）",
+          "fixed": "固定值（如 0.01 = +0.01）"
+        }
+      },
+      "markupValue": {
+        "label": "加价数值",
+        "desc": "百分比方式填小数（0.1 表示 +10%），固定值方式直接加到倍率上",
+        "placeholder": "0"
+      },
+      "lastSync": "最近同步：上游倍率 {rate}，时间 {time}"
+    },
     "activeTime": {
       "title": "调度时间窗口",
       "description": "在指定时间窗口内自动激活供应商",

@@ -431,6 +431,33 @@
         "placeholder": "1"
       }
     },
+    "upstreamRate": {
+      "follow": {
+        "label": "Follow upstream rate",
+        "desc": "Periodically probe the billing rate of the upstream sub2api and automatically sync it to the cost multiplier (requires upstream support for GET /v1/sub2api/billing)"
+      },
+      "costAutoSync": "Follow upstream rate is enabled. The cost multiplier is automatically written back from probe results (the current value is the effective value)",
+      "defaultRate": {
+        "label": "Default rate",
+        "desc": "Fallback rate used when probing fails or the upstream is not supported. Must be configured before enabling follow",
+        "placeholder": "e.g. 1.0"
+      },
+      "markupType": {
+        "label": "Markup type",
+        "desc": "Markup rule applied on top of the upstream rate",
+        "options": {
+          "none": "No markup",
+          "percent": "Percentage (e.g. 0.1 = +10%)",
+          "fixed": "Fixed value (e.g. 0.01 = +0.01)"
+        }
+      },
+      "markupValue": {
+        "label": "Markup value",
+        "desc": "For percentage mode enter a decimal (0.1 means +10%); for fixed mode the value is added directly to the rate",
+        "placeholder": "0"
+      },
+      "lastSync": "Last sync: upstream rate {rate}, at {time}"
+    },
     "activeTime": {
       "title": "Scheduled Active Time",
       "description": "Automatically activate provider during specific time windows",

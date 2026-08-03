@@ -73,6 +73,12 @@ function makeProvider(id: number, overrides: Record<string, unknown> = {}) {
     priority: 1,
     groupPriorities: null,
     costMultiplier: 1.0,
+    rateFollowUpstream: false,
+    rateDefaultMultiplier: null,
+    rateMarkupType: "none",
+    rateMarkupValue: 0,
+    upstreamRateMultiplier: null,
+    upstreamRateSyncedAt: null,
     groupTag: null,
     providerType: "claude",
     preserveClientIp: false,
@@ -239,6 +245,42 @@ describe("Provider Single Edit Undo Actions", () => {
     );
     expect(undone.data.revertedCount).toBe(1);
     expect(publishCacheInvalidationMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("undoProviderPatch should restore all upstream rate-follow fields", async () => {
+    findProviderByIdMock.mockResolvedValueOnce(
+      makeProvider(1, {
+        costMultiplier: 1.5,
+        rateFollowUpstream: true,
+        rateDefaultMultiplier: 1.2,
+        rateMarkupType: "percent",
+        rateMarkupValue: 0.1,
+      })
+    );
+
+    const { editProvider, undoProviderPatch } = await import("../../../src/actions/providers");
+    const edited = await editProvider(1, {
+      rate_follow_upstream: false,
+      rate_default_multiplier: 1.1,
+      rate_markup_type: "fixed",
+      rate_markup_value: 0.05,
+    });
+    if (!edited.ok) throw new Error(`Edit should succeed: ${edited.error}`);
+
+    updateProvidersBatchMock.mockClear();
+    const undone = await undoProviderPatch({
+      undoToken: edited.data.undoToken,
+      operationId: edited.data.operationId,
+    });
+
+    expect(undone.ok).toBe(true);
+    expect(updateProvidersBatchMock).toHaveBeenCalledWith([1], {
+      costMultiplier: "1.5",
+      rateFollowUpstream: true,
+      rateDefaultMultiplier: "1.2",
+      rateMarkupType: "percent",
+      rateMarkupValue: "0.1",
+    });
   });
 
   it("undoProviderPatch should atomically consume a volatile token before reverting", async () => {

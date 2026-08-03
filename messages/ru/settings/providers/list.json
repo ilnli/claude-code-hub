@@ -41,7 +41,14 @@
   "actionResetCircuit": "Сбросить автоматический выключатель",
   "actionResetUsage": "Сбросить использование",
   "actionDelete": "Удалить",
+  "actionSyncUpstreamRate": "Синхронизировать множитель",
   "selectProvider": "Выбрать {name}",
   "schedule": "Расписание",
-  "proxyEnabled": "Прокси включен"
+  "proxyEnabled": "Прокси включен",
+  "syncRateTitle": "Немедленно определить и синхронизировать множитель апстрима",
+  "syncRateSuccess": "Множитель апстрима синхронизирован",
+  "syncRateSuccessDesc": "{name}: множитель апстрима {upstreamRate}, действующий множитель {finalRate}",
+  "syncRateUnsupported": "Апстрим не поддерживает определение множителя",
+  "syncRateUnsupportedDesc": "Апстрим провайдера {name} не реализует протокол определения sub2api, выполнен откат к множителю по умолчанию",
+  "syncRateFailed": "Не удалось синхронизировать множитель апстрима"
 }

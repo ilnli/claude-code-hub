@@ -73,6 +73,8 @@ describe("saveSystemSettings", () => {
       cleanupSchedule: "0 3 * * *",
       cleanupBatchSize: 1000,
       enableClientVersionCheck: false,
+      upstreamBillingProbeEnabled: false,
+      upstreamBillingProbeIntervalMinutes: 30,
       verboseProviderError: false,
       passThroughUpstreamErrorMessage: true,
       enableHttp2: false,
@@ -138,6 +140,8 @@ describe("saveSystemSettings", () => {
   it("should call updateSystemSettings with validated data", async () => {
     const result = await saveSystemSettings({
       siteTitle: "New Site Title",
+      upstreamBillingProbeEnabled: true,
+      upstreamBillingProbeIntervalMinutes: 15,
       verboseProviderError: true,
       passThroughUpstreamErrorMessage: false,
     });
@@ -146,6 +150,8 @@ describe("saveSystemSettings", () => {
     expect(updateSystemSettingsMock).toHaveBeenCalledWith(
       expect.objectContaining({
         siteTitle: "New Site Title",
+        upstreamBillingProbeEnabled: true,
+        upstreamBillingProbeIntervalMinutes: 15,
         verboseProviderError: true,
         passThroughUpstreamErrorMessage: false,
       })

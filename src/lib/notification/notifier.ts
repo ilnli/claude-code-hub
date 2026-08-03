@@ -4,11 +4,10 @@ import type { CircuitBreakerAlertData } from "@/lib/webhook";
 import { generateCostAlerts } from "./tasks/cost-alert";
 import { generateDailyLeaderboard } from "./tasks/daily-leaderboard";
 
-/**
- * 发送熔断器告警通知
- * 防止重复推送：使用 Redis 缓存 5 分钟内不重复发送同一供应商的告警
- */
-export async function sendCircuitBreakerAlert(data: CircuitBreakerAlertData): Promise<void> {
+async function deliverCircuitBreakerAlert(
+  data: CircuitBreakerAlertData,
+  options: { deduplicate: boolean }
+): Promise<void> {
   try {
     // 检查是否开启熔断器告警
     const { getNotificationSettings } = await import("@/repository/notifications");
@@ -22,12 +21,12 @@ export async function sendCircuitBreakerAlert(data: CircuitBreakerAlertData): Pr
       return;
     }
 
-    // 防止 5 分钟内重复告警
-    const redisClient = getRedisClient();
+    // 常规熔断告警 5 分钟内去重；倍率探测要求每次失败都通知，因此显式跳过去重。
+    const redisClient = options.deduplicate ? getRedisClient() : null;
     const source = data.incidentSource ?? "provider";
     const dedupSuffix =
       source === "endpoint" && data.endpointId != null ? `endpoint:${data.endpointId}` : source;
-    if (redisClient) {
+    if (options.deduplicate && redisClient) {
       const cacheKey = `circuit-breaker-alert:${data.providerId}:${dedupSuffix}`;
       const cached = await redisClient.get(cacheKey);
 
@@ -126,6 +125,30 @@ export async function sendCircuitBreakerAlert(data: CircuitBreakerAlertData): Pr
       error: error instanceof Error ? error.message : String(error),
     });
   }
+}
+
+/**
+ * 发送熔断器告警通知。
+ * 防止重复推送：使用 Redis 缓存 5 分钟内不重复发送同一供应商的告警。
+ */
+export async function sendCircuitBreakerAlert(data: CircuitBreakerAlertData): Promise<void> {
+  await deliverCircuitBreakerAlert(data, { deduplicate: true });
+}
+
+/**
+ * 通过现有熔断告警通知渠道发送上游倍率探测失败。
+ * 此类告警不去重，确保每次失败都会进入通知队列。
+ */
+export async function sendUpstreamBillingProbeFailureAlert(
+  data: Omit<CircuitBreakerAlertData, "incidentSource">
+): Promise<void> {
+  await deliverCircuitBreakerAlert(
+    {
+      ...data,
+      incidentSource: "upstream_billing",
+    },
+    { deduplicate: false }
+  );
 }
 
 /**

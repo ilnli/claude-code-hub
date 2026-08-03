@@ -284,6 +284,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/providers/{id}/upstream-rate:sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sync upstream billing rate now
+         * @description Probes the upstream sub2api-compatible billing endpoint once and writes back the effective cost multiplier (with markup) for one provider. Requires rate_follow_upstream enabled on the provider.
+         */
+        post: operations["postProvidersByIdUpstreamRateSync"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/providers/upstream-rate:syncBatch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Batch sync upstream billing rates
+         * @description Probes upstream billing endpoints for multiple providers and writes back effective cost multipliers. Providers without rate_follow_upstream enabled are reported as skipped.
+         */
+        post: operations["postProvidersUpstreamRateSyncbatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/providers/{id}/limit-usage": {
         parameters: {
             query?: never;
@@ -4379,6 +4419,24 @@ export interface operations {
                             } | null;
                             /** @description Provider cost multiplier. */
                             costMultiplier: number;
+                            /** @description Whether the provider follows its upstream rate. */
+                            rateFollowUpstream: boolean;
+                            /** @description Fallback multiplier used when upstream rate probing is unsupported. */
+                            rateDefaultMultiplier: number | null;
+                            /**
+                             * @description Markup applied to the upstream rate.
+                             * @enum {string}
+                             */
+                            rateMarkupType: "none" | "percent" | "fixed";
+                            /** @description Markup value applied to the upstream rate. */
+                            rateMarkupValue: number;
+                            /** @description Most recently observed upstream rate multiplier. */
+                            upstreamRateMultiplier: number | null;
+                            /**
+                             * Format: date-time
+                             * @description Timestamp of the most recent successful upstream rate synchronization.
+                             */
+                            upstreamRateSyncedAt: string | null;
                             /** @description Provider group tag. */
                             groupTag: string | null;
                             /**
@@ -4690,6 +4748,17 @@ export interface operations {
                     priority?: number;
                     /** @description Provider cost multiplier. */
                     cost_multiplier?: number;
+                    /** @description Whether the provider follows its upstream rate. */
+                    rate_follow_upstream?: boolean;
+                    /** @description Fallback multiplier used when upstream rate probing is unsupported. */
+                    rate_default_multiplier?: number | null;
+                    /**
+                     * @description Markup mode applied to the upstream rate.
+                     * @enum {string}
+                     */
+                    rate_markup_type?: "none" | "percent" | "fixed";
+                    /** @description Markup value applied to the upstream rate. */
+                    rate_markup_value?: number;
                     /** @description Provider group tag. */
                     group_tag?: string | null;
                     /** @description Per-group priority overrides. */
@@ -4844,6 +4913,24 @@ export interface operations {
                         } | null;
                         /** @description Provider cost multiplier. */
                         costMultiplier: number;
+                        /** @description Whether the provider follows its upstream rate. */
+                        rateFollowUpstream: boolean;
+                        /** @description Fallback multiplier used when upstream rate probing is unsupported. */
+                        rateDefaultMultiplier: number | null;
+                        /**
+                         * @description Markup applied to the upstream rate.
+                         * @enum {string}
+                         */
+                        rateMarkupType: "none" | "percent" | "fixed";
+                        /** @description Markup value applied to the upstream rate. */
+                        rateMarkupValue: number;
+                        /** @description Most recently observed upstream rate multiplier. */
+                        upstreamRateMultiplier: number | null;
+                        /**
+                         * Format: date-time
+                         * @description Timestamp of the most recent successful upstream rate synchronization.
+                         */
+                        upstreamRateSyncedAt: string | null;
                         /** @description Provider group tag. */
                         groupTag: string | null;
                         /**
@@ -5166,6 +5253,24 @@ export interface operations {
                         } | null;
                         /** @description Provider cost multiplier. */
                         costMultiplier: number;
+                        /** @description Whether the provider follows its upstream rate. */
+                        rateFollowUpstream: boolean;
+                        /** @description Fallback multiplier used when upstream rate probing is unsupported. */
+                        rateDefaultMultiplier: number | null;
+                        /**
+                         * @description Markup applied to the upstream rate.
+                         * @enum {string}
+                         */
+                        rateMarkupType: "none" | "percent" | "fixed";
+                        /** @description Markup value applied to the upstream rate. */
+                        rateMarkupValue: number;
+                        /** @description Most recently observed upstream rate multiplier. */
+                        upstreamRateMultiplier: number | null;
+                        /**
+                         * Format: date-time
+                         * @description Timestamp of the most recent successful upstream rate synchronization.
+                         */
+                        upstreamRateSyncedAt: string | null;
                         /** @description Provider group tag. */
                         groupTag: string | null;
                         /**
@@ -5653,6 +5758,17 @@ export interface operations {
                     priority?: number;
                     /** @description Provider cost multiplier. */
                     cost_multiplier?: number;
+                    /** @description Whether the provider follows its upstream rate. */
+                    rate_follow_upstream?: boolean;
+                    /** @description Fallback multiplier used when upstream rate probing is unsupported. */
+                    rate_default_multiplier?: number | null;
+                    /**
+                     * @description Markup mode applied to the upstream rate.
+                     * @enum {string}
+                     */
+                    rate_markup_type?: "none" | "percent" | "fixed";
+                    /** @description Markup value applied to the upstream rate. */
+                    rate_markup_value?: number;
                     /** @description Provider group tag. */
                     group_tag?: string | null;
                     /** @description Per-group priority overrides. */
@@ -5812,6 +5928,24 @@ export interface operations {
                         } | null;
                         /** @description Provider cost multiplier. */
                         costMultiplier: number;
+                        /** @description Whether the provider follows its upstream rate. */
+                        rateFollowUpstream: boolean;
+                        /** @description Fallback multiplier used when upstream rate probing is unsupported. */
+                        rateDefaultMultiplier: number | null;
+                        /**
+                         * @description Markup applied to the upstream rate.
+                         * @enum {string}
+                         */
+                        rateMarkupType: "none" | "percent" | "fixed";
+                        /** @description Markup value applied to the upstream rate. */
+                        rateMarkupValue: number;
+                        /** @description Most recently observed upstream rate multiplier. */
+                        upstreamRateMultiplier: number | null;
+                        /**
+                         * Format: date-time
+                         * @description Timestamp of the most recent successful upstream rate synchronization.
+                         */
+                        upstreamRateSyncedAt: string | null;
                         /** @description Provider group tag. */
                         groupTag: string | null;
                         /**
@@ -7034,6 +7168,403 @@ export interface operations {
                 content: {
                     "application/json": {
                         [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Invalid request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Admin access required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Provider not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    postProvidersByIdUpstreamRateSync: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required only when authenticating with the auth-token cookie on mutation requests. */
+                "X-CCH-CSRF"?: string;
+            };
+            path: {
+                /** @description Provider id. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Upstream rate sync result. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Provider id. */
+                        providerId: number;
+                        /** @description Provider display name. */
+                        providerName: string;
+                        /**
+                         * @description Sync outcome: synced = upstream rate written back; unsupported_restored = upstream does not support probing and the default rate was restored; unsupported = upstream does not support probing (already at default); failed = probe error; skipped = follow-upstream not enabled; not_found = provider missing.
+                         * @enum {string}
+                         */
+                        status: "synced" | "unsupported_restored" | "unsupported" | "failed" | "skipped" | "not_found";
+                        /** @description Probed upstream rate (status=synced only). */
+                        upstreamRate?: number;
+                        /** @description Effective cost multiplier after markup (status=synced/unsupported_restored). */
+                        finalRate?: number;
+                        /** @description Failure detail (status=failed only). */
+                        error?: string;
+                    };
+                };
+            };
+            /** @description Invalid request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Admin access required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Provider not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    postProvidersUpstreamRateSyncbatch: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required only when authenticating with the auth-token cookie on mutation requests. */
+                "X-CCH-CSRF"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Provider ids. */
+                    providerIds: number[];
+                };
+            };
+        };
+        responses: {
+            /** @description Batch upstream rate sync summary. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Total requested provider count. */
+                        total: number;
+                        /** @description Successfully synced count. */
+                        synced: number;
+                        /** @description Providers whose upstream does not support probing. */
+                        unsupported: number;
+                        /** @description Failed (or not found) count. */
+                        failed: number;
+                        /** @description Skipped count (follow-upstream not enabled). */
+                        skipped: number;
+                        /** @description Per-provider sync results. */
+                        results: {
+                            /** @description Provider id. */
+                            providerId: number;
+                            /** @description Provider display name. */
+                            providerName: string;
+                            /**
+                             * @description Sync outcome: synced = upstream rate written back; unsupported_restored = upstream does not support probing and the default rate was restored; unsupported = upstream does not support probing (already at default); failed = probe error; skipped = follow-upstream not enabled; not_found = provider missing.
+                             * @enum {string}
+                             */
+                            status: "synced" | "unsupported_restored" | "unsupported" | "failed" | "skipped" | "not_found";
+                            /** @description Probed upstream rate (status=synced only). */
+                            upstreamRate?: number;
+                            /** @description Effective cost multiplier after markup (status=synced/unsupported_restored). */
+                            finalRate?: number;
+                            /** @description Failure detail (status=failed only). */
+                            error?: string;
+                        }[];
                     };
                 };
             };
@@ -12165,6 +12696,10 @@ export interface operations {
                         cleanupBatchSize?: number;
                         /** @description Whether client version checks are enabled. */
                         enableClientVersionCheck: boolean;
+                        /** @description Whether scheduled upstream billing-rate probing is enabled. */
+                        upstreamBillingProbeEnabled: boolean;
+                        /** @description Interval between scheduled upstream billing-rate probes in minutes. */
+                        upstreamBillingProbeIntervalMinutes: number;
                         /** @description Whether provider errors include extra diagnostics. */
                         verboseProviderError: boolean;
                         /** @description Whether sanitized upstream error messages are passed through. */
@@ -12452,6 +12987,10 @@ export interface operations {
                     cleanupBatchSize?: number;
                     /** @description Whether client version checks are enabled. */
                     enableClientVersionCheck?: boolean;
+                    /** @description Whether scheduled upstream billing-rate probing is enabled. */
+                    upstreamBillingProbeEnabled?: boolean;
+                    /** @description Interval between scheduled upstream billing-rate probes in minutes. */
+                    upstreamBillingProbeIntervalMinutes?: number;
                     /** @description Whether provider errors include extra diagnostics. */
                     verboseProviderError?: boolean;
                     /** @description Whether sanitized upstream error messages are passed through. */
@@ -12612,6 +13151,10 @@ export interface operations {
                         cleanupBatchSize?: number;
                         /** @description Whether client version checks are enabled. */
                         enableClientVersionCheck: boolean;
+                        /** @description Whether scheduled upstream billing-rate probing is enabled. */
+                        upstreamBillingProbeEnabled: boolean;
+                        /** @description Interval between scheduled upstream billing-rate probes in minutes. */
+                        upstreamBillingProbeIntervalMinutes: number;
                         /** @description Whether provider errors include extra diagnostics. */
                         verboseProviderError: boolean;
                         /** @description Whether sanitized upstream error messages are passed through. */

@@ -41,7 +41,14 @@
   "actionResetCircuit": "サーキットリセット",
   "actionResetUsage": "使用量リセット",
   "actionDelete": "削除",
+  "actionSyncUpstreamRate": "今すぐ倍率を同期",
   "selectProvider": "{name} を選択",
   "schedule": "スケジュール",
-  "proxyEnabled": "プロキシ有効"
+  "proxyEnabled": "プロキシ有効",
+  "syncRateTitle": "アップストリーム倍率を今すぐ検出して同期",
+  "syncRateSuccess": "アップストリーム倍率を同期しました",
+  "syncRateSuccessDesc": "{name}: アップストリーム倍率 {upstreamRate}、有効倍率 {finalRate}",
+  "syncRateUnsupported": "アップストリームは倍率検出に対応していません",
+  "syncRateUnsupportedDesc": "{name} のアップストリームは sub2api 検出プロトコルを実装していないため、デフォルト倍率にフォールバックしました",
+  "syncRateFailed": "アップストリーム倍率の同期に失敗しました"
 }

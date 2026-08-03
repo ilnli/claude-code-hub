@@ -494,6 +494,21 @@ export const CreateProviderSchema = z
       .optional()
       .default(null),
     cost_multiplier: z.coerce.number().min(0, "成本倍率不能为负数").optional().default(1.0),
+    // 上游倍率跟随（套娃场景）：开启前必须已配置默认倍率
+    rate_follow_upstream: z.boolean().optional().default(false),
+    rate_default_multiplier: z.coerce
+      .number()
+      .gt(0, "默认倍率必须大于 0")
+      .max(100, "默认倍率不能超过 100")
+      .nullable()
+      .optional(),
+    rate_markup_type: z.enum(["none", "percent", "fixed"]).optional().default("none"),
+    rate_markup_value: z.coerce
+      .number()
+      .min(0, "加价数值不能为负数")
+      .max(100, "加价数值不能超过 100")
+      .optional()
+      .default(0),
     group_tag: z.string().max(255, "分组标签不能超过255个字符").nullable().optional(),
     // Codex 支持:供应商类型和模型重定向
     provider_type: z
@@ -711,6 +726,18 @@ export const CreateProviderSchema = z
         path: ["active_time_end"],
       });
     }
+    // 开启跟随上游倍率时必须已配置默认倍率（未显式提供时由 action 层取 cost_multiplier 复制）
+    if (
+      data.rate_follow_upstream &&
+      data.rate_default_multiplier == null &&
+      data.cost_multiplier == null
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "开启跟随上游倍率前必须先配置默认倍率",
+        path: ["rate_default_multiplier"],
+      });
+    }
   });
 
 /**
@@ -743,6 +770,20 @@ export const UpdateProviderSchema = z
       .nullable()
       .optional(),
     cost_multiplier: z.coerce.number().min(0, "成本倍率不能为负数").optional(),
+    // 上游倍率跟随（套娃场景）：开启前必须已配置默认倍率
+    rate_follow_upstream: z.boolean().optional(),
+    rate_default_multiplier: z.coerce
+      .number()
+      .gt(0, "默认倍率必须大于 0")
+      .max(100, "默认倍率不能超过 100")
+      .nullable()
+      .optional(),
+    rate_markup_type: z.enum(["none", "percent", "fixed"]).optional(),
+    rate_markup_value: z.coerce
+      .number()
+      .min(0, "加价数值不能为负数")
+      .max(100, "加价数值不能超过 100")
+      .optional(),
     group_tag: z.string().max(255, "分组标签不能超过255个字符").nullable().optional(),
     // Codex 支持:供应商类型和模型重定向
     provider_type: z
@@ -951,6 +992,8 @@ export const UpdateProviderSchema = z
         path: ["active_time_end"],
       });
     }
+    // 注意：更新场景不在此处校验「跟随上游倍率需要默认倍率」——
+    // providers.cost_multiplier 在 DB 层 NOT NULL 恒存在，action 层会在开启跟随时复制兜底。
   });
 
 /**
@@ -1007,6 +1050,14 @@ export const UpdateSystemSettingsSchema = z
       .optional(),
     // 客户端版本检查配置（可选）
     enableClientVersionCheck: z.boolean().optional(),
+    // 上游倍率探测（可选）：全局开关与探测间隔（分钟）
+    upstreamBillingProbeEnabled: z.boolean().optional(),
+    upstreamBillingProbeIntervalMinutes: z.coerce
+      .number()
+      .int("探测间隔必须是整数")
+      .min(1, "探测间隔不能少于1分钟")
+      .max(1440, "探测间隔不能超过1440分钟")
+      .optional(),
     // 供应商不可用时是否返回详细错误信息（可选）
     verboseProviderError: z.boolean().optional(),
     // 标准代理错误响应是否透传安全脱敏后的上游错误 message（可选）

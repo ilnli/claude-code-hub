@@ -43,14 +43,18 @@ export interface CircuitBreakerAlertData {
   providerName: string;
   providerId: number;
   failureCount: number;
-  retryAt: string;
+  retryAt?: string;
   lastError?: string;
-  /** Incident source: 'provider' for key circuit, 'endpoint' for endpoint circuit */
-  incidentSource?: "provider" | "endpoint";
+  /** Incident source for provider, endpoint, or upstream billing probe alerts. */
+  incidentSource?: "provider" | "endpoint" | "upstream_billing";
   /** Endpoint ID when incidentSource is 'endpoint' */
   endpointId?: number;
   /** Endpoint URL when incidentSource is 'endpoint' */
   endpointUrl?: string;
+  /** Whether this failure caused the effective rate to fall back to its configured default. */
+  fallbackApplied?: boolean;
+  /** Effective fallback rate after markup, when available. */
+  fallbackRate?: number;
 }
 
 export interface DailyLeaderboardEntry {

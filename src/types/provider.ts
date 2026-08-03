@@ -1,6 +1,7 @@
 // 供应商类型枚举
 
 import type { CacheTtlPreference } from "./cache";
+import type { RateMarkupType } from "./upstream-billing";
 
 export type ProviderType =
   | "claude"
@@ -331,6 +332,15 @@ export interface Provider {
   priority: number;
   groupPriorities: Record<string, number> | null;
   costMultiplier: number;
+  // 上游倍率跟随（套娃场景）：开启后调度器自动回写 costMultiplier
+  rateFollowUpstream: boolean;
+  // 默认倍率：跟随失败/上游不支持时的兜底
+  rateDefaultMultiplier: number | null;
+  rateMarkupType: RateMarkupType;
+  rateMarkupValue: number;
+  // 最近一次探测到的上游倍率（仅观测用）
+  upstreamRateMultiplier: number | null;
+  upstreamRateSyncedAt: Date | null;
   groupTag: string | null;
 
   // 供应商类型：扩展支持 4 种类型
@@ -453,6 +463,13 @@ export interface ProviderDisplay {
   priority: number;
   groupPriorities: Record<string, number> | null;
   costMultiplier: number;
+  // 上游倍率跟随（套娃场景）
+  rateFollowUpstream: boolean;
+  rateDefaultMultiplier: number | null;
+  rateMarkupType: RateMarkupType;
+  rateMarkupValue: number;
+  upstreamRateMultiplier: number | null;
+  upstreamRateSyncedAt: Date | null;
   groupTag: string | null;
   // 供应商类型
   providerType: ProviderType;
@@ -575,6 +592,11 @@ export interface CreateProviderData {
   priority?: number;
   group_priorities?: Record<string, number> | null;
   cost_multiplier?: number;
+  // 上游倍率跟随（套娃场景）
+  rate_follow_upstream?: boolean;
+  rate_default_multiplier?: number | null;
+  rate_markup_type?: RateMarkupType;
+  rate_markup_value?: number;
   group_tag?: string | null;
 
   // 供应商类型和模型配置
@@ -660,6 +682,11 @@ export interface UpdateProviderData {
   priority?: number;
   group_priorities?: Record<string, number> | null;
   cost_multiplier?: number;
+  // 上游倍率跟随（套娃场景）
+  rate_follow_upstream?: boolean;
+  rate_default_multiplier?: number | null;
+  rate_markup_type?: RateMarkupType;
+  rate_markup_value?: number;
   group_tag?: string | null;
 
   // 供应商类型和模型配置

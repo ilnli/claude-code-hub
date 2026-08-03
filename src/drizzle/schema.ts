@@ -21,6 +21,7 @@ import type { AllowedModelRuleInput, ProviderModelRedirectRule, ProviderType } f
 import type { FilterOperation } from "@/lib/request-filter-types";
 import type { IpExtractionConfig } from "@/types/ip-extraction";
 import type { AuditCategory } from "@/types/audit-log";
+import type { RateMarkupType } from "@/types/upstream-billing";
 import type { RoutingTraceV1 } from "@/types/routing-trace";
 
 // Enums
@@ -198,6 +199,24 @@ export const providers = pgTable('providers', {
   priority: integer('priority').notNull().default(0),
   groupPriorities: jsonb('group_priorities').$type<Record<string, number> | null>().default(null),
   costMultiplier: numeric('cost_multiplier', { precision: 10, scale: 4 }).default('1.0'),
+
+  // 上游倍率跟随配置（套娃场景：上游为支持 GET /v1/sub2api/billing 探测的中转站）
+  // 开启后由上游倍率探测调度器自动回写 cost_multiplier = applyMarkup(upstream_rate)
+  rateFollowUpstream: boolean('rate_follow_upstream').notNull().default(false),
+  // 默认倍率：开启跟随前必须配置，探测失败/上游不支持时的兜底（关闭跟随时还原到 cost_multiplier）
+  rateDefaultMultiplier: numeric('rate_default_multiplier', { precision: 10, scale: 4 }),
+  // 加价方式：none=不加价，percent=上游×(1+value)，fixed=上游+value
+  rateMarkupType: varchar('rate_markup_type', { length: 10 })
+    .notNull()
+    .default('none')
+    .$type<RateMarkupType>(),
+  rateMarkupValue: numeric('rate_markup_value', { precision: 10, scale: 4 })
+    .notNull()
+    .default('0'),
+  // 最近一次探测到的上游倍率快照（resolved_rate_multiplier，仅观测用）
+  upstreamRateMultiplier: numeric('upstream_rate_multiplier', { precision: 10, scale: 4 }),
+  upstreamRateSyncedAt: timestamp('upstream_rate_synced_at', { withTimezone: true }),
+
   groupTag: varchar('group_tag', { length: 255 }),
 
   // 供应商类型：扩展支持 5 种类型
@@ -920,6 +939,12 @@ export const systemSettings = pgTable('system_settings', {
 
   // 客户端版本检查配置
   enableClientVersionCheck: boolean('enable_client_version_check').notNull().default(false),
+
+  // 上游倍率探测（套娃场景）：全局开关（默认关闭）与探测间隔（分钟）
+  upstreamBillingProbeEnabled: boolean('upstream_billing_probe_enabled').notNull().default(false),
+  upstreamBillingProbeIntervalMinutes: integer('upstream_billing_probe_interval_minutes')
+    .notNull()
+    .default(30),
 
   // 供应商不可用时是否返回详细错误信息
   verboseProviderError: boolean('verbose_provider_error').notNull().default(false),

@@ -125,6 +125,7 @@ describe("v1 action migration matrix", () => {
       "public-status",
       "provider-slots",
       "client-versions",
+      "upstream-billing",
     ];
 
     expect(ACTION_MIGRATION_MATRIX.map((entry) => entry.module).sort()).toEqual(

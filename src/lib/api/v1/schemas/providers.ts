@@ -10,6 +10,7 @@ export const HIDDEN_PROVIDER_TYPES = new Set(HIDDEN_PROVIDER_TYPE_VALUES);
 
 const NullableStringSchema = z.string().nullable();
 const CodexImageGenerationPreferenceSchema = z.enum(CODEX_IMAGE_GENERATION_PREFERENCE_VALUES);
+const RateMarkupTypeSchema = z.enum(["none", "percent", "fixed"]);
 
 export const ProviderListQuerySchema = z.object({
   q: z.string().trim().optional().describe("Case-insensitive provider search text."),
@@ -35,6 +36,22 @@ export const ProviderSummarySchema = z
     priority: z.number().int().describe("Provider routing priority."),
     groupPriorities: z.record(z.string(), z.number()).nullable().describe("Per-group priorities."),
     costMultiplier: z.number().describe("Provider cost multiplier."),
+    rateFollowUpstream: z.boolean().describe("Whether the provider follows its upstream rate."),
+    rateDefaultMultiplier: z
+      .number()
+      .nullable()
+      .describe("Fallback multiplier used when upstream rate probing is unsupported."),
+    rateMarkupType: RateMarkupTypeSchema.describe("Markup applied to the upstream rate."),
+    rateMarkupValue: z.number().describe("Markup value applied to the upstream rate."),
+    upstreamRateMultiplier: z
+      .number()
+      .nullable()
+      .describe("Most recently observed upstream rate multiplier."),
+    upstreamRateSyncedAt: z
+      .string()
+      .datetime({ offset: true })
+      .nullable()
+      .describe("Timestamp of the most recent successful upstream rate synchronization."),
     groupTag: NullableStringSchema.describe("Provider group tag."),
     providerType: ProviderTypeSchema,
     providerVendorId: z.number().int().nullable().describe("Provider vendor id."),
@@ -196,6 +213,31 @@ export const ProviderIdsBodySchema = z
     providerIds: z.array(z.number().int().positive()).min(1).max(500).describe("Provider ids."),
   })
   .strict();
+
+export const ProviderUpstreamRateSyncResultSchema = z.object({
+  providerId: z.number().describe("Provider id."),
+  providerName: z.string().describe("Provider display name."),
+  status: z
+    .enum(["synced", "unsupported_restored", "unsupported", "failed", "skipped", "not_found"])
+    .describe(
+      "Sync outcome: synced = upstream rate written back; unsupported_restored = upstream does not support probing and the default rate was restored; unsupported = upstream does not support probing (already at default); failed = probe error; skipped = follow-upstream not enabled; not_found = provider missing."
+    ),
+  upstreamRate: z.number().optional().describe("Probed upstream rate (status=synced only)."),
+  finalRate: z
+    .number()
+    .optional()
+    .describe("Effective cost multiplier after markup (status=synced/unsupported_restored)."),
+  error: z.string().optional().describe("Failure detail (status=failed only)."),
+});
+
+export const ProviderUpstreamRateBatchSyncResponseSchema = z.object({
+  total: z.number().describe("Total requested provider count."),
+  synced: z.number().describe("Successfully synced count."),
+  unsupported: z.number().describe("Providers whose upstream does not support probing."),
+  failed: z.number().describe("Failed (or not found) count."),
+  skipped: z.number().describe("Skipped count (follow-upstream not enabled)."),
+  results: z.array(ProviderUpstreamRateSyncResultSchema).describe("Per-provider sync results."),
+});
 
 const ProviderBatchUpdateFieldsSchema = z
   .object({
@@ -360,6 +402,26 @@ export const ProviderCreateSchema = z
     weight: z.number().int().min(1).max(100).optional().describe("Provider routing weight."),
     priority: z.number().int().min(0).optional().describe("Provider routing priority."),
     cost_multiplier: z.number().min(0).optional().describe("Provider cost multiplier."),
+    rate_follow_upstream: z
+      .boolean()
+      .optional()
+      .describe("Whether the provider follows its upstream rate."),
+    rate_default_multiplier: z
+      .number()
+      .gt(0)
+      .max(100)
+      .nullable()
+      .optional()
+      .describe("Fallback multiplier used when upstream rate probing is unsupported."),
+    rate_markup_type: RateMarkupTypeSchema.optional().describe(
+      "Markup mode applied to the upstream rate."
+    ),
+    rate_markup_value: z
+      .number()
+      .min(0)
+      .max(100)
+      .optional()
+      .describe("Markup value applied to the upstream rate."),
     group_tag: z.string().max(255).nullable().optional().describe("Provider group tag."),
     group_priorities: z
       .record(z.string(), z.number().int().min(0))

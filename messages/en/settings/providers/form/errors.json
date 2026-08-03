@@ -3,6 +3,7 @@
   "deleteFailed": "Failed to delete provider",
   "groupTagTooLong": "Provider group tags are too long (max {max} chars total)",
   "keyRequired": "Please enter an API key",
+  "rateDefaultRequired": "A default multiplier is required when following the upstream rate",
   "nameRequired": "Please enter a provider name",
   "invalidUrl": "Please enter a valid API address",
   "urlRequired": "Please enter an API address",

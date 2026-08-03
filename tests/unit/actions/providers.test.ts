@@ -650,6 +650,44 @@ describe("Provider Actions - Async Optimization", () => {
       );
     });
 
+    it("editProvider should reject clearing the default rate while upstream follow is enabled", async () => {
+      findProviderByIdMock.mockResolvedValueOnce({
+        id: 1,
+        name: "p1",
+        costMultiplier: 1.6,
+        rateFollowUpstream: true,
+        rateDefaultMultiplier: 1.2,
+      });
+      const { editProvider } = await import("@/actions/providers");
+
+      const result = await editProvider(1, { rate_default_multiplier: null });
+
+      expect(result).toMatchObject({
+        ok: false,
+        errorCode: "PROVIDER_RATE_DEFAULT_MULTIPLIER_REQUIRED",
+      });
+      expect(updateProviderMock).not.toHaveBeenCalled();
+    });
+
+    it("editProvider should repair a missing default rate on an existing followed provider", async () => {
+      findProviderByIdMock.mockResolvedValueOnce({
+        id: 1,
+        name: "p1",
+        costMultiplier: 1.6,
+        rateFollowUpstream: true,
+        rateDefaultMultiplier: null,
+      });
+      const { editProvider } = await import("@/actions/providers");
+
+      const result = await editProvider(1, { name: "p1-updated" });
+
+      expect(result.ok).toBe(true);
+      expect(updateProviderMock).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ rate_default_multiplier: 1.6 })
+      );
+    });
+
     it("editProvider: group or allowlist changes should also terminate sticky sessions", async () => {
       const { editProvider } = await import("@/actions/providers");
 

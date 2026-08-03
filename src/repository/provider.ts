@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, ne, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { db } from "@/drizzle/db";
 import {
   type ProviderBatchApplyLedgerResult,
@@ -199,6 +199,7 @@ async function restoreProviderInTransaction(
 }
 
 export async function createProvider(providerData: CreateProviderData): Promise<Provider> {
+  const updatedAt = new Date();
   const dbData = {
     name: providerData.name,
     url: providerData.url,
@@ -209,6 +210,14 @@ export async function createProvider(providerData: CreateProviderData): Promise<
     groupPriorities: providerData.group_priorities ?? null,
     costMultiplier:
       providerData.cost_multiplier != null ? providerData.cost_multiplier.toString() : "1.0",
+    rateFollowUpstream: providerData.rate_follow_upstream ?? false,
+    rateDefaultMultiplier:
+      providerData.rate_default_multiplier != null
+        ? providerData.rate_default_multiplier.toString()
+        : null,
+    rateMarkupType: providerData.rate_markup_type ?? "none",
+    rateMarkupValue:
+      providerData.rate_markup_value != null ? providerData.rate_markup_value.toString() : "0",
     groupTag: providerData.group_tag,
     providerType: providerData.provider_type,
     preserveClientIp: providerData.preserve_client_ip ?? false,
@@ -269,6 +278,7 @@ export async function createProvider(providerData: CreateProviderData): Promise<
     rpm: providerData.rpm,
     rpd: providerData.rpd,
     cc: providerData.cc,
+    updatedAt,
   };
 
   return db.transaction(async (tx) => {
@@ -298,6 +308,12 @@ export async function createProvider(providerData: CreateProviderData): Promise<
         weight: providers.weight,
         priority: providers.priority,
         costMultiplier: providers.costMultiplier,
+        rateFollowUpstream: providers.rateFollowUpstream,
+        rateDefaultMultiplier: providers.rateDefaultMultiplier,
+        rateMarkupType: providers.rateMarkupType,
+        rateMarkupValue: providers.rateMarkupValue,
+        upstreamRateMultiplier: providers.upstreamRateMultiplier,
+        upstreamRateSyncedAt: providers.upstreamRateSyncedAt,
         groupTag: providers.groupTag,
         providerType: providers.providerType,
         preserveClientIp: providers.preserveClientIp,
@@ -387,6 +403,12 @@ export async function findProviderList(
       priority: providers.priority,
       groupPriorities: providers.groupPriorities,
       costMultiplier: providers.costMultiplier,
+      rateFollowUpstream: providers.rateFollowUpstream,
+      rateDefaultMultiplier: providers.rateDefaultMultiplier,
+      rateMarkupType: providers.rateMarkupType,
+      rateMarkupValue: providers.rateMarkupValue,
+      upstreamRateMultiplier: providers.upstreamRateMultiplier,
+      upstreamRateSyncedAt: providers.upstreamRateSyncedAt,
       groupTag: providers.groupTag,
       providerType: providers.providerType,
       preserveClientIp: providers.preserveClientIp,
@@ -476,6 +498,12 @@ export async function findAllProvidersFresh(): Promise<Provider[]> {
       priority: providers.priority,
       groupPriorities: providers.groupPriorities,
       costMultiplier: providers.costMultiplier,
+      rateFollowUpstream: providers.rateFollowUpstream,
+      rateDefaultMultiplier: providers.rateDefaultMultiplier,
+      rateMarkupType: providers.rateMarkupType,
+      rateMarkupValue: providers.rateMarkupValue,
+      upstreamRateMultiplier: providers.upstreamRateMultiplier,
+      upstreamRateSyncedAt: providers.upstreamRateSyncedAt,
       groupTag: providers.groupTag,
       providerType: providers.providerType,
       preserveClientIp: providers.preserveClientIp,
@@ -569,6 +597,12 @@ export async function findProviderById(id: number): Promise<Provider | null> {
       priority: providers.priority,
       groupPriorities: providers.groupPriorities,
       costMultiplier: providers.costMultiplier,
+      rateFollowUpstream: providers.rateFollowUpstream,
+      rateDefaultMultiplier: providers.rateDefaultMultiplier,
+      rateMarkupType: providers.rateMarkupType,
+      rateMarkupValue: providers.rateMarkupValue,
+      upstreamRateMultiplier: providers.upstreamRateMultiplier,
+      upstreamRateSyncedAt: providers.upstreamRateSyncedAt,
       groupTag: providers.groupTag,
       providerType: providers.providerType,
       preserveClientIp: providers.preserveClientIp,
@@ -654,6 +688,18 @@ export async function updateProvider(
   if (providerData.cost_multiplier !== undefined)
     dbData.costMultiplier =
       providerData.cost_multiplier != null ? providerData.cost_multiplier.toString() : "1.0";
+  if (providerData.rate_follow_upstream !== undefined)
+    dbData.rateFollowUpstream = providerData.rate_follow_upstream;
+  if (providerData.rate_default_multiplier !== undefined)
+    dbData.rateDefaultMultiplier =
+      providerData.rate_default_multiplier != null
+        ? providerData.rate_default_multiplier.toString()
+        : null;
+  if (providerData.rate_markup_type !== undefined)
+    dbData.rateMarkupType = providerData.rate_markup_type;
+  if (providerData.rate_markup_value !== undefined)
+    dbData.rateMarkupValue =
+      providerData.rate_markup_value != null ? providerData.rate_markup_value.toString() : "0";
   if (providerData.group_tag !== undefined) dbData.groupTag = providerData.group_tag;
   if (providerData.provider_type !== undefined) dbData.providerType = providerData.provider_type;
   if (providerData.preserve_client_ip !== undefined)
@@ -820,6 +866,12 @@ export async function updateProvider(
         priority: providers.priority,
         groupPriorities: providers.groupPriorities,
         costMultiplier: providers.costMultiplier,
+        rateFollowUpstream: providers.rateFollowUpstream,
+        rateDefaultMultiplier: providers.rateDefaultMultiplier,
+        rateMarkupType: providers.rateMarkupType,
+        rateMarkupValue: providers.rateMarkupValue,
+        upstreamRateMultiplier: providers.upstreamRateMultiplier,
+        upstreamRateSyncedAt: providers.upstreamRateSyncedAt,
         groupTag: providers.groupTag,
         providerType: providers.providerType,
         preserveClientIp: providers.preserveClientIp,
@@ -1080,6 +1132,10 @@ export interface BatchProviderUpdates {
   priority?: number;
   weight?: number;
   costMultiplier?: string;
+  rateFollowUpstream?: boolean;
+  rateDefaultMultiplier?: string | null;
+  rateMarkupType?: Provider["rateMarkupType"];
+  rateMarkupValue?: string;
   groupTag?: string | null;
   modelRedirects?: ProviderModelRedirectRule[] | null;
   allowedModels?: AllowedModelRuleInput[] | null;
@@ -1238,6 +1294,18 @@ export async function updateProvidersBatch(
   }
   if (updates.costMultiplier !== undefined) {
     setClauses.costMultiplier = updates.costMultiplier;
+  }
+  if (updates.rateFollowUpstream !== undefined) {
+    setClauses.rateFollowUpstream = updates.rateFollowUpstream;
+  }
+  if (updates.rateDefaultMultiplier !== undefined) {
+    setClauses.rateDefaultMultiplier = updates.rateDefaultMultiplier;
+  }
+  if (updates.rateMarkupType !== undefined) {
+    setClauses.rateMarkupType = updates.rateMarkupType;
+  }
+  if (updates.rateMarkupValue !== undefined) {
+    setClauses.rateMarkupValue = updates.rateMarkupValue;
   }
   if (updates.groupTag !== undefined) {
     setClauses.groupTag = updates.groupTag;
@@ -2403,4 +2471,87 @@ export async function getProviderStatistics(): Promise<ProviderStatisticsRow[]> 
     });
     throw error;
   }
+}
+
+/**
+ * 查询开启了「跟随上游倍率」的供应商（供上游倍率探测调度器扫描）。
+ * 仅返回调度器探测所需的最小字段。
+ */
+export async function findFollowUpstreamProviders(): Promise<Provider[]> {
+  const rows = await db
+    .select()
+    .from(providers)
+    .where(
+      and(
+        eq(providers.rateFollowUpstream, true),
+        eq(providers.isEnabled, true),
+        isNull(providers.deletedAt)
+      )
+    );
+
+  return rows.map((row) => toProvider(row));
+}
+
+/**
+ * 上游倍率探测成功后回写结果：
+ * cost_multiplier = 加价后的最终倍率，并记录上游倍率快照与同步时间。
+ */
+export async function updateUpstreamBillingProbeResult(
+  id: number,
+  result: {
+    costMultiplier: number;
+    upstreamRateMultiplier: number;
+    syncedAt: Date;
+  },
+  expectedUpdatedAt: Date
+): Promise<boolean> {
+  const updated = await db
+    .update(providers)
+    .set({
+      costMultiplier: result.costMultiplier.toString(),
+      upstreamRateMultiplier: result.upstreamRateMultiplier.toString(),
+      upstreamRateSyncedAt: result.syncedAt,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(providers.id, id),
+        eq(providers.rateFollowUpstream, true),
+        isNull(providers.deletedAt),
+        gte(providers.updatedAt, expectedUpdatedAt),
+        lt(providers.updatedAt, new Date(expectedUpdatedAt.getTime() + 1))
+      )
+    )
+    .returning({ id: providers.id });
+
+  return updated.length > 0;
+}
+
+/**
+ * 上游不支持探测或连续失败达到阈值时，仅把 cost_multiplier 还原为
+ * 默认倍率（加价后），不动快照列。
+ */
+export async function restoreProviderCostMultiplier(
+  id: number,
+  costMultiplier: number,
+  expectedUpdatedAt: Date
+): Promise<boolean> {
+  const updated = await db
+    .update(providers)
+    .set({
+      costMultiplier: costMultiplier.toString(),
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(providers.id, id),
+        eq(providers.rateFollowUpstream, true),
+        isNull(providers.deletedAt),
+        gte(providers.updatedAt, expectedUpdatedAt),
+        lt(providers.updatedAt, new Date(expectedUpdatedAt.getTime() + 1))
+      )
+    )
+    .returning({ id: providers.id });
+
+  return updated.length > 0;
 }

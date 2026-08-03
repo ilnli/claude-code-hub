@@ -10,6 +10,7 @@ import {
   Globe,
   Key,
   MoreHorizontal,
+  RefreshCw,
   RotateCcw,
   ShieldCheck,
   Trash,
@@ -55,6 +56,7 @@ import {
   removeProvider,
   resetProviderCircuit,
   resetProviderTotalUsage,
+  syncProviderUpstreamRateNow,
   undoProviderDelete,
 } from "@/lib/api-client/v1/actions/providers";
 import {
@@ -183,6 +185,7 @@ function ProviderRichListItemInner({
   const [clipboardAvailable, setClipboardAvailable] = useState(false);
   const [resetPending, startResetTransition] = useTransition();
   const [resetUsagePending, startResetUsageTransition] = useTransition();
+  const [syncRatePending, startSyncRateTransition] = useTransition();
   const [deletePending, startDeleteTransition] = useTransition();
   const [togglePending, startToggleTransition] = useTransition();
 
@@ -390,6 +393,45 @@ function ProviderRichListItemInner({
         console.error("Failed to reset total usage:", error);
         toast.error(tList("resetUsageFailed"), {
           description: tList("deleteError"),
+        });
+      }
+    });
+  };
+
+  // 处理立即同步上游倍率（跟随上游倍率开启时可用）
+  const handleSyncUpstreamRate = () => {
+    startSyncRateTransition(async () => {
+      try {
+        const res = await syncProviderUpstreamRateNow(provider.id);
+        if (!res.ok) {
+          toast.error(tList("syncRateFailed"), {
+            description: res.error || tList("unknownError"),
+          });
+          return;
+        }
+        const data = res.data;
+        if (data?.status === "synced") {
+          toast.success(tList("syncRateSuccess"), {
+            description: tList("syncRateSuccessDesc", {
+              name: provider.name,
+              upstreamRate: data.upstreamRate ?? 0,
+              finalRate: data.finalRate ?? 0,
+            }),
+          });
+        } else if (data?.status === "unsupported" || data?.status === "unsupported_restored") {
+          toast.warning(tList("syncRateUnsupported"), {
+            description: tList("syncRateUnsupportedDesc", { name: provider.name }),
+          });
+        } else {
+          toast.error(tList("syncRateFailed"), {
+            description: data?.error || tList("unknownError"),
+          });
+        }
+        doInvalidate();
+      } catch (error) {
+        console.error("Failed to sync upstream rate:", error);
+        toast.error(tList("syncRateFailed"), {
+          description: tList("unknownError"),
         });
       }
     });
@@ -689,6 +731,12 @@ function ProviderRichListItemInner({
                   <DropdownMenuItem onClick={handleResetTotalUsage} disabled={resetUsagePending}>
                     <RotateCcw className="mr-2 h-4 w-4 text-blue-600" />
                     {tList("actionResetUsage")}
+                  </DropdownMenuItem>
+                )}
+                {provider.rateFollowUpstream && (
+                  <DropdownMenuItem onClick={handleSyncUpstreamRate} disabled={syncRatePending}>
+                    <RefreshCw className="mr-2 h-4 w-4 text-emerald-600" />
+                    {tList("actionSyncUpstreamRate")}
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuSeparator />
@@ -1024,6 +1072,22 @@ function ProviderRichListItemInner({
               disabled={resetUsagePending}
             >
               <RotateCcw className="h-4 w-4 text-blue-600" />
+            </Button>
+          )}
+          {canEdit && provider.rateFollowUpstream && (
+            <Button
+              size="icon"
+              variant="ghost"
+              title={tList("syncRateTitle")}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleSyncUpstreamRate();
+              }}
+              disabled={syncRatePending}
+            >
+              <RefreshCw
+                className={cn("h-4 w-4 text-emerald-600", syncRatePending && "animate-spin")}
+              />
             </Button>
           )}
           {canEdit && (

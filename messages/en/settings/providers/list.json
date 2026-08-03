@@ -41,7 +41,14 @@
   "actionResetCircuit": "Reset Circuit",
   "actionResetUsage": "Reset Usage",
   "actionDelete": "Delete",
+  "actionSyncUpstreamRate": "Sync Rate Now",
   "selectProvider": "Select {name}",
   "schedule": "Schedule",
-  "proxyEnabled": "Proxy enabled"
+  "proxyEnabled": "Proxy enabled",
+  "syncRateTitle": "Probe and sync upstream rate now",
+  "syncRateSuccess": "Upstream rate synced",
+  "syncRateSuccessDesc": "{name}: upstream rate {upstreamRate}, effective rate {finalRate}",
+  "syncRateUnsupported": "Upstream does not support rate probing",
+  "syncRateUnsupportedDesc": "The upstream of {name} does not implement the sub2api probing protocol; reverted to the default rate",
+  "syncRateFailed": "Failed to sync upstream rate"
 }

@@ -96,6 +96,8 @@ export async function POST(req: Request) {
       cleanupSchedule: validated.cleanupSchedule,
       cleanupBatchSize: validated.cleanupBatchSize,
       enableClientVersionCheck: validated.enableClientVersionCheck,
+      upstreamBillingProbeEnabled: validated.upstreamBillingProbeEnabled,
+      upstreamBillingProbeIntervalMinutes: validated.upstreamBillingProbeIntervalMinutes,
       verboseProviderError: validated.verboseProviderError,
       passThroughUpstreamErrorMessage: validated.passThroughUpstreamErrorMessage,
       enableHttp2: validated.enableHttp2,

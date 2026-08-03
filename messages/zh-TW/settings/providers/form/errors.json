@@ -3,6 +3,7 @@
   "deleteFailed": "刪除供應商失敗",
   "groupTagTooLong": "分組標籤總長度不能超過 {max} 個字元",
   "keyRequired": "請輸入 API 金鑰",
+  "rateDefaultRequired": "啟用跟隨上游倍率時必須填寫預設倍率",
   "nameRequired": "請輸入供應商名稱",
   "invalidUrl": "請輸入有效的 API 位址",
   "urlRequired": "請先填寫供應商 URL",

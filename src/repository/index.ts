@@ -41,12 +41,15 @@ export {
 export {
   createProvider,
   deleteProvider,
+  findFollowUpstreamProviders,
   findProviderById,
   findProviderList,
   getDistinctProviderGroups,
   restoreProvider,
+  restoreProviderCostMultiplier,
   restoreProvidersBatch,
   updateProvider,
+  updateUpstreamBillingProbeResult,
 } from "./provider";
 export type { ProviderEndpointProbeTarget } from "./provider-endpoints";
 export {

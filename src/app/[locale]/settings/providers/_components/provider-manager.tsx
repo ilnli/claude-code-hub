@@ -707,6 +707,7 @@ export function ProviderManager({
 
       <ProviderBatchActions
         selectedCount={selectedProviderIds.size}
+        selectedProviderIds={[...selectedProviderIds]}
         isVisible={isMultiSelectMode}
         onAction={handleBatchAction}
         onClose={handleExitMultiSelectMode}

@@ -177,5 +177,35 @@ describe("sendCircuitBreakerAlert", () => {
       // Should have checked cache twice
       expect(mockRedisGet).toHaveBeenCalledTimes(2);
     });
+
+    it("should enqueue every upstream billing probe failure without deduplication", async () => {
+      const { sendUpstreamBillingProbeFailureAlert } = await import("@/lib/notification/notifier");
+      const data = {
+        providerName: "Nested Provider",
+        providerId: 8,
+        failureCount: 1,
+        lastError: "missing resolved_rate_multiplier",
+        fallbackApplied: false,
+      };
+
+      await sendUpstreamBillingProbeFailureAlert(data);
+      await sendUpstreamBillingProbeFailureAlert({ ...data, failureCount: 2 });
+
+      expect(mockRedisGet).not.toHaveBeenCalled();
+      expect(mockRedisSet).not.toHaveBeenCalled();
+      expect(mockAddNotificationJob).toHaveBeenCalledTimes(2);
+      expect(mockAddNotificationJob).toHaveBeenNthCalledWith(
+        1,
+        "circuit-breaker",
+        expect.any(String),
+        expect.objectContaining({ incidentSource: "upstream_billing", failureCount: 1 })
+      );
+      expect(mockAddNotificationJob).toHaveBeenNthCalledWith(
+        2,
+        "circuit-breaker",
+        expect.any(String),
+        expect.objectContaining({ incidentSource: "upstream_billing", failureCount: 2 })
+      );
+    });
   });
 });

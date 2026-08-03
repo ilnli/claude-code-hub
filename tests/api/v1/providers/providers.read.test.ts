@@ -96,6 +96,12 @@ function provider(overrides: Partial<ProviderDisplay> = {}): ProviderDisplay {
     priority: 0,
     groupPriorities: null,
     costMultiplier: 1,
+    rateFollowUpstream: true,
+    rateDefaultMultiplier: 1.2,
+    rateMarkupType: "percent",
+    rateMarkupValue: 0.1,
+    upstreamRateMultiplier: 1.6,
+    upstreamRateSyncedAt: new Date("2026-04-28T12:00:00.000Z"),
     groupTag: "default",
     providerType: "claude",
     providerVendorId: 1,
@@ -458,6 +464,12 @@ describe("v1 providers read endpoints", () => {
     const firstProvider = (list.json as { items: Array<Record<string, unknown>> }).items[0];
     expect(firstProvider).toMatchObject({
       url: "https://REDACTED:REDACTED@api.anthropic.com/",
+      rateFollowUpstream: true,
+      rateDefaultMultiplier: 1.2,
+      rateMarkupType: "percent",
+      rateMarkupValue: 0.1,
+      upstreamRateMultiplier: 1.6,
+      upstreamRateSyncedAt: "2026-04-28T12:00:00.000Z",
       proxyUrl: "http://REDACTED:REDACTED@proxy.example.com:8080/",
       customHeaders: {
         "cf-aig-authorization": "[REDACTED]",
@@ -597,25 +609,47 @@ describe("v1 providers read endpoints", () => {
         url: "https://new.example.com",
         key: "sk-new",
         provider_type: "openai-compatible",
+        rate_follow_upstream: true,
+        rate_default_multiplier: 1.2,
+        rate_markup_type: "percent",
+        rate_markup_value: 0.1,
       },
     });
     expect(created.response.status).toBe(201);
     expect(created.response.headers.get("Location")).toBe("/api/v1/providers/4");
     expect(addProviderMock).toHaveBeenCalledWith(
-      expect.objectContaining({ provider_type: "openai-compatible" })
+      expect.objectContaining({
+        provider_type: "openai-compatible",
+        rate_follow_upstream: true,
+        rate_default_multiplier: 1.2,
+        rate_markup_type: "percent",
+        rate_markup_value: 0.1,
+      })
     );
 
     const updated = await callV1Route({
       method: "PATCH",
       pathname: "/api/v1/providers/1",
       headers: { Authorization: "Bearer admin-token" },
-      body: { name: "Updated provider" },
+      body: {
+        name: "Updated provider",
+        rate_follow_upstream: false,
+        rate_default_multiplier: 1.1,
+        rate_markup_type: "fixed",
+        rate_markup_value: 0.05,
+      },
     });
     expect(updated.response.status).toBe(200);
     expect(updated.response.headers.get("X-CCH-Undo-Token")).toBe("undo-1");
     expect(updated.response.headers.get("X-CCH-Operation-Id")).toBe("op-1");
     expect(updated.json).toMatchObject({ id: 1, name: "Updated provider" });
-    expect(editProviderMock).toHaveBeenCalledWith(1, { name: "Updated provider" });
+    expect(editProviderMock).toHaveBeenCalledWith(1, {
+      name: "Updated provider",
+      rate_follow_upstream: false,
+      rate_default_multiplier: 1.1,
+      rate_markup_type: "fixed",
+      rate_markup_value: 0.05,
+    });
 
     const deleted = await callV1Route({
       method: "DELETE",

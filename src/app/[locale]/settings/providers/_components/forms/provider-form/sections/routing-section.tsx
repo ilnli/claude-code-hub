@@ -397,7 +397,11 @@ export function RoutingSection({ subSectionRefs }: RoutingSectionProps) {
 
             <SmartInputWrapper
               label={t("sections.routing.scheduleParams.costMultiplier.label")}
-              description={t("sections.routing.scheduleParams.costMultiplier.desc")}
+              description={
+                !isBatch && state.routing.rateFollowUpstream
+                  ? t("sections.routing.upstreamRate.costAutoSync")
+                  : t("sections.routing.scheduleParams.costMultiplier.desc")
+              }
             >
               <div className="space-y-2">
                 <Input
@@ -418,7 +422,7 @@ export function RoutingSection({ subSectionRefs }: RoutingSectionProps) {
                   }}
                   onFocus={(e) => e.target.select()}
                   placeholder={t("sections.routing.scheduleParams.costMultiplier.placeholder")}
-                  disabled={state.ui.isPending}
+                  disabled={state.ui.isPending || (!isBatch && state.routing.rateFollowUpstream)}
                   min="0"
                   step="0.0001"
                 />
@@ -428,6 +432,124 @@ export function RoutingSection({ subSectionRefs }: RoutingSectionProps) {
               </div>
             </SmartInputWrapper>
           </div>
+
+          {/* Upstream rate follow (nested-upstream scenario; batch mode not supported) */}
+          {!isBatch && (
+            <div className="mt-4 space-y-3">
+              <ToggleRow
+                label={t("sections.routing.upstreamRate.follow.label")}
+                description={t("sections.routing.upstreamRate.follow.desc")}
+              >
+                <Switch
+                  id={isEdit ? "edit-rate-follow-upstream" : "rate-follow-upstream"}
+                  checked={state.routing.rateFollowUpstream}
+                  onCheckedChange={(checked) =>
+                    dispatch({ type: "SET_RATE_FOLLOW_UPSTREAM", payload: checked })
+                  }
+                  disabled={state.ui.isPending}
+                />
+              </ToggleRow>
+
+              {state.routing.rateFollowUpstream && (
+                <div className="space-y-3">
+                  <SmartInputWrapper
+                    label={t("sections.routing.upstreamRate.defaultRate.label")}
+                    description={t("sections.routing.upstreamRate.defaultRate.desc")}
+                  >
+                    <Input
+                      id={isEdit ? "edit-rate-default-multiplier" : "rate-default-multiplier"}
+                      type="number"
+                      value={state.routing.rateDefaultMultiplier ?? ""}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value === "") {
+                          dispatch({ type: "SET_RATE_DEFAULT_MULTIPLIER", payload: null });
+                          return;
+                        }
+                        const num = parseFloat(value);
+                        dispatch({
+                          type: "SET_RATE_DEFAULT_MULTIPLIER",
+                          payload: Number.isNaN(num) ? null : num,
+                        });
+                      }}
+                      onFocus={(e) => e.target.select()}
+                      placeholder={t("sections.routing.upstreamRate.defaultRate.placeholder")}
+                      disabled={state.ui.isPending}
+                      min="0.0001"
+                      step="0.0001"
+                    />
+                  </SmartInputWrapper>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <SmartInputWrapper
+                      label={t("sections.routing.upstreamRate.markupType.label")}
+                      description={t("sections.routing.upstreamRate.markupType.desc")}
+                    >
+                      <Select
+                        value={state.routing.rateMarkupType}
+                        onValueChange={(value) =>
+                          dispatch({
+                            type: "SET_RATE_MARKUP_TYPE",
+                            payload: value as "none" | "percent" | "fixed",
+                          })
+                        }
+                        disabled={state.ui.isPending}
+                      >
+                        <SelectTrigger id={isEdit ? "edit-rate-markup-type" : "rate-markup-type"}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">
+                            {t("sections.routing.upstreamRate.markupType.options.none")}
+                          </SelectItem>
+                          <SelectItem value="percent">
+                            {t("sections.routing.upstreamRate.markupType.options.percent")}
+                          </SelectItem>
+                          <SelectItem value="fixed">
+                            {t("sections.routing.upstreamRate.markupType.options.fixed")}
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </SmartInputWrapper>
+
+                    <SmartInputWrapper
+                      label={t("sections.routing.upstreamRate.markupValue.label")}
+                      description={t("sections.routing.upstreamRate.markupValue.desc")}
+                    >
+                      <Input
+                        id={isEdit ? "edit-rate-markup-value" : "rate-markup-value"}
+                        type="number"
+                        value={state.routing.rateMarkupValue}
+                        onChange={(e) => {
+                          const num = parseFloat(e.target.value);
+                          dispatch({
+                            type: "SET_RATE_MARKUP_VALUE",
+                            payload: Number.isNaN(num) ? 0 : num,
+                          });
+                        }}
+                        onFocus={(e) => e.target.select()}
+                        placeholder={t("sections.routing.upstreamRate.markupValue.placeholder")}
+                        disabled={state.ui.isPending || state.routing.rateMarkupType === "none"}
+                        min="0"
+                        step="0.0001"
+                      />
+                    </SmartInputWrapper>
+                  </div>
+
+                  {isEdit && provider?.upstreamRateMultiplier != null && (
+                    <p className="text-xs text-muted-foreground">
+                      {t("sections.routing.upstreamRate.lastSync", {
+                        rate: provider.upstreamRateMultiplier,
+                        time: provider.upstreamRateSyncedAt
+                          ? new Date(provider.upstreamRateSyncedAt).toLocaleString()
+                          : "-",
+                      })}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Per-Group Priority Override */}
           {state.routing.groupTag.length > 0 && (

@@ -99,6 +99,7 @@ function createDbMock(insertedRow: ProviderRow) {
     mocks: {
       transactionMock,
       insertMock,
+      insertValuesMock,
     },
   };
 }
@@ -139,6 +140,9 @@ describe("provider repository - createProvider transactional endpoint seeding", 
     expect(provider.id).toBe(101);
     expect(dbState.mocks.transactionMock).toHaveBeenCalledTimes(1);
     expect(dbState.mocks.insertMock).toHaveBeenCalledTimes(1);
+    expect(dbState.mocks.insertValuesMock).toHaveBeenCalledWith(
+      expect.objectContaining({ updatedAt: expect.any(Date) })
+    );
 
     expect(getOrCreateProviderVendorIdFromUrlsMock).toHaveBeenCalledWith(
       expect.objectContaining({

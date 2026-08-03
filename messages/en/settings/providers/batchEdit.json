@@ -4,7 +4,8 @@
     "edit": "Edit",
     "test": "Test",
     "resetCircuit": "Reset Circuit",
-    "delete": "Delete"
+    "delete": "Delete",
+    "syncRate": "Sync Rate"
   },
   "enterMode": "Batch Edit",
   "selectionHint": "Select providers to batch edit",
@@ -106,5 +107,7 @@
     "label": "(mixed values)",
     "tooltip": "Selected providers have different values:",
     "andMore": "...and {count} more"
-  }
+  },
+  "syncRateSummary": "Sync complete: {synced} succeeded, {unsupported} unsupported, {failed} failed, {skipped} skipped",
+  "syncRateFailed": "Failed to batch sync upstream rates"
 }

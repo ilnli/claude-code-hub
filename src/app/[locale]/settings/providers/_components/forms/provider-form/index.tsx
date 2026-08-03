@@ -272,6 +272,10 @@ function ProviderFormContent({
       return t("errors.keyRequired");
     }
 
+    if (state.routing.rateFollowUpstream && state.routing.rateDefaultMultiplier == null) {
+      return t("errors.rateDefaultRequired");
+    }
+
     // Custom headers JSON: parse-on-submit; invalid input maps to a localized message
     if (mode !== "batch") {
       const customHeadersResult = parseCustomHeadersJsonText(state.routing.customHeadersText);
@@ -349,6 +353,10 @@ function ProviderFormContent({
               : null,
           weight: state.routing.weight,
           cost_multiplier: state.routing.costMultiplier,
+          rate_follow_upstream: state.routing.rateFollowUpstream,
+          rate_default_multiplier: state.routing.rateDefaultMultiplier,
+          rate_markup_type: state.routing.rateMarkupType,
+          rate_markup_value: state.routing.rateMarkupValue,
           group_tag: state.routing.groupTag.length > 0 ? state.routing.groupTag.join(",") : null,
           cache_ttl_preference: state.routing.cacheTtlPreference,
           swap_cache_ttl_billing: state.routing.swapCacheTtlBilling,

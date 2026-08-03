@@ -173,7 +173,14 @@
     "replayEnabled": "Request Replay",
     "replayEnabledDesc": "Caches upstream responses and reuses upstream connections: identical concurrent or reconnecting requests attach to the in-flight stream instead of re-hitting the provider. Follows the ENABLE_REQUEST_REPLAY environment variable until saved here. Default on.",
     "cacheEffectivenessEnabled": "Prefix Cache Simulation",
-    "cacheEffectivenessEnabledDesc": "Simulates longest-prefix cache hit rates (theoretical vs actual) for observability only; never affects routing. Follows the ENABLE_CACHE_EFFECTIVENESS environment variable until saved here. Default on."
+    "cacheEffectivenessEnabledDesc": "Simulates longest-prefix cache hit rates (theoretical vs actual) for observability only; never affects routing. Follows the ENABLE_CACHE_EFFECTIVENESS environment variable until saved here. Default on.",
+    "upstreamBillingProbeEnabled": "Enable upstream rate probe",
+    "upstreamBillingProbeEnabledDesc": "When enabled, probes all providers with \"Follow upstream rate\" turned on at the configured interval; when disabled, no probe requests are made",
+    "upstreamBillingProbeIntervalRequired": "Probe interval (minutes)",
+    "upstreamBillingProbeIntervalPlaceholder": "30",
+    "upstreamBillingProbeIntervalDesc": "Probe interval per provider, range 1-1440 minutes, default 30 minutes",
+    "upstreamBillingProbeHint": "After a successful probe, the provider's cost multiplier is automatically updated to the result of \"upstream rate + markup rule\"; on probe failure it falls back to the default rate configured for that provider",
+    "upstreamBillingProbeSaved": "Upstream rate probe settings saved"
   },
   "ipLogging": {
     "title": "IP logging & extraction",
@@ -193,6 +200,10 @@
     "siteParams": {
       "description": "Configure site title, currency display unit, and dashboard statistics display policy.",
       "title": "Site Parameters"
+    },
+    "upstreamBillingProbe": {
+      "title": "Upstream Rate Probe",
+      "description": "Automatically follow the billing rate of an upstream sub2api in nested proxy scenarios"
     }
   },
   "siteSettings": "Site Parameters",

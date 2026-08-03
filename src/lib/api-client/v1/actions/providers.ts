@@ -1,4 +1,8 @@
 import type { EditProviderResult, RemoveProviderResult } from "@/actions/providers";
+import type {
+  UpstreamRateBatchSyncSummary,
+  UpstreamRateSyncResult,
+} from "@/actions/upstream-billing";
 import { DASHBOARD_COMPAT_HEADER } from "@/lib/api/v1/_shared/constants";
 import type {
   ProviderDisplay,
@@ -23,6 +27,10 @@ export type {
   ProviderBatchPreviewRow,
   RemoveProviderResult,
 } from "@/actions/providers";
+export type {
+  UpstreamRateBatchSyncSummary,
+  UpstreamRateSyncResult,
+} from "@/actions/upstream-billing";
 export type {
   ProviderCircuitHealth,
   ProviderDisplay,
@@ -118,6 +126,26 @@ export function resetProviderCircuit(providerId: number) {
 export function resetProviderTotalUsage(providerId: number) {
   return toActionResult(
     apiPost(`/api/v1/providers/${providerId}/usage:reset`, undefined, dashboardCompatOptions)
+  );
+}
+
+export function syncProviderUpstreamRateNow(providerId: number) {
+  return toActionResult(
+    apiPost<UpstreamRateSyncResult>(
+      `/api/v1/providers/${providerId}/upstream-rate:sync`,
+      undefined,
+      dashboardCompatOptions
+    )
+  );
+}
+
+export function syncProvidersUpstreamRateBatch(providerIds: number[]) {
+  return toActionResult(
+    apiPost<UpstreamRateBatchSyncSummary>(
+      `/api/v1/providers/upstream-rate:syncBatch`,
+      { providerIds },
+      dashboardCompatOptions
+    )
   );
 }
 
