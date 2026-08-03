@@ -28,10 +28,16 @@ import type { Provider } from "@/types/provider";
  * 4. 成功后回写 cost_multiplier = applyMarkup(resolved_rate_multiplier)，
  *    并记录上游倍率快照与同步时间；
  * 5. 常规失败时，前两次保留上次成功倍率，第三次起回退默认倍率；
- *    每次失败均通知，并按 ×2（封顶 ×8）退避。HTTP 400/404 则立即用默认倍率兜底，
- *    并固定为 8 倍间隔降频。
+ *    每次失败均通知，并按 ×2（封顶 ×8）退避。HTTP 404 则立即用默认倍率兜底，
+ *    并固定为 8 倍间隔降频；
+ * 6. provider_changed（管理员并发改动导致 CAS 写入跳过）不算上游故障：
+ *    只刷新本轮尝试时间，不计入连续失败、不发失败通知。
  *
- * 进程内内存态（lastAttempt/连续失败/退避）不持久化：重启后重新计数。
+ * 到期判定优先读进程内内存态；没有内存态时（进程重启、或 leader 轮换到未探测过的实例）
+ * 回落到库里的 upstream_rate_synced_at，因此成功节奏可跨实例存活，
+ * 不会在每次 leader 切换时把所有 provider 重新探测一遍。
+ * 已知取舍：连续失败计数与退避倍数仍只存在于进程内存，不持久化——
+ * 进程重启或 leader 切换后从零重新计数。
  */
 
 const LOCK_KEY = "locks:upstream-billing-probe-scheduler";
@@ -115,12 +121,19 @@ function filterDueProviders(providers: Provider[], intervalMs: number, nowMs: nu
   const memory = getMemory();
   return providers.filter((provider) => {
     const entry = memory.get(provider.id);
-    if (!entry) {
-      // 从未探测过：立即到期
+    if (entry) {
+      // 内存态优先：同时编码了失败计数与退避倍数
+      const dueAtMs = entry.lastAttemptAtMs + intervalMs * getBackoffMultiplier(entry);
+      return nowMs >= dueAtMs;
+    }
+
+    // 本进程无内存态（重启或 leader 切换）：回落到库里的上次成功同步时间
+    const syncedAtMs = provider.upstreamRateSyncedAt?.getTime();
+    if (syncedAtMs == null || !Number.isFinite(syncedAtMs)) {
+      // 确实从未成功同步过：立即到期
       return true;
     }
-    const dueAtMs = entry.lastAttemptAtMs + intervalMs * getBackoffMultiplier(entry);
-    return nowMs >= dueAtMs;
+    return nowMs >= syncedAtMs + intervalMs;
   });
 }
 
@@ -150,18 +163,26 @@ function recordAttempt(providerId: number, entry: ProbeMemoryEntry): void {
 }
 
 /**
+ * 管理员并发改动 provider 导致 CAS 写入被跳过：上游本身没出问题，
+ * 不计入连续失败、不告警，下一轮按常规间隔重试即可。
+ */
+function isConcurrentProviderChange(outcome: UpstreamRateSyncOutcome): boolean {
+  return outcome.status === "failed" && outcome.reason === "provider_changed";
+}
+
+/**
  * 记录一次同步结果到调度器内存态（定时探测与手动「立即同步」共用）。
  * 手动同步后按全间隔重新计时，避免紧接着被定时任务重复探测。
  */
 export function noteUpstreamRateSyncOutcome(
   providerId: number,
-  status: UpstreamRateSyncOutcome["status"]
+  outcome: UpstreamRateSyncOutcome
 ): number {
   const previous = getMemory().get(providerId);
   const nowMs = Date.now();
   let entry: ProbeMemoryEntry;
 
-  switch (status) {
+  switch (outcome.status) {
     case "synced":
       entry = { lastAttemptAtMs: nowMs, failures: 0, unsupported: false };
       break;
@@ -174,6 +195,15 @@ export function noteUpstreamRateSyncOutcome(
       };
       break;
     default:
+      if (isConcurrentProviderChange(outcome)) {
+        // 只刷新尝试时间，保留既有失败计数与 unsupported 标记
+        entry = {
+          lastAttemptAtMs: nowMs,
+          failures: previous?.failures ?? 0,
+          unsupported: previous?.unsupported ?? false,
+        };
+        break;
+      }
       entry = {
         lastAttemptAtMs: nowMs,
         failures: (previous?.failures ?? 0) + 1,
@@ -221,8 +251,8 @@ export async function syncAndTrackProviderUpstreamRate(
     };
   }
 
-  const failureCount = noteUpstreamRateSyncOutcome(provider.id, outcome.status);
-  if (outcome.status !== "synced") {
+  const failureCount = noteUpstreamRateSyncOutcome(provider.id, outcome);
+  if (outcome.status !== "synced" && !isConcurrentProviderChange(outcome)) {
     const fallbackApplied =
       outcome.status === "unsupported_restored" ||
       (outcome.status === "failed" && outcome.fallbackApplied === true);

@@ -892,20 +892,25 @@ export async function editProvider(
         };
       }
 
-      // 新开启跟随或修复历史缺失值时，以当前成本倍率作为默认倍率。
-      if (
-        payload.rate_default_multiplier === undefined ||
-        payload.rate_default_multiplier === null
-      ) {
-        payload.rate_default_multiplier = currentProvider.costMultiplier;
+      // 请求未显式给出默认倍率时：仅在库中也缺失（新开启跟随、或修复历史遗留空值）才用当前
+      // 成本倍率兜底。跟随期间 cost_multiplier 会被探测任务按加价规则回写，若无条件回填，
+      // 任何局部编辑（启用开关、权重/优先级微调、REST PATCH）都会冲掉管理员配置的默认倍率。
+      if (payload.rate_default_multiplier == null) {
+        if (currentProvider.rateDefaultMultiplier == null) {
+          payload.rate_default_multiplier = currentProvider.costMultiplier;
+        } else {
+          // 已存在的默认倍率必须保留：移除本次写入字段，避免被回填值或 null 覆盖。
+          delete payload.rate_default_multiplier;
+        }
       }
     } else if (
       validated.rate_follow_upstream !== undefined &&
       validated.rate_follow_upstream !== currentProvider.rateFollowUpstream
     ) {
-      // 关闭跟随：用默认倍率还原 cost_multiplier（探测期间它可能已被自动回写）
+      // 关闭跟随：调用方未显式指定 cost_multiplier 时，用默认倍率还原
+      //（探测期间它可能已被自动回写）；显式指定则以调用方传入的值为准。
       const restore = payload.rate_default_multiplier ?? currentProvider.rateDefaultMultiplier;
-      if (restore != null) {
+      if (validated.cost_multiplier === undefined && restore != null) {
         payload.cost_multiplier = restore;
       }
     }

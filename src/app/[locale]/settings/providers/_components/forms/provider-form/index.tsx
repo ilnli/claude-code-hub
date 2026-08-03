@@ -35,6 +35,7 @@ import type { ProviderDisplay, ProviderEndpoint, ProviderType } from "@/types/pr
 import { invalidateProviderQueries } from "../../invalidate-provider-queries";
 import { FormTabNav, NAV_ORDER, PARENT_MAP, TAB_ORDER } from "./components/form-tab-nav";
 import { ProviderFormProvider, useProviderForm } from "./provider-form-context";
+import { resolveCostMultiplierForSubmit } from "./provider-form-payload";
 import type { NavTargetId, SubTabId, TabId } from "./provider-form-types";
 import { BasicInfoSection } from "./sections/basic-info-section";
 import { LimitsSection } from "./sections/limits-section";
@@ -352,7 +353,13 @@ function ProviderFormContent({
               ? state.routing.groupPriorities
               : null,
           weight: state.routing.weight,
-          cost_multiplier: state.routing.costMultiplier,
+          cost_multiplier: resolveCostMultiplierForSubmit({
+            mode,
+            initialRateFollowUpstream: provider?.rateFollowUpstream ?? false,
+            currentRateFollowUpstream: state.routing.rateFollowUpstream,
+            initialCostMultiplier: provider?.costMultiplier ?? 1.0,
+            currentCostMultiplier: state.routing.costMultiplier,
+          }),
           rate_follow_upstream: state.routing.rateFollowUpstream,
           rate_default_multiplier: state.routing.rateDefaultMultiplier,
           rate_markup_type: state.routing.rateMarkupType,

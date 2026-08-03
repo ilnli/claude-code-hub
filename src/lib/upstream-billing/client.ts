@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { GeminiAuth } from "@/app/v1/_lib/gemini/auth";
 import { resolveAnthropicAuthHeaders } from "@/app/v1/_lib/headers";
 import { logger } from "@/lib/logger";
 import { createProxyAgentForProvider } from "@/lib/proxy-agent";
@@ -26,9 +27,9 @@ const upstreamBillingResponseSchema = z
   .loose();
 
 export type UpstreamBillingProbeFailureReason =
-  | "unsupported" // 上游不是 sub2api / 未实现探测端点（HTTP 400/404）
+  | "unsupported" // 上游不是 sub2api / 未实现探测端点（HTTP 404）
   | "auth" // 凭证被拒绝（HTTP 401/403）
-  | "http" // 其他非 2xx
+  | "http" // 其他非 2xx（含瞬时 HTTP 400，按 3 次失败宽限期处理，不立即判定为 unsupported）
   | "invalid" // 响应不是合法 JSON 或缺少/越界 resolved_rate_multiplier
   | "timeout"
   | "network";
@@ -37,15 +38,31 @@ export type UpstreamBillingProbeResult =
   | { ok: true; rate: number }
   | { ok: false; reason: UpstreamBillingProbeFailureReason; error?: string; status?: number };
 
-function buildAuthHeaders(provider: Provider): Record<string, string> {
+// 尽力而为地释放未消费的响应体，避免 undici 连接被挂起直到 GC
+async function releaseResponseBody(response: Response): Promise<void> {
+  try {
+    await response.body?.cancel();
+  } catch {
+    // 释放失败不影响探测结果判定
+  }
+}
+
+async function buildAuthHeaders(provider: Provider): Promise<Record<string, string>> {
   switch (provider.providerType) {
     case "claude":
       return resolveAnthropicAuthHeaders(provider.key, provider.url);
     case "claude-auth":
       return resolveAnthropicAuthHeaders(provider.key, provider.url, { forceBearerOnly: true });
     case "gemini":
-    case "gemini-cli":
-      return { "x-goog-api-key": provider.key };
+    case "gemini-cli": {
+      // provider.key 对 gemini-cli 而言常是 OAuth 凭据 JSON（含 refresh_token/client_secret）。
+      // 复用转发器同款的 GeminiAuth 换取短期 access token，避免把长期凭据原样发给上游。
+      const accessToken = await GeminiAuth.getAccessToken(provider.key);
+      const isApiKey = GeminiAuth.isApiKey(provider.key);
+      return isApiKey
+        ? { "x-goog-api-key": accessToken }
+        : { Authorization: `Bearer ${accessToken}` };
+    }
     default:
       // codex / openai-compatible
       return { Authorization: `Bearer ${provider.key}` };
@@ -62,7 +79,7 @@ export async function probeUpstreamBilling(
     return { ok: false, reason: "invalid", error: "provider url is not a valid URL" };
   }
 
-  const headers = buildAuthHeaders(provider);
+  const headers = await buildAuthHeaders(provider);
 
   // 通用 fetch 选项（undici 兼容），复用 provider 出站代理配置
   interface UndiciFetchOptions extends RequestInit {
@@ -123,11 +140,7 @@ export async function probeUpstreamBilling(
     logger.warn("[UpstreamBillingProbe] proxy authentication failed, falling back to direct", {
       providerId: provider.id,
     });
-    try {
-      await response.body?.cancel();
-    } catch {
-      // Releasing the proxy response is best-effort; the direct fallback must still proceed.
-    }
+    await releaseResponseBody(response);
     try {
       response = await fetch(billingUrl, createFetchInit());
     } catch (fallbackError) {
@@ -137,7 +150,8 @@ export async function probeUpstreamBilling(
 
   if (!response.ok) {
     const status = response.status;
-    if (status === 400 || status === 404) {
+    await releaseResponseBody(response);
+    if (status === 404) {
       return { ok: false, reason: "unsupported", status };
     }
     if (status === 401 || status === 403) {

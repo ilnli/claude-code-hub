@@ -196,6 +196,7 @@ function ProviderRichListItemInner({
   const tBatchEdit = useTranslations("settings.providers.batchEdit");
   const tTimeout = useTranslations("settings.providers.form.sections.timeout");
   const tInline = useTranslations("settings.providers.inlineEdit");
+  const tUpstreamRate = useTranslations("settings.providers.form.sections.routing.upstreamRate");
 
   const validatePriority = (raw: string) => {
     if (raw.length === 0) return tInline("priorityInvalid");
@@ -683,13 +684,12 @@ function ProviderRichListItemInner({
             <span className="text-xs text-muted-foreground">{tList("costMultiplier")}:</span>
             <span className="font-medium tabular-nums">
               {canEdit ? (
-                <InlineEditPopover
-                  value={provider.costMultiplier}
+                <CostMultiplierCell
+                  provider={provider}
                   label={tInline("costMultiplierLabel")}
                   validator={validateCostMultiplier}
                   onSave={handleSaveCostMultiplier}
-                  suffix="x"
-                  type="number"
+                  autoSyncHint={tUpstreamRate("costAutoSync")}
                 />
               ) : (
                 <>{provider.costMultiplier}x</>
@@ -969,13 +969,12 @@ function ProviderRichListItemInner({
             </div>
             <div className="font-semibold text-sm">
               {canEdit ? (
-                <InlineEditPopover
-                  value={provider.costMultiplier}
+                <CostMultiplierCell
+                  provider={provider}
                   label={tInline("costMultiplierLabel")}
                   validator={validateCostMultiplier}
                   onSave={handleSaveCostMultiplier}
-                  suffix="x"
-                  type="number"
+                  autoSyncHint={tUpstreamRate("costAutoSync")}
                 />
               ) : (
                 <span>{provider.costMultiplier}x</span>
@@ -1203,6 +1202,51 @@ function ProviderRichListItemInner({
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+/**
+ * Cost-multiplier inline editor cell. When the provider follows the upstream rate, the value is
+ * auto-synced by a background probe (the edit form disables this same field for the same
+ * reason), so editing it inline here would be accepted and then silently overwritten on the
+ * next probe run. Disable the editor in that case and explain why via tooltip.
+ */
+function CostMultiplierCell({
+  provider,
+  label,
+  validator,
+  onSave,
+  autoSyncHint,
+}: {
+  provider: ProviderDisplay;
+  label: string;
+  validator: (value: string) => string | null;
+  onSave: (value: number) => Promise<boolean>;
+  autoSyncHint: string;
+}) {
+  const editor = (
+    <InlineEditPopover
+      value={provider.costMultiplier}
+      label={label}
+      validator={validator}
+      onSave={onSave}
+      suffix="x"
+      type="number"
+      disabled={provider.rateFollowUpstream}
+    />
+  );
+
+  if (!provider.rateFollowUpstream) return editor;
+
+  return (
+    <Tooltip delayDuration={200}>
+      <TooltipTrigger asChild>
+        <span className="inline-flex cursor-help">{editor}</span>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="text-xs max-w-[240px]">
+        {autoSyncHint}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 

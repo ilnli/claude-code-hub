@@ -57,6 +57,16 @@ import {
   syncAndTrackProviderUpstreamRate,
 } from "@/lib/upstream-billing/probe-scheduler";
 
+/** 探测节奏断言的时间基准；全局设置固定为 30 分钟间隔 */
+const BASE_NOW = new Date("2026-08-02T12:00:00.000Z");
+const BASE_NOW_MS = BASE_NOW.getTime();
+const INTERVAL_MINUTES = 30;
+
+/** 把被 mock 的系统时间推进到基准时间之后的第 N 分钟 */
+function setClockMinutes(minutes: number): void {
+  vi.setSystemTime(new Date(BASE_NOW_MS + minutes * 60_000));
+}
+
 function makeProvider(overrides: Partial<Provider> = {}): Provider {
   return {
     id: 1,
@@ -98,6 +108,9 @@ async function runNextCycle(): Promise<void> {
 
 describe("upstream-billing probe-scheduler", () => {
   beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(BASE_NOW);
+
     acquireLeaderLockMock = vi.fn().mockResolvedValue({ key: "k", lockId: "lock-1" });
     renewLeaderLockMock = vi.fn().mockResolvedValue(true);
     releaseLeaderLockMock = vi.fn().mockResolvedValue(undefined);
@@ -118,6 +131,7 @@ describe("upstream-billing probe-scheduler", () => {
 
   afterEach(async () => {
     await stopUpstreamBillingProbeScheduler();
+    vi.useRealTimers();
   });
 
   it("idles when globally disabled", async () => {
@@ -178,9 +192,19 @@ describe("upstream-billing probe-scheduler", () => {
     expect(restoreProviderCostMultiplierMock).not.toHaveBeenCalled();
     expect(publishInvalidationMock).not.toHaveBeenCalled();
 
-    // 失败后进入退避：紧接着的下一个周期不再探测该 provider
+    // 一次失败 → ×2 退避：过了一个完整间隔仍未到期
+    setClockMinutes(INTERVAL_MINUTES);
     await runNextCycle();
     expect(probeUpstreamBillingMock).toHaveBeenCalledTimes(1);
+
+    setClockMinutes(INTERVAL_MINUTES * 2 - 1);
+    await runNextCycle();
+    expect(probeUpstreamBillingMock).toHaveBeenCalledTimes(1);
+
+    // 恰好 interval × 2 后到期
+    setClockMinutes(INTERVAL_MINUTES * 2);
+    await runNextCycle();
+    expect(probeUpstreamBillingMock).toHaveBeenCalledTimes(2);
   });
 
   it("restores default rate when upstream is unsupported", async () => {
@@ -199,9 +223,18 @@ describe("upstream-billing probe-scheduler", () => {
     );
     expect(publishInvalidationMock).toHaveBeenCalled();
 
-    // unsupported 标记后固定 8 倍间隔降频：下一周期不再探测
+    // unsupported 固定 ×8 降频（而非首次失败的 ×2）
+    setClockMinutes(INTERVAL_MINUTES * 2);
     await runNextCycle();
     expect(probeUpstreamBillingMock).toHaveBeenCalledTimes(1);
+
+    setClockMinutes(INTERVAL_MINUTES * 8 - 1);
+    await runNextCycle();
+    expect(probeUpstreamBillingMock).toHaveBeenCalledTimes(1);
+
+    setClockMinutes(INTERVAL_MINUTES * 8);
+    await runNextCycle();
+    expect(probeUpstreamBillingMock).toHaveBeenCalledTimes(2);
   });
 
   it("skips restore when current rate already equals default", async () => {
@@ -224,9 +257,15 @@ describe("upstream-billing probe-scheduler", () => {
     await waitForCurrentCycle();
     expect(probeUpstreamBillingMock).toHaveBeenCalledTimes(1);
 
-    // 成功探测后未到期间隔：下一周期跳过
+    // 成功探测后无退避：差一分钟到期时仍跳过
+    setClockMinutes(INTERVAL_MINUTES - 1);
     await runNextCycle();
     expect(probeUpstreamBillingMock).toHaveBeenCalledTimes(1);
+
+    // 恰好一个间隔后重新到期
+    setClockMinutes(INTERVAL_MINUTES);
+    await runNextCycle();
+    expect(probeUpstreamBillingMock).toHaveBeenCalledTimes(2);
   });
 
   it("probes ALL due providers in one cycle without starvation cap", async () => {
@@ -286,5 +325,91 @@ describe("upstream-billing probe-scheduler", () => {
         fallbackRate: 1.2,
       })
     );
+  });
+
+  it("skips a provider whose persisted sync time is still fresh after a leadership handoff", async () => {
+    // 新 leader 实例：内存态为空，但库里 29 分钟前刚同步过（间隔 30 分钟）
+    findFollowUpstreamProvidersMock.mockResolvedValue([
+      makeProvider({
+        upstreamRateSyncedAt: new Date(BASE_NOW_MS - (INTERVAL_MINUTES - 1) * 60_000),
+      }),
+    ]);
+    probeUpstreamBillingMock.mockResolvedValue({ ok: true, rate: 1.0 });
+
+    startUpstreamBillingProbeScheduler();
+    await waitForCurrentCycle();
+
+    expect(probeUpstreamBillingMock).not.toHaveBeenCalled();
+    expect(updateUpstreamBillingProbeResultMock).not.toHaveBeenCalled();
+  });
+
+  it("probes when the persisted sync time is older than the interval", async () => {
+    findFollowUpstreamProvidersMock.mockResolvedValue([
+      makeProvider({ upstreamRateSyncedAt: new Date(BASE_NOW_MS - INTERVAL_MINUTES * 60_000) }),
+    ]);
+    probeUpstreamBillingMock.mockResolvedValue({ ok: true, rate: 1.0 });
+
+    startUpstreamBillingProbeScheduler();
+    await waitForCurrentCycle();
+
+    expect(probeUpstreamBillingMock).toHaveBeenCalledTimes(1);
+    expect(updateUpstreamBillingProbeResultMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("probes immediately without memory state and without a persisted sync time", async () => {
+    findFollowUpstreamProvidersMock.mockResolvedValue([
+      makeProvider({ upstreamRateSyncedAt: null }),
+    ]);
+    probeUpstreamBillingMock.mockResolvedValue({ ok: true, rate: 1.0 });
+
+    startUpstreamBillingProbeScheduler();
+    await waitForCurrentCycle();
+
+    expect(probeUpstreamBillingMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("treats a concurrent provider change as a skipped attempt, not a failure", async () => {
+    const provider = makeProvider({ id: 51 });
+    probeUpstreamBillingMock.mockResolvedValue({ ok: true, rate: 1.5 });
+    // CAS 写入落空：管理员在探测期间改动了该 provider
+    updateUpstreamBillingProbeResultMock.mockResolvedValue(false);
+
+    const outcome = await syncAndTrackProviderUpstreamRate(provider);
+
+    expect(outcome).toMatchObject({ status: "failed", reason: "provider_changed", wrote: false });
+    expect(sendFailureAlertMock).not.toHaveBeenCalled();
+    // 已记录尝试时间
+    expect(getUpstreamBillingProbeSchedulerStatus().trackedProviders).toBe(1);
+
+    // 连续失败计数未被污染：随后的真实失败仍从 1 开始计
+    probeUpstreamBillingMock.mockResolvedValue({ ok: false, reason: "network", error: "boom" });
+    await syncAndTrackProviderUpstreamRate(provider);
+
+    expect(sendFailureAlertMock).toHaveBeenCalledTimes(1);
+    expect(sendFailureAlertMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ providerId: 51, failureCount: 1 })
+    );
+  });
+
+  it("does not back off extra when a scheduled probe hits a concurrent provider change", async () => {
+    findFollowUpstreamProvidersMock.mockResolvedValue([makeProvider()]);
+    probeUpstreamBillingMock.mockResolvedValue({ ok: true, rate: 1.5 });
+    updateUpstreamBillingProbeResultMock.mockResolvedValue(false);
+
+    startUpstreamBillingProbeScheduler();
+    await waitForCurrentCycle();
+
+    expect(probeUpstreamBillingMock).toHaveBeenCalledTimes(1);
+    expect(sendFailureAlertMock).not.toHaveBeenCalled();
+    expect(publishInvalidationMock).not.toHaveBeenCalled();
+
+    // 只刷新尝试时间：未到期不重复探测，一个常规间隔后（无 ×2 退避）重新到期
+    setClockMinutes(INTERVAL_MINUTES - 1);
+    await runNextCycle();
+    expect(probeUpstreamBillingMock).toHaveBeenCalledTimes(1);
+
+    setClockMinutes(INTERVAL_MINUTES);
+    await runNextCycle();
+    expect(probeUpstreamBillingMock).toHaveBeenCalledTimes(2);
   });
 });

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { GeminiAuth } from "@/app/v1/_lib/gemini/auth";
 import { createProxyAgentForProvider } from "@/lib/proxy-agent";
 import type { Provider } from "@/types/provider";
 
@@ -15,6 +16,15 @@ vi.mock("@/app/v1/_lib/headers", () => ({
     Authorization: `Bearer ${apiKey}`,
     "x-api-key": apiKey,
   })),
+}));
+
+// 与转发器测试同款：整体 mock GeminiAuth，避免 JSON 凭据分支触发真实的 OAuth 网络请求。
+// beforeEach 中的默认实现模拟纯 API Key 场景，让既有用例无需感知这层 mock。
+vi.mock("@/app/v1/_lib/gemini/auth", () => ({
+  GeminiAuth: {
+    getAccessToken: vi.fn(),
+    isApiKey: vi.fn(),
+  },
 }));
 
 vi.mock("@/lib/proxy-agent", () => ({
@@ -53,12 +63,21 @@ function makeResponse(init: {
 describe("probeUpstreamBilling", () => {
   const fetchMock = vi.fn();
   const createProxyAgentMock = vi.mocked(createProxyAgentForProvider);
+  const geminiAuthMock = vi.mocked(GeminiAuth);
 
   beforeEach(() => {
     fetchMock.mockReset();
     createProxyAgentMock.mockReset();
     createProxyAgentMock.mockReturnValue(null);
     vi.stubGlobal("fetch", fetchMock);
+
+    // 默认模拟 GeminiAuth 对纯 API Key 的真实行为：原样返回 key，判定为 isApiKey。
+    geminiAuthMock.getAccessToken.mockReset();
+    geminiAuthMock.isApiKey.mockReset();
+    geminiAuthMock.getAccessToken.mockImplementation(async (key: string) => key);
+    geminiAuthMock.isApiKey.mockImplementation(
+      (key: string) => !key.trim().startsWith("{") && !key.startsWith("ya29.")
+    );
   });
 
   afterEach(() => {
@@ -116,10 +135,10 @@ describe("probeUpstreamBilling", () => {
     expect(result).toEqual({ ok: false, reason: "unsupported", status: 404 });
   });
 
-  it("marks HTTP 400 as unsupported", async () => {
+  it("marks HTTP 400 as a generic http failure (not unsupported)", async () => {
     fetchMock.mockResolvedValue(makeResponse({ ok: false, status: 400 }));
     const result = await probeUpstreamBilling(makeProvider());
-    expect(result).toMatchObject({ ok: false, reason: "unsupported" });
+    expect(result).toMatchObject({ ok: false, reason: "http", status: 400 });
   });
 
   it("marks HTTP 401/403 as auth failure", async () => {
@@ -143,6 +162,16 @@ describe("probeUpstreamBilling", () => {
       reason: "http",
       status: 500,
     });
+  });
+
+  it("cancels the response body for non-2xx responses to release the connection", async () => {
+    const cancel = vi.fn().mockResolvedValue(undefined);
+    fetchMock.mockResolvedValue(makeResponse({ ok: false, status: 500, stream: { cancel } }));
+
+    const result = await probeUpstreamBilling(makeProvider());
+
+    expect(result).toMatchObject({ ok: false, reason: "http", status: 500 });
+    expect(cancel).toHaveBeenCalledTimes(1);
   });
 
   it("rejects responses missing resolved_rate_multiplier", async () => {
@@ -264,5 +293,34 @@ describe("probeUpstreamBilling", () => {
   it("rejects invalid provider url", async () => {
     const result = await probeUpstreamBilling(makeProvider({ url: "not-a-url" }));
     expect(result).toMatchObject({ ok: false, reason: "invalid" });
+  });
+
+  it("exchanges gemini-cli OAuth JSON credentials for an access token instead of sending them raw", async () => {
+    const credentialsJson = JSON.stringify({
+      refresh_token: "1//refresh-token",
+      client_id: "client-id.apps.googleusercontent.com",
+      client_secret: "client-secret",
+    });
+    geminiAuthMock.getAccessToken.mockResolvedValueOnce("ya29.exchanged-access-token");
+    geminiAuthMock.isApiKey.mockReturnValueOnce(false);
+    fetchMock.mockResolvedValue(
+      makeResponse({ ok: true, status: 200, body: { resolved_rate_multiplier: 1 } })
+    );
+
+    const result = await probeUpstreamBilling(
+      makeProvider({ providerType: "gemini-cli", key: credentialsJson })
+    );
+
+    expect(result).toEqual({ ok: true, rate: 1 });
+    expect(geminiAuthMock.getAccessToken).toHaveBeenCalledWith(credentialsJson);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        headers: { Authorization: "Bearer ya29.exchanged-access-token" },
+      })
+    );
+
+    const sentHeaders = fetchMock.mock.calls[0]?.[1]?.headers as Record<string, string>;
+    expect(Object.values(sentHeaders)).not.toContain(credentialsJson);
   });
 });

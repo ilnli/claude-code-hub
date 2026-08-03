@@ -688,6 +688,91 @@ describe("Provider Actions - Async Optimization", () => {
       );
     });
 
+    it("editProvider should keep the stored default rate when a partial edit omits it", async () => {
+      // 跟随期间 costMultiplier 由探测任务按加价规则回写（1.2 * 1.6），仅切换开关时不应回填默认倍率
+      findProviderByIdMock.mockResolvedValueOnce({
+        id: 1,
+        name: "p1",
+        costMultiplier: 1.92,
+        rateFollowUpstream: true,
+        rateDefaultMultiplier: 1.2,
+      });
+      const { editProvider } = await import("@/actions/providers");
+
+      const result = await editProvider(1, { is_enabled: false });
+
+      expect(result.ok).toBe(true);
+      expect(updateProviderMock).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ is_enabled: false })
+      );
+      expect(updateProviderMock.mock.calls[0]?.[1]).not.toHaveProperty("rate_default_multiplier");
+    });
+
+    it("editProvider should keep the stored default rate when only weight is edited", async () => {
+      findProviderByIdMock.mockResolvedValueOnce({
+        id: 1,
+        name: "p1",
+        costMultiplier: 1.92,
+        rateFollowUpstream: true,
+        rateDefaultMultiplier: 1.2,
+      });
+      const { editProvider } = await import("@/actions/providers");
+
+      const result = await editProvider(1, { weight: 5 });
+
+      expect(result.ok).toBe(true);
+      expect(updateProviderMock).toHaveBeenCalledWith(1, expect.objectContaining({ weight: 5 }));
+      expect(updateProviderMock.mock.calls[0]?.[1]).not.toHaveProperty("rate_default_multiplier");
+    });
+
+    it("editProvider should restore the default rate when upstream follow is turned off", async () => {
+      findProviderByIdMock.mockResolvedValueOnce({
+        id: 1,
+        name: "p1",
+        costMultiplier: 1.92,
+        rateFollowUpstream: true,
+        rateDefaultMultiplier: 1.2,
+      });
+      const { editProvider } = await import("@/actions/providers");
+
+      const result = await editProvider(1, { rate_follow_upstream: false });
+
+      expect(result.ok).toBe(true);
+      expect(updateProviderMock).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          rate_follow_upstream: false,
+          cost_multiplier: 1.2,
+        })
+      );
+    });
+
+    it("editProvider should honor an explicit cost multiplier when upstream follow is turned off", async () => {
+      findProviderByIdMock.mockResolvedValueOnce({
+        id: 1,
+        name: "p1",
+        costMultiplier: 1.92,
+        rateFollowUpstream: true,
+        rateDefaultMultiplier: 1.2,
+      });
+      const { editProvider } = await import("@/actions/providers");
+
+      const result = await editProvider(1, {
+        rate_follow_upstream: false,
+        cost_multiplier: 2,
+      });
+
+      expect(result.ok).toBe(true);
+      expect(updateProviderMock).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          rate_follow_upstream: false,
+          cost_multiplier: 2,
+        })
+      );
+    });
+
     it("editProvider: group or allowlist changes should also terminate sticky sessions", async () => {
       const { editProvider } = await import("@/actions/providers");
 
