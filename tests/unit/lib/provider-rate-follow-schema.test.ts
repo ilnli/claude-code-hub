@@ -88,16 +88,49 @@ describe("provider upstream-rate-follow validation", () => {
     expect(ProviderV1UpdateSchema.safeParse(rateFields).success).toBe(true);
   });
 
-  it("exposes rate-follow state in the V1 provider response schema", () => {
+  it("defaults probe type to sub2api and newapi_group to null on create", () => {
+    const parsed = CreateProviderSchema.parse(baseCreateInput);
+    expect(parsed.rate_upstream_type).toBe("sub2api");
+    expect(parsed.newapi_group).toBeNull();
+  });
+
+  it("accepts newapi probe type with a group name; rejects unknown probe types", () => {
+    const parsed = CreateProviderSchema.parse({
+      ...baseCreateInput,
+      rate_follow_upstream: true,
+      rate_default_multiplier: 1.0,
+      rate_upstream_type: "newapi",
+      newapi_group: "vip",
+    });
+    expect(parsed.rate_upstream_type).toBe("newapi");
+    expect(parsed.newapi_group).toBe("vip");
+
+    expect(() =>
+      CreateProviderSchema.parse({ ...baseCreateInput, rate_upstream_type: "oneapi" })
+    ).toThrow();
+    // 分组名最长 64 字符
+    expect(() =>
+      CreateProviderSchema.parse({ ...baseCreateInput, newapi_group: "g".repeat(65) })
+    ).toThrow();
+  });
+
+  it("allows clearing newapi_group on update", () => {
+    const parsed = UpdateProviderSchema.parse({ rate_upstream_type: "newapi", newapi_group: null });
+    expect(parsed.rate_upstream_type).toBe("newapi");
+    expect(parsed.newapi_group).toBeNull();
+  });
+
+  it("accepts probe-type fields in strict V1 create and update schemas", () => {
+    const probeFields = { rate_upstream_type: "newapi" as const, newapi_group: "vip" };
+    expect(ProviderCreateSchema.safeParse({ ...baseCreateInput, ...probeFields }).success).toBe(
+      true
+    );
+    expect(ProviderV1UpdateSchema.safeParse(probeFields).success).toBe(true);
+  });
+
+  it("exposes probe-type state in the V1 provider response schema", () => {
     expect(Object.keys(ProviderSummarySchema.shape)).toEqual(
-      expect.arrayContaining([
-        "rateFollowUpstream",
-        "rateDefaultMultiplier",
-        "rateMarkupType",
-        "rateMarkupValue",
-        "upstreamRateMultiplier",
-        "upstreamRateSyncedAt",
-      ])
+      expect.arrayContaining(["rateUpstreamType", "newapiGroup", "newapiDetectedGroup"])
     );
   });
 });

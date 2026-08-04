@@ -22,7 +22,8 @@ import type { Provider } from "@/types/provider";
  * 每 tick（60s）：
  * 1. 读取 system_settings 的运行时设置——全局关闭则空转（默认关闭，零影响）；
  * 2. 持 Redis leader lock（多实例安全），扫描所有开启「跟随上游倍率」的 provider；
- * 3. 将所有到期的 provider 加入 FIFO 队列后执行 GET {上游}/sub2api/billing 探测：
+ * 3. 将所有到期的 provider 加入 FIFO 队列后按各自协议执行探测（sub2api 走
+ *    GET {上游}/sub2api/billing；newapi 走 /api/pricing 倍率表 + /api/log/token 校准）：
  *    队列按 provider ID 去重，从入队到处理完成都不会重复入队；并发受限，
  *    但不设单轮数量上限，避免固定顺序切片导致靠后的 provider 饿死；
  * 4. 成功后回写 cost_multiplier = applyMarkup(resolved_rate_multiplier)，
@@ -45,6 +46,15 @@ const TICK_INTERVAL_MS = 60_000;
 const LOCK_TTL_MS = 30_000;
 const CONCURRENCY = 4;
 const MAX_BACKOFF_MULTIPLIER = 8;
+// newapi 协议每轮都要请求 /api/log/token（CriticalRateLimit 默认 20 次/20 分钟/源 IP
+// 共享桶），有效探测间隔设下限，避免同站点多 key 时打满上游限流
+const NEWAPI_MIN_INTERVAL_MS = 5 * 60_000;
+
+function getEffectiveIntervalMs(provider: Provider, intervalMs: number): number {
+  return provider.rateUpstreamType === "newapi"
+    ? Math.max(intervalMs, NEWAPI_MIN_INTERVAL_MS)
+    : intervalMs;
+}
 
 interface ProbeMemoryEntry {
   lastAttemptAtMs: number;
@@ -120,10 +130,11 @@ function getBackoffMultiplier(entry: ProbeMemoryEntry | undefined): number {
 function filterDueProviders(providers: Provider[], intervalMs: number, nowMs: number): Provider[] {
   const memory = getMemory();
   return providers.filter((provider) => {
+    const effectiveIntervalMs = getEffectiveIntervalMs(provider, intervalMs);
     const entry = memory.get(provider.id);
     if (entry) {
       // 内存态优先：同时编码了失败计数与退避倍数
-      const dueAtMs = entry.lastAttemptAtMs + intervalMs * getBackoffMultiplier(entry);
+      const dueAtMs = entry.lastAttemptAtMs + effectiveIntervalMs * getBackoffMultiplier(entry);
       return nowMs >= dueAtMs;
     }
 
@@ -133,7 +144,7 @@ function filterDueProviders(providers: Provider[], intervalMs: number, nowMs: nu
       // 确实从未成功同步过：立即到期
       return true;
     }
-    return nowMs >= syncedAtMs + intervalMs;
+    return nowMs >= syncedAtMs + effectiveIntervalMs;
   });
 }
 
@@ -207,7 +218,9 @@ export function noteUpstreamRateSyncOutcome(
       entry = {
         lastAttemptAtMs: nowMs,
         failures: (previous?.failures ?? 0) + 1,
-        unsupported: false,
+        // group_not_in_table 属配置问题（分组不在上游匿名倍率表），持续重试无意义，
+        // 与 unsupported 同按 8x 退避，等待管理员介入
+        unsupported: outcome.status === "failed" && outcome.reason === "group_not_in_table",
       };
       break;
   }

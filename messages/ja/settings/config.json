@@ -203,7 +203,7 @@
     },
     "upstreamBillingProbe": {
       "title": "上流倍率プローブ",
-      "description": "多段プロキシ構成で上流 sub2api の課金倍率に自動的に追随します"
+      "description": "多段プロキシ構成で上流中継（sub2api / new-api）の課金倍率に自動的に追随します"
     }
   },
   "siteSettings": "サイトパラメータ",

@@ -203,7 +203,7 @@
     },
     "upstreamBillingProbe": {
       "title": "Upstream Rate Probe",
-      "description": "Automatically follow the billing rate of an upstream sub2api in nested proxy scenarios"
+      "description": "Automatically follow the billing rate of an upstream relay (sub2api or new-api) in nested proxy scenarios"
     }
   },
   "siteSettings": "Site Parameters",

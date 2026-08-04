@@ -704,6 +704,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/providers/upstream-groups:fetch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fetch new-api upstream groups
+         * @description Fetches the anonymous group ratio table from a new-api site (GET /api/pricing) for the upstream group selector. Groups hidden by the site's user-usable-group settings are not included.
+         */
+        post: operations["postProvidersUpstreamGroupsFetch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/providers/model-suggestions": {
         parameters: {
             query?: never;
@@ -4437,6 +4457,15 @@ export interface operations {
                              * @description Timestamp of the most recent successful upstream rate synchronization.
                              */
                             upstreamRateSyncedAt: string | null;
+                            /**
+                             * @description Upstream rate probing protocol: sub2api (/sub2api/billing) or newapi (/api/pricing group ratio + /api/log/token group calibration).
+                             * @enum {string}
+                             */
+                            rateUpstreamType: "sub2api" | "newapi";
+                            /** @description Configured new-api group name used as fallback when log-based group detection is unavailable. */
+                            newapiGroup: string | null;
+                            /** @description Most recently observed new-api billing group from token consume logs. */
+                            newapiDetectedGroup: string | null;
                             /** @description Provider group tag. */
                             groupTag: string | null;
                             /**
@@ -4759,6 +4788,13 @@ export interface operations {
                     rate_markup_type?: "none" | "percent" | "fixed";
                     /** @description Markup value applied to the upstream rate. */
                     rate_markup_value?: number;
+                    /**
+                     * @description Upstream rate probing protocol: sub2api (/sub2api/billing) or newapi (/api/pricing group ratio + /api/log/token group calibration).
+                     * @enum {string}
+                     */
+                    rate_upstream_type?: "sub2api" | "newapi";
+                    /** @description Configured new-api group name used as fallback when log-based group detection is unavailable. */
+                    newapi_group?: string | null;
                     /** @description Provider group tag. */
                     group_tag?: string | null;
                     /** @description Per-group priority overrides. */
@@ -4931,6 +4967,15 @@ export interface operations {
                          * @description Timestamp of the most recent successful upstream rate synchronization.
                          */
                         upstreamRateSyncedAt: string | null;
+                        /**
+                         * @description Upstream rate probing protocol: sub2api (/sub2api/billing) or newapi (/api/pricing group ratio + /api/log/token group calibration).
+                         * @enum {string}
+                         */
+                        rateUpstreamType: "sub2api" | "newapi";
+                        /** @description Configured new-api group name used as fallback when log-based group detection is unavailable. */
+                        newapiGroup: string | null;
+                        /** @description Most recently observed new-api billing group from token consume logs. */
+                        newapiDetectedGroup: string | null;
                         /** @description Provider group tag. */
                         groupTag: string | null;
                         /**
@@ -5271,6 +5316,15 @@ export interface operations {
                          * @description Timestamp of the most recent successful upstream rate synchronization.
                          */
                         upstreamRateSyncedAt: string | null;
+                        /**
+                         * @description Upstream rate probing protocol: sub2api (/sub2api/billing) or newapi (/api/pricing group ratio + /api/log/token group calibration).
+                         * @enum {string}
+                         */
+                        rateUpstreamType: "sub2api" | "newapi";
+                        /** @description Configured new-api group name used as fallback when log-based group detection is unavailable. */
+                        newapiGroup: string | null;
+                        /** @description Most recently observed new-api billing group from token consume logs. */
+                        newapiDetectedGroup: string | null;
                         /** @description Provider group tag. */
                         groupTag: string | null;
                         /**
@@ -5769,6 +5823,13 @@ export interface operations {
                     rate_markup_type?: "none" | "percent" | "fixed";
                     /** @description Markup value applied to the upstream rate. */
                     rate_markup_value?: number;
+                    /**
+                     * @description Upstream rate probing protocol: sub2api (/sub2api/billing) or newapi (/api/pricing group ratio + /api/log/token group calibration).
+                     * @enum {string}
+                     */
+                    rate_upstream_type?: "sub2api" | "newapi";
+                    /** @description Configured new-api group name used as fallback when log-based group detection is unavailable. */
+                    newapi_group?: string | null;
                     /** @description Provider group tag. */
                     group_tag?: string | null;
                     /** @description Per-group priority overrides. */
@@ -5946,6 +6007,15 @@ export interface operations {
                          * @description Timestamp of the most recent successful upstream rate synchronization.
                          */
                         upstreamRateSyncedAt: string | null;
+                        /**
+                         * @description Upstream rate probing protocol: sub2api (/sub2api/billing) or newapi (/api/pricing group ratio + /api/log/token group calibration).
+                         * @enum {string}
+                         */
+                        rateUpstreamType: "sub2api" | "newapi";
+                        /** @description Configured new-api group name used as fallback when log-based group detection is unavailable. */
+                        newapiGroup: string | null;
+                        /** @description Most recently observed new-api billing group from token consume logs. */
+                        newapiDetectedGroup: string | null;
                         /** @description Provider group tag. */
                         groupTag: string | null;
                         /**
@@ -11143,6 +11213,193 @@ export interface operations {
         };
         responses: {
             /** @description Upstream models. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Invalid request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Admin access required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Provider not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    postProvidersUpstreamGroupsFetch: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required only when authenticating with the auth-token cookie on mutation requests. */
+                "X-CCH-CSRF"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * Format: uri
+                     * @description Provider base URL.
+                     */
+                    providerUrl: string;
+                    /** @description Optional proxy URL. */
+                    proxyUrl?: string | null;
+                    /** @description Whether proxy failure can fall back to direct. */
+                    proxyFallbackToDirect?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Upstream group ratio table. */
             200: {
                 headers: {
                     [name: string]: unknown;

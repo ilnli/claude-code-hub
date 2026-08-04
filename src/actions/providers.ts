@@ -116,7 +116,7 @@ import type {
   ProviderStatisticsMap,
   ProviderType,
 } from "@/types/provider";
-import type { RateMarkupType } from "@/types/upstream-billing";
+import type { RateMarkupType, UpstreamProbeType } from "@/types/upstream-billing";
 import type { ActionResult } from "./types";
 
 type AutoSortResult = {
@@ -346,6 +346,9 @@ export async function getProviders(): Promise<ProviderDisplay[]> {
         rateMarkupValue: provider.rateMarkupValue,
         upstreamRateMultiplier: provider.upstreamRateMultiplier,
         upstreamRateSyncedAt: provider.upstreamRateSyncedAt,
+        rateUpstreamType: provider.rateUpstreamType,
+        newapiGroup: provider.newapiGroup,
+        newapiDetectedGroup: provider.newapiDetectedGroup,
         groupTag: provider.groupTag,
         providerType: provider.providerType,
         providerVendorId: provider.providerVendorId,
@@ -552,6 +555,8 @@ export async function addProvider(data: {
   rate_default_multiplier?: number | null;
   rate_markup_type?: RateMarkupType;
   rate_markup_value?: number;
+  rate_upstream_type?: UpstreamProbeType;
+  newapi_group?: string | null;
   group_tag?: string | null;
   provider_type?: ProviderType;
   preserve_client_ip?: boolean;
@@ -776,6 +781,8 @@ export async function editProvider(
     rate_default_multiplier?: number | null;
     rate_markup_type?: RateMarkupType;
     rate_markup_value?: number;
+    rate_upstream_type?: UpstreamProbeType;
+    newapi_group?: string | null;
     group_tag?: string | null;
     group_priorities?: Record<string, number> | null;
     provider_type?: ProviderType;
@@ -1527,6 +1534,8 @@ const SINGLE_EDIT_PREIMAGE_FIELD_TO_PROVIDER_KEY: Record<string, keyof Provider>
   rate_default_multiplier: "rateDefaultMultiplier",
   rate_markup_type: "rateMarkupType",
   rate_markup_value: "rateMarkupValue",
+  rate_upstream_type: "rateUpstreamType",
+  newapi_group: "newapiGroup",
   group_tag: "groupTag",
   group_priorities: "groupPriorities",
   provider_type: "providerType",

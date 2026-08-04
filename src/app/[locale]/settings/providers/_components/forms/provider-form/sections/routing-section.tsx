@@ -1,13 +1,14 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Info, Layers, Route, Scale } from "lucide-react";
+import { Info, Layers, RefreshCw, Route, Scale } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { RuleTesterDialogTrigger } from "@/app/[locale]/settings/providers/_components/rule-tester-dialog-trigger";
 import { ClientRestrictionsEditor } from "@/components/form/client-restrictions-editor";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -18,8 +19,10 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { TagInput } from "@/components/ui/tag-input";
+import { fetchNewapiUpstreamGroups } from "@/lib/api-client/v1/actions/providers";
 import { getProviderTypeConfig } from "@/lib/provider-type-utils";
 import type { ProviderType } from "@/types/provider";
+import type { UpstreamProbeType } from "@/types/upstream-billing";
 import { AllowedModelRuleEditor } from "../../../allowed-model-rule-editor";
 import { AllowedModelTester } from "../../../allowed-model-tester";
 import { MixedValueIndicator } from "../../../batch-edit/mixed-value-indicator";
@@ -94,6 +97,42 @@ export function RoutingSection({ subSectionRefs }: RoutingSectionProps) {
     if (!enabled) {
       dispatch({ type: "SET_ALLOWED_CLIENTS", payload: [] });
       dispatch({ type: "SET_BLOCKED_CLIENTS", payload: [] });
+    }
+  };
+
+  // new-api 上游分组建议列表（「拉取分组」动作填充；null=尚未拉取）
+  const [upstreamGroups, setUpstreamGroups] = useState<Array<{
+    name: string;
+    ratio: number;
+  }> | null>(null);
+  const [fetchingUpstreamGroups, setFetchingUpstreamGroups] = useState(false);
+
+  const handleFetchUpstreamGroups = async () => {
+    const providerUrl = state.basic.url.trim();
+    if (!providerUrl) {
+      toast.error(t("sections.routing.upstreamRate.group.fetchNeedUrl"));
+      return;
+    }
+    setFetchingUpstreamGroups(true);
+    try {
+      const res = await fetchNewapiUpstreamGroups({
+        providerUrl,
+        proxyUrl: state.network.proxyUrl?.trim() || null,
+        proxyFallbackToDirect: state.network.proxyFallbackToDirect,
+      });
+      if (!res.ok) {
+        toast.error(t("sections.routing.upstreamRate.group.fetchFailed"));
+        return;
+      }
+      const groups = res.data?.groups ?? [];
+      setUpstreamGroups(groups);
+      if (groups.length === 0) {
+        toast.message(t("sections.routing.upstreamRate.group.fetchEmpty"));
+      }
+    } catch {
+      toast.error(t("sections.routing.upstreamRate.group.fetchFailed"));
+    } finally {
+      setFetchingUpstreamGroups(false);
     }
   };
 
@@ -453,6 +492,97 @@ export function RoutingSection({ subSectionRefs }: RoutingSectionProps) {
               {state.routing.rateFollowUpstream && (
                 <div className="space-y-3">
                   <SmartInputWrapper
+                    label={t("sections.routing.upstreamRate.probeType.label")}
+                    description={t("sections.routing.upstreamRate.probeType.desc")}
+                  >
+                    <Select
+                      value={state.routing.rateUpstreamType}
+                      onValueChange={(value) =>
+                        dispatch({
+                          type: "SET_RATE_UPSTREAM_TYPE",
+                          payload: value as UpstreamProbeType,
+                        })
+                      }
+                      disabled={state.ui.isPending}
+                    >
+                      <SelectTrigger id={isEdit ? "edit-rate-upstream-type" : "rate-upstream-type"}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="sub2api">
+                          {t("sections.routing.upstreamRate.probeType.options.sub2api")}
+                        </SelectItem>
+                        <SelectItem value="newapi">
+                          {t("sections.routing.upstreamRate.probeType.options.newapi")}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </SmartInputWrapper>
+
+                  {state.routing.rateUpstreamType === "newapi" && (
+                    <SmartInputWrapper
+                      label={t("sections.routing.upstreamRate.group.label")}
+                      description={t("sections.routing.upstreamRate.group.desc")}
+                    >
+                      <div className="space-y-2">
+                        <div className="flex gap-2">
+                          <Input
+                            id={isEdit ? "edit-newapi-group" : "newapi-group"}
+                            value={state.routing.newapiGroup}
+                            onChange={(e) =>
+                              dispatch({ type: "SET_NEWAPI_GROUP", payload: e.target.value })
+                            }
+                            placeholder={t("sections.routing.upstreamRate.group.placeholder")}
+                            disabled={state.ui.isPending}
+                            maxLength={64}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="shrink-0"
+                            onClick={handleFetchUpstreamGroups}
+                            disabled={state.ui.isPending || fetchingUpstreamGroups}
+                          >
+                            <RefreshCw
+                              className={
+                                fetchingUpstreamGroups ? "h-4 w-4 animate-spin" : "h-4 w-4"
+                              }
+                            />
+                            {t("sections.routing.upstreamRate.group.fetch")}
+                          </Button>
+                        </div>
+                        {upstreamGroups && upstreamGroups.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5">
+                            {upstreamGroups.map((group) => (
+                              <button
+                                key={group.name}
+                                type="button"
+                                disabled={state.ui.isPending}
+                                onClick={() =>
+                                  dispatch({ type: "SET_NEWAPI_GROUP", payload: group.name })
+                                }
+                              >
+                                <Badge
+                                  variant={
+                                    state.routing.newapiGroup === group.name ? "default" : "outline"
+                                  }
+                                  className="cursor-pointer text-xs"
+                                >
+                                  {group.name} ×{group.ratio}
+                                </Badge>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          {t("sections.routing.upstreamRate.group.hint")}
+                        </p>
+                      </div>
+                    </SmartInputWrapper>
+                  )}
+
+                  <SmartInputWrapper
                     label={t("sections.routing.upstreamRate.defaultRate.label")}
                     description={t("sections.routing.upstreamRate.defaultRate.desc")}
                   >
@@ -544,6 +674,9 @@ export function RoutingSection({ subSectionRefs }: RoutingSectionProps) {
                           ? new Date(provider.upstreamRateSyncedAt).toLocaleString()
                           : "-",
                       })}
+                      {provider.rateUpstreamType === "newapi" && provider.newapiDetectedGroup
+                        ? ` · ${t("sections.routing.upstreamRate.detectedGroup", { group: provider.newapiDetectedGroup })}`
+                        : ""}
                     </p>
                   )}
                 </div>

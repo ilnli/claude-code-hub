@@ -15,6 +15,7 @@ import {
   ProviderBatchUpdateSchema,
   ProviderConfirmBodySchema,
   ProviderCreateSchema,
+  ProviderFetchUpstreamGroupsSchema,
   ProviderFetchUpstreamModelsSchema,
   ProviderGenericResponseSchema,
   ProviderGroupsQuerySchema,
@@ -41,6 +42,7 @@ import {
   batchUpdateProviders,
   createProvider,
   deleteProvider,
+  fetchProviderUpstreamGroups,
   fetchProviderUpstreamModels,
   getProvider,
   getProviderLimit,
@@ -913,6 +915,34 @@ providersRouter.openapi(
     },
   }),
   fetchProviderUpstreamModels as never
+);
+
+providersRouter.openapi(
+  createRoute({
+    method: "post",
+    path: "/providers/upstream-groups:fetch",
+    middleware: requireAuth("admin"),
+    tags: ["Providers"],
+    summary: "Fetch new-api upstream groups",
+    description:
+      "Fetches the anonymous group ratio table from a new-api site (GET /api/pricing) for the upstream group selector. Groups hidden by the site's user-usable-group settings are not included.",
+    "x-required-access": "admin",
+    security,
+    request: {
+      body: {
+        required: true,
+        content: { "application/json": { schema: ProviderFetchUpstreamGroupsSchema } },
+      },
+    },
+    responses: {
+      200: {
+        description: "Upstream group ratio table.",
+        content: { "application/json": { schema: ProviderGenericResponseSchema } },
+      },
+      ...problemResponses,
+    },
+  }),
+  fetchProviderUpstreamGroups as never
 );
 
 providersRouter.openapi(

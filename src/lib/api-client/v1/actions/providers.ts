@@ -257,6 +257,16 @@ export function fetchUpstreamModels(data: unknown) {
   );
 }
 
+export function fetchNewapiUpstreamGroups(data: unknown) {
+  return toActionResult(
+    apiPost<{ groups: Array<{ name: string; ratio: number }> }>(
+      "/api/v1/providers/upstream-groups:fetch",
+      data,
+      dashboardCompatOptions
+    )
+  );
+}
+
 export function getModelSuggestionsByProviderGroup(providerGroup?: string | null) {
   return toActionResult(
     apiGet<string[]>(

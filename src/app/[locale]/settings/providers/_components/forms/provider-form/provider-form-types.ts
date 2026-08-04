@@ -18,7 +18,7 @@ import type {
   ProviderModelRedirectRule,
   ProviderType,
 } from "@/types/provider";
-import type { RateMarkupType } from "@/types/upstream-billing";
+import type { RateMarkupType, UpstreamProbeType } from "@/types/upstream-billing";
 import type { BatchSettingsAnalysis } from "../../batch-edit/analyze-batch-settings";
 
 // Form mode
@@ -66,6 +66,9 @@ export interface RoutingState {
   rateDefaultMultiplier: number | null;
   rateMarkupType: RateMarkupType;
   rateMarkupValue: number;
+  // 上游探测协议（sub2api/newapi）与 newapi 分组名（日志校准兜底）
+  rateUpstreamType: UpstreamProbeType;
+  newapiGroup: string;
   cacheTtlPreference: "inherit" | "5m" | "1h";
   swapCacheTtlBilling: boolean;
   // Codex-specific
@@ -166,6 +169,8 @@ export type ProviderFormAction =
   | { type: "SET_RATE_DEFAULT_MULTIPLIER"; payload: number | null }
   | { type: "SET_RATE_MARKUP_TYPE"; payload: RateMarkupType }
   | { type: "SET_RATE_MARKUP_VALUE"; payload: number }
+  | { type: "SET_RATE_UPSTREAM_TYPE"; payload: UpstreamProbeType }
+  | { type: "SET_NEWAPI_GROUP"; payload: string }
   | { type: "SET_CACHE_TTL_PREFERENCE"; payload: "inherit" | "5m" | "1h" }
   | { type: "SET_SWAP_CACHE_TTL_BILLING"; payload: boolean }
   | { type: "SET_CODEX_REASONING_EFFORT"; payload: CodexReasoningEffortPreference }

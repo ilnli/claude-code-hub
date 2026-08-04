@@ -5,6 +5,9 @@ let getSessionMock: ReturnType<typeof vi.fn>;
 let findProviderByIdMock: ReturnType<typeof vi.fn>;
 let syncAndTrackProviderUpstreamRateMock: ReturnType<typeof vi.fn>;
 let publishInvalidationMock: ReturnType<typeof vi.fn>;
+let getNewapiRatioTableMock: ReturnType<typeof vi.fn>;
+let isValidProxyUrlMock: ReturnType<typeof vi.fn>;
+let validateProviderUrlForConnectivityMock: ReturnType<typeof vi.fn>;
 
 vi.mock("@/lib/auth", () => ({
   getSession: () => getSessionMock(),
@@ -23,11 +26,25 @@ vi.mock("@/lib/cache/provider-cache", () => ({
   publishProviderCacheInvalidation: (...args: unknown[]) => publishInvalidationMock(...args),
 }));
 
+vi.mock("@/lib/proxy-agent", () => ({
+  isValidProxyUrl: (...args: unknown[]) => isValidProxyUrlMock(...args),
+}));
+
+vi.mock("@/lib/upstream-billing/newapi-table-cache", () => ({
+  getNewapiRatioTable: (...args: unknown[]) => getNewapiRatioTableMock(...args),
+}));
+
+vi.mock("@/lib/validation/provider-url", () => ({
+  validateProviderUrlForConnectivity: (...args: unknown[]) =>
+    validateProviderUrlForConnectivityMock(...args),
+}));
+
 vi.mock("@/repository", () => ({
   findProviderById: (...args: unknown[]) => findProviderByIdMock(...args),
 }));
 
 import {
+  fetchNewapiUpstreamGroups,
   syncProvidersUpstreamRateBatch,
   syncProviderUpstreamRateNow,
 } from "@/actions/upstream-billing";
@@ -166,5 +183,99 @@ describe("syncProvidersUpstreamRateBatch", () => {
     expect(res.data).toMatchObject({ total: 1, synced: 1, failed: 0 });
     expect(findProviderByIdMock).toHaveBeenCalledTimes(1);
     expect(syncAndTrackProviderUpstreamRateMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("fetchNewapiUpstreamGroups", () => {
+  beforeEach(() => {
+    getSessionMock = vi.fn().mockResolvedValue({ user: { role: "admin" } });
+    getNewapiRatioTableMock = vi.fn();
+    isValidProxyUrlMock = vi.fn().mockReturnValue(true);
+    validateProviderUrlForConnectivityMock = vi.fn().mockReturnValue({
+      valid: true,
+      normalizedUrl: "https://newapi.example.com/v1",
+    });
+  });
+
+  it("rejects non-admin callers without probing upstream", async () => {
+    getSessionMock.mockResolvedValue({ user: { role: "user" } });
+
+    const result = await fetchNewapiUpstreamGroups({
+      providerUrl: "https://newapi.example.com/v1",
+    });
+
+    expect(result.ok).toBe(false);
+    expect(getNewapiRatioTableMock).not.toHaveBeenCalled();
+  });
+
+  it("validates the provider and proxy URLs before probing", async () => {
+    validateProviderUrlForConnectivityMock.mockReturnValue({
+      valid: false,
+      error: { message: "invalid provider URL" },
+    });
+
+    const invalidProvider = await fetchNewapiUpstreamGroups({ providerUrl: "not-a-url" });
+    expect(invalidProvider).toMatchObject({ ok: false, error: "invalid provider URL" });
+    expect(getNewapiRatioTableMock).not.toHaveBeenCalled();
+
+    validateProviderUrlForConnectivityMock.mockReturnValue({
+      valid: true,
+      normalizedUrl: "https://newapi.example.com/v1",
+    });
+    isValidProxyUrlMock.mockReturnValue(false);
+
+    const invalidProxy = await fetchNewapiUpstreamGroups({
+      providerUrl: "https://newapi.example.com/v1",
+      proxyUrl: "bad-proxy",
+    });
+    expect(invalidProxy.ok).toBe(false);
+    expect(getNewapiRatioTableMock).not.toHaveBeenCalled();
+  });
+
+  it("returns groups sorted by ratio and name using a forced refresh", async () => {
+    getNewapiRatioTableMock.mockResolvedValue({
+      ok: true,
+      table: { vip: 0.8, default: 1, beta: 0.8 },
+    });
+
+    const result = await fetchNewapiUpstreamGroups({
+      providerUrl: "https://newapi.example.com/v1",
+      proxyUrl: "http://proxy.example.com:8080",
+      proxyFallbackToDirect: true,
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      data: {
+        groups: [
+          { name: "beta", ratio: 0.8 },
+          { name: "vip", ratio: 0.8 },
+          { name: "default", ratio: 1 },
+        ],
+      },
+    });
+    expect(getNewapiRatioTableMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 0,
+        url: "https://newapi.example.com/v1",
+        proxyUrl: "http://proxy.example.com:8080",
+        proxyFallbackToDirect: true,
+      }),
+      { forceRefresh: true }
+    );
+  });
+
+  it("reports unsupported upstream pricing tables", async () => {
+    getNewapiRatioTableMock.mockResolvedValue({
+      ok: false,
+      reason: "unsupported",
+      status: 404,
+    });
+
+    const result = await fetchNewapiUpstreamGroups({
+      providerUrl: "https://newapi.example.com/v1",
+    });
+
+    expect(result.ok).toBe(false);
   });
 });

@@ -218,6 +218,8 @@ export async function createProvider(providerData: CreateProviderData): Promise<
     rateMarkupType: providerData.rate_markup_type ?? "none",
     rateMarkupValue:
       providerData.rate_markup_value != null ? providerData.rate_markup_value.toString() : "0",
+    rateUpstreamType: providerData.rate_upstream_type ?? "sub2api",
+    newapiGroup: providerData.newapi_group ?? null,
     groupTag: providerData.group_tag,
     providerType: providerData.provider_type,
     preserveClientIp: providerData.preserve_client_ip ?? false,
@@ -314,6 +316,9 @@ export async function createProvider(providerData: CreateProviderData): Promise<
         rateMarkupValue: providers.rateMarkupValue,
         upstreamRateMultiplier: providers.upstreamRateMultiplier,
         upstreamRateSyncedAt: providers.upstreamRateSyncedAt,
+        rateUpstreamType: providers.rateUpstreamType,
+        newapiGroup: providers.newapiGroup,
+        newapiDetectedGroup: providers.newapiDetectedGroup,
         groupTag: providers.groupTag,
         providerType: providers.providerType,
         preserveClientIp: providers.preserveClientIp,
@@ -409,6 +414,9 @@ export async function findProviderList(
       rateMarkupValue: providers.rateMarkupValue,
       upstreamRateMultiplier: providers.upstreamRateMultiplier,
       upstreamRateSyncedAt: providers.upstreamRateSyncedAt,
+      rateUpstreamType: providers.rateUpstreamType,
+      newapiGroup: providers.newapiGroup,
+      newapiDetectedGroup: providers.newapiDetectedGroup,
       groupTag: providers.groupTag,
       providerType: providers.providerType,
       preserveClientIp: providers.preserveClientIp,
@@ -504,6 +512,9 @@ export async function findAllProvidersFresh(): Promise<Provider[]> {
       rateMarkupValue: providers.rateMarkupValue,
       upstreamRateMultiplier: providers.upstreamRateMultiplier,
       upstreamRateSyncedAt: providers.upstreamRateSyncedAt,
+      rateUpstreamType: providers.rateUpstreamType,
+      newapiGroup: providers.newapiGroup,
+      newapiDetectedGroup: providers.newapiDetectedGroup,
       groupTag: providers.groupTag,
       providerType: providers.providerType,
       preserveClientIp: providers.preserveClientIp,
@@ -603,6 +614,9 @@ export async function findProviderById(id: number): Promise<Provider | null> {
       rateMarkupValue: providers.rateMarkupValue,
       upstreamRateMultiplier: providers.upstreamRateMultiplier,
       upstreamRateSyncedAt: providers.upstreamRateSyncedAt,
+      rateUpstreamType: providers.rateUpstreamType,
+      newapiGroup: providers.newapiGroup,
+      newapiDetectedGroup: providers.newapiDetectedGroup,
       groupTag: providers.groupTag,
       providerType: providers.providerType,
       preserveClientIp: providers.preserveClientIp,
@@ -700,6 +714,9 @@ export async function updateProvider(
   if (providerData.rate_markup_value !== undefined)
     dbData.rateMarkupValue =
       providerData.rate_markup_value != null ? providerData.rate_markup_value.toString() : "0";
+  if (providerData.rate_upstream_type !== undefined)
+    dbData.rateUpstreamType = providerData.rate_upstream_type;
+  if (providerData.newapi_group !== undefined) dbData.newapiGroup = providerData.newapi_group;
   if (providerData.group_tag !== undefined) dbData.groupTag = providerData.group_tag;
   if (providerData.provider_type !== undefined) dbData.providerType = providerData.provider_type;
   if (providerData.preserve_client_ip !== undefined)
@@ -872,6 +889,9 @@ export async function updateProvider(
         rateMarkupValue: providers.rateMarkupValue,
         upstreamRateMultiplier: providers.upstreamRateMultiplier,
         upstreamRateSyncedAt: providers.upstreamRateSyncedAt,
+        rateUpstreamType: providers.rateUpstreamType,
+        newapiGroup: providers.newapiGroup,
+        newapiDetectedGroup: providers.newapiDetectedGroup,
         groupTag: providers.groupTag,
         providerType: providers.providerType,
         preserveClientIp: providers.preserveClientIp,
@@ -2495,6 +2515,7 @@ export async function findFollowUpstreamProviders(): Promise<Provider[]> {
 /**
  * 上游倍率探测成功后回写结果：
  * cost_multiplier = 加价后的最终倍率，并记录上游倍率快照与同步时间。
+ * detectedGroup 仅 newapi 协议传入（观测到的实际落组分组）；undefined 表示不动该列。
  */
 export async function updateUpstreamBillingProbeResult(
   id: number,
@@ -2502,6 +2523,7 @@ export async function updateUpstreamBillingProbeResult(
     costMultiplier: number;
     upstreamRateMultiplier: number;
     syncedAt: Date;
+    detectedGroup?: string | null;
   },
   expectedUpdatedAt: Date
 ): Promise<boolean> {
@@ -2511,6 +2533,7 @@ export async function updateUpstreamBillingProbeResult(
       costMultiplier: result.costMultiplier.toString(),
       upstreamRateMultiplier: result.upstreamRateMultiplier.toString(),
       upstreamRateSyncedAt: result.syncedAt,
+      ...(result.detectedGroup !== undefined ? { newapiDetectedGroup: result.detectedGroup } : {}),
       updatedAt: new Date(),
     })
     .where(

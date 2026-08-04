@@ -434,9 +434,27 @@
     "upstreamRate": {
       "follow": {
         "label": "Follow upstream rate",
-        "desc": "Periodically probe the billing rate of the upstream sub2api and automatically sync it to the cost multiplier (requires upstream support for GET /v1/sub2api/billing)"
+        "desc": "Periodically probe the upstream billing rate and automatically sync it to the cost multiplier (choose the probe protocol below: sub2api or new-api)"
       },
       "costAutoSync": "Follow upstream rate is enabled. The cost multiplier is automatically written back from probe results (the current value is the effective value)",
+      "probeType": {
+        "label": "Probe protocol",
+        "desc": "sub2api probes GET /v1/sub2api/billing; new-api reads the anonymous group ratio table (/api/pricing) and calibrates the key's actual billing group via its consume logs",
+        "options": {
+          "sub2api": "sub2api",
+          "newapi": "new-api"
+        }
+      },
+      "group": {
+        "label": "Upstream group",
+        "desc": "The key's group name on the new-api site. The actual billing group observed from consume logs takes precedence during probing; this value is the fallback when logs are unavailable. Leave empty to rely on log detection only",
+        "placeholder": "e.g. default",
+        "fetch": "Fetch groups",
+        "fetchNeedUrl": "Please fill in the provider URL first",
+        "fetchFailed": "Failed to fetch upstream groups",
+        "fetchEmpty": "The upstream anonymous ratio table exposes no groups; you can still enter a group name manually",
+        "hint": "The new-api log endpoint is rate limited per source IP (default 20 requests / 20 min). Recommended probe interval is at least 5 minutes; increase it when many keys point to the same site"
+      },
       "defaultRate": {
         "label": "Default rate",
         "desc": "Fallback rate used when probing fails or the upstream is not supported. Must be configured before enabling follow",
@@ -456,7 +474,8 @@
         "desc": "For percentage mode enter a decimal (0.1 means +10%); for fixed mode the value is added directly to the rate",
         "placeholder": "0"
       },
-      "lastSync": "Last sync: upstream rate {rate}, at {time}"
+      "lastSync": "Last sync: upstream rate {rate}, at {time}",
+      "detectedGroup": "Detected group: {group}"
     },
     "activeTime": {
       "title": "Scheduled Active Time",

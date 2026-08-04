@@ -1,14 +1,25 @@
+import { logger } from "@/lib/logger";
 import { probeUpstreamBilling } from "@/lib/upstream-billing/client";
-import { applyMarkup } from "@/lib/upstream-billing/rate-resolver";
+import { fetchNewapiTokenGroup } from "@/lib/upstream-billing/newapi-client";
+import { getNewapiRatioTable } from "@/lib/upstream-billing/newapi-table-cache";
+import { applyMarkup, isValidUpstreamRate } from "@/lib/upstream-billing/rate-resolver";
 import { restoreProviderCostMultiplier, updateUpstreamBillingProbeResult } from "@/repository";
 import type { Provider } from "@/types/provider";
 
 /**
  * 上游倍率同步核心逻辑（调度器与手动「立即同步」共用）。
  *
- * - 探测成功：回写 cost_multiplier = applyMarkup(resolved_rate_multiplier)，并记录快照；
- * - 上游不支持（HTTP 400/404）：若当前值与默认倍率（加价后）不一致则还原，否则不动；
- * - 其他失败：若曾成功同步，前两次沿用旧值，第三次起回退默认倍率。
+ * 按 provider.rateUpstreamType 分发两种探测协议：
+ * - sub2api：GET {版本根}/sub2api/billing，消费 resolved_rate_multiplier；
+ * - newapi：匿名 GET {站点}/api/pricing 取 group_ratio 倍率表，配合
+ *   GET {站点}/api/log/token 校准 key 实际落组分组后取对应分组倍率。
+ *
+ * 共同的回写/回退语义：
+ * - 探测成功：回写 cost_multiplier = applyMarkup(upstream_rate)，并记录快照；
+ * - 上游不支持（sub2api HTTP 404；newapi pricing 403/404）：立即还原默认倍率；
+ * - 其他失败：若曾成功同步，前两次沿用旧值，第三次起回退默认倍率；
+ * - newapi 特有：分组无法确定（group_unknown）按普通失败处理；
+ *   分组不在匿名倍率表（group_not_in_table）属配置问题，立即还原默认倍率并按 8x 退避。
  */
 
 // cost_multiplier 浮点比较容差（避免无效写库与缓存失效广播）
@@ -37,6 +48,16 @@ export interface UpstreamRateSyncOptions {
 export async function syncProviderUpstreamRate(
   provider: Provider,
   options: UpstreamRateSyncOptions = {}
+): Promise<UpstreamRateSyncOutcome> {
+  if (provider.rateUpstreamType === "newapi") {
+    return syncProviderUpstreamRateNewApi(provider, options);
+  }
+  return syncProviderUpstreamRateSub2api(provider, options);
+}
+
+async function syncProviderUpstreamRateSub2api(
+  provider: Provider,
+  options: UpstreamRateSyncOptions
 ): Promise<UpstreamRateSyncOutcome> {
   let result: Awaited<ReturnType<typeof probeUpstreamBilling>>;
   try {
@@ -88,11 +109,27 @@ export async function syncProviderUpstreamRate(
     return { status: "unsupported", wrote: false };
   }
 
-  const failure = {
-    status: "failed",
+  return buildFailureOutcome(provider, options, {
     reason: result.reason,
     error: result.error,
     httpStatus: result.status,
+  });
+}
+
+/**
+ * 失败 outcome 构造：若已连续失败 >=3 次且曾成功同步过，则回退默认倍率。
+ * sub2api 与 newapi 两条路径共用，保证失败语义一致。
+ */
+async function buildFailureOutcome(
+  provider: Provider,
+  options: UpstreamRateSyncOptions,
+  failure: { reason: string; error?: string; httpStatus?: number }
+): Promise<UpstreamRateSyncOutcome> {
+  const base = {
+    status: "failed",
+    reason: failure.reason,
+    error: failure.error,
+    httpStatus: failure.httpStatus,
     wrote: false,
   } as const;
 
@@ -102,7 +139,7 @@ export async function syncProviderUpstreamRate(
     provider.rateDefaultMultiplier != null;
 
   if (!shouldRestoreDefault || provider.rateDefaultMultiplier == null) {
-    return failure;
+    return base;
   }
 
   const fallbackRate = applyMarkup(
@@ -112,7 +149,7 @@ export async function syncProviderUpstreamRate(
   );
   if (Math.abs(provider.costMultiplier - fallbackRate) <= COST_MULTIPLIER_EPSILON) {
     return {
-      ...failure,
+      ...base,
       fallbackApplied: true,
       fallbackRate,
     };
@@ -120,10 +157,152 @@ export async function syncProviderUpstreamRate(
 
   const wrote = await restoreProviderCostMultiplier(provider.id, fallbackRate, provider.updatedAt);
   return {
-    ...failure,
+    ...base,
     wrote,
     fallbackApplied: wrote,
     fallbackRate,
     ...(wrote ? {} : { fallbackError: "provider_changed" as const }),
   };
+}
+
+/**
+ * new-api 协议同步：
+ * 1. 取站点级倍率表（进程内缓存，多 provider 同站点每轮只拉一次）；
+ * 2. 用 sk- 拉 /api/log/token 求众数分组做校准——校准失败/无日志不阻塞，
+ *    回落到用户配置的 newapiGroup；
+ * 3. 分组仍为空 -> group_unknown（普通失败，3 次宽限后回退默认倍率）；
+ * 4. 分组不在匿名倍率表或倍率越界 -> group_not_in_table（配置问题，
+ *    立即还原默认倍率，调度器按 8x 退避）。
+ */
+async function syncProviderUpstreamRateNewApi(
+  provider: Provider,
+  options: UpstreamRateSyncOptions
+): Promise<UpstreamRateSyncOutcome> {
+  let tableResult: Awaited<ReturnType<typeof getNewapiRatioTable>>;
+  try {
+    tableResult = await getNewapiRatioTable(provider);
+  } catch (error) {
+    tableResult = {
+      ok: false,
+      reason: "network",
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+
+  if (!tableResult.ok) {
+    if (tableResult.reason === "unsupported") {
+      // pricing 模块关闭/非 new-api 站点：与 sub2api unsupported 同语义，立即还原默认倍率
+      if (provider.rateDefaultMultiplier != null) {
+        const fallbackRate = applyMarkup(
+          provider.rateDefaultMultiplier,
+          provider.rateMarkupType,
+          provider.rateMarkupValue
+        );
+        if (Math.abs(provider.costMultiplier - fallbackRate) > COST_MULTIPLIER_EPSILON) {
+          const wrote = await restoreProviderCostMultiplier(
+            provider.id,
+            fallbackRate,
+            provider.updatedAt
+          );
+          if (!wrote) {
+            return { status: "failed", reason: "provider_changed", wrote: false };
+          }
+          return { status: "unsupported_restored", finalRate: fallbackRate, wrote: true };
+        }
+      }
+      return { status: "unsupported", wrote: false };
+    }
+
+    return buildFailureOutcome(provider, options, {
+      reason: tableResult.reason,
+      error: tableResult.error,
+      httpStatus: tableResult.status,
+    });
+  }
+
+  // 日志校准：任何失败都只降级不阻塞（表已拿到，配置分组仍可同步）
+  let observedGroup: string | null = null;
+  try {
+    const groupResult = await fetchNewapiTokenGroup(provider);
+    if (groupResult.ok) {
+      observedGroup = groupResult.group;
+    } else {
+      logger.warn("[UpstreamBilling] newapi group calibration failed, using configured group", {
+        providerId: provider.id,
+        reason: groupResult.reason,
+        error: groupResult.error,
+      });
+    }
+  } catch (error) {
+    logger.warn("[UpstreamBilling] newapi group calibration error, using configured group", {
+      providerId: provider.id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  const configuredGroup = provider.newapiGroup?.trim() || null;
+  const effectiveGroup = observedGroup ?? configuredGroup;
+
+  if (!effectiveGroup) {
+    return buildFailureOutcome(provider, options, {
+      reason: "group_unknown",
+      error: "billing group unknown: no consume logs for this key and no upstream group configured",
+    });
+  }
+
+  const rate = tableResult.table[effectiveGroup];
+  if (rate == null || !isValidUpstreamRate(rate)) {
+    // 组不在匿名倍率表（可能被站点「用户可用分组」过滤或倍率越界）：配置问题，立即还原默认倍率
+    const error = `group "${effectiveGroup}" is not in the upstream anonymous ratio table (or its ratio is out of range); check the group config or the default rate`;
+    if (provider.rateDefaultMultiplier != null) {
+      const fallbackRate = applyMarkup(
+        provider.rateDefaultMultiplier,
+        provider.rateMarkupType,
+        provider.rateMarkupValue
+      );
+      if (Math.abs(provider.costMultiplier - fallbackRate) <= COST_MULTIPLIER_EPSILON) {
+        return {
+          status: "failed",
+          reason: "group_not_in_table",
+          error,
+          wrote: false,
+          fallbackApplied: true,
+          fallbackRate,
+        };
+      }
+      const wrote = await restoreProviderCostMultiplier(
+        provider.id,
+        fallbackRate,
+        provider.updatedAt
+      );
+      return {
+        status: "failed",
+        reason: "group_not_in_table",
+        error,
+        wrote,
+        fallbackApplied: wrote,
+        fallbackRate,
+        ...(wrote ? {} : { fallbackError: "provider_changed" as const }),
+      };
+    }
+    return { status: "failed", reason: "group_not_in_table", error, wrote: false };
+  }
+
+  const finalRate = applyMarkup(rate, provider.rateMarkupType, provider.rateMarkupValue);
+  const wrote = await updateUpstreamBillingProbeResult(
+    provider.id,
+    {
+      costMultiplier: finalRate,
+      upstreamRateMultiplier: rate,
+      syncedAt: new Date(),
+      // Only persist a detected-group snapshot when it came from consume logs.
+      // A configured fallback is effective for this sync, but was not actually observed.
+      ...(observedGroup !== null ? { detectedGroup: observedGroup } : {}),
+    },
+    provider.updatedAt
+  );
+  if (!wrote) {
+    return { status: "failed", reason: "provider_changed", wrote: false };
+  }
+  return { status: "synced", upstreamRate: rate, finalRate, wrote: true };
 }

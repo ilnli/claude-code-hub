@@ -8,6 +8,8 @@ let findFollowUpstreamProvidersMock: ReturnType<typeof vi.fn>;
 let updateUpstreamBillingProbeResultMock: ReturnType<typeof vi.fn>;
 let restoreProviderCostMultiplierMock: ReturnType<typeof vi.fn>;
 let probeUpstreamBillingMock: ReturnType<typeof vi.fn>;
+let getNewapiRatioTableMock: ReturnType<typeof vi.fn>;
+let fetchNewapiTokenGroupMock: ReturnType<typeof vi.fn>;
 let getSettingsMock: ReturnType<typeof vi.fn>;
 let publishInvalidationMock: ReturnType<typeof vi.fn>;
 let sendFailureAlertMock: ReturnType<typeof vi.fn>;
@@ -41,6 +43,14 @@ vi.mock("@/lib/system-settings/upstream-billing-probe", () => ({
 
 vi.mock("@/lib/upstream-billing/client", () => ({
   probeUpstreamBilling: (...args: unknown[]) => probeUpstreamBillingMock(...args),
+}));
+
+vi.mock("@/lib/upstream-billing/newapi-table-cache", () => ({
+  getNewapiRatioTable: (...args: unknown[]) => getNewapiRatioTableMock(...args),
+}));
+
+vi.mock("@/lib/upstream-billing/newapi-client", () => ({
+  fetchNewapiTokenGroup: (...args: unknown[]) => fetchNewapiTokenGroupMock(...args),
 }));
 
 vi.mock("@/repository", () => ({
@@ -81,6 +91,9 @@ function makeProvider(overrides: Partial<Provider> = {}): Provider {
     rateMarkupValue: 0,
     upstreamRateMultiplier: null,
     upstreamRateSyncedAt: null,
+    rateUpstreamType: "sub2api",
+    newapiGroup: null,
+    newapiDetectedGroup: null,
     isEnabled: true,
     proxyUrl: null,
     proxyFallbackToDirect: false,
@@ -118,6 +131,8 @@ describe("upstream-billing probe-scheduler", () => {
     updateUpstreamBillingProbeResultMock = vi.fn().mockResolvedValue(true);
     restoreProviderCostMultiplierMock = vi.fn().mockResolvedValue(true);
     probeUpstreamBillingMock = vi.fn();
+    getNewapiRatioTableMock = vi.fn();
+    fetchNewapiTokenGroupMock = vi.fn();
     getSettingsMock = vi.fn().mockResolvedValue({ enabled: true, intervalMinutes: 30 });
     publishInvalidationMock = vi.fn().mockResolvedValue(undefined);
     sendFailureAlertMock = vi.fn().mockResolvedValue(undefined);
@@ -266,6 +281,49 @@ describe("upstream-billing probe-scheduler", () => {
     setClockMinutes(INTERVAL_MINUTES);
     await runNextCycle();
     expect(probeUpstreamBillingMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("enforces a five-minute minimum interval for newapi probes", async () => {
+    getSettingsMock.mockResolvedValue({ enabled: true, intervalMinutes: 1 });
+    findFollowUpstreamProvidersMock.mockResolvedValue([
+      makeProvider({ rateUpstreamType: "newapi", newapiGroup: "default" }),
+    ]);
+    getNewapiRatioTableMock.mockResolvedValue({ ok: true, table: { default: 1 } });
+    fetchNewapiTokenGroupMock.mockResolvedValue({ ok: true, group: "default" });
+
+    startUpstreamBillingProbeScheduler();
+    await waitForCurrentCycle();
+    expect(getNewapiRatioTableMock).toHaveBeenCalledTimes(1);
+    expect(probeUpstreamBillingMock).not.toHaveBeenCalled();
+
+    setClockMinutes(4);
+    await runNextCycle();
+    expect(getNewapiRatioTableMock).toHaveBeenCalledTimes(1);
+
+    setClockMinutes(5);
+    await runNextCycle();
+    expect(getNewapiRatioTableMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("backs off a missing newapi group for eight effective intervals", async () => {
+    getSettingsMock.mockResolvedValue({ enabled: true, intervalMinutes: 1 });
+    findFollowUpstreamProvidersMock.mockResolvedValue([
+      makeProvider({ rateUpstreamType: "newapi", newapiGroup: "default" }),
+    ]);
+    getNewapiRatioTableMock.mockResolvedValue({ ok: true, table: { default: 1 } });
+    fetchNewapiTokenGroupMock.mockResolvedValue({ ok: true, group: "hidden" });
+
+    startUpstreamBillingProbeScheduler();
+    await waitForCurrentCycle();
+    expect(getNewapiRatioTableMock).toHaveBeenCalledTimes(1);
+
+    setClockMinutes(39);
+    await runNextCycle();
+    expect(getNewapiRatioTableMock).toHaveBeenCalledTimes(1);
+
+    setClockMinutes(40);
+    await runNextCycle();
+    expect(getNewapiRatioTableMock).toHaveBeenCalledTimes(2);
   });
 
   it("probes ALL due providers in one cycle without starvation cap", async () => {

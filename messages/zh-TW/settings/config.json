@@ -202,7 +202,7 @@
       "title": "站台參數"
     },
     "upstreamBillingProbe": {
-      "description": "套娃場景下自動跟隨上游 sub2api 的計費倍率",
+      "description": "套娃場景下自動跟隨上游中轉站（sub2api / new-api）的計費倍率",
       "title": "上游倍率探測"
     }
   },

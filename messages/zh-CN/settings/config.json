@@ -16,7 +16,7 @@
     },
     "upstreamBillingProbe": {
       "title": "上游倍率探测",
-      "description": "套娃场景下自动跟随上游 sub2api 的计费倍率"
+      "description": "套娃场景下自动跟随上游中转站（sub2api / new-api）的计费倍率"
     }
   },
   "form": {

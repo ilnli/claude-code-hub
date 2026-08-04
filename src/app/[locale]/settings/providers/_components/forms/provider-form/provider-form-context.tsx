@@ -192,6 +192,8 @@ export function createInitialState(
         rateDefaultMultiplier: null,
         rateMarkupType: "none",
         rateMarkupValue: 0,
+        rateUpstreamType: "sub2api",
+        newapiGroup: "",
         cacheTtlPreference:
           analysis.routing.cacheTtlPreference.status === "uniform"
             ? analysis.routing.cacheTtlPreference.value
@@ -368,6 +370,8 @@ export function createInitialState(
         rateDefaultMultiplier: null,
         rateMarkupType: "none",
         rateMarkupValue: 0,
+        rateUpstreamType: "sub2api",
+        newapiGroup: "",
         cacheTtlPreference: "inherit",
         swapCacheTtlBilling: false,
         codexReasoningEffortPreference: "inherit",
@@ -450,6 +454,8 @@ export function createInitialState(
       rateDefaultMultiplier: sourceProvider?.rateDefaultMultiplier ?? null,
       rateMarkupType: sourceProvider?.rateMarkupType ?? "none",
       rateMarkupValue: sourceProvider?.rateMarkupValue ?? 0,
+      rateUpstreamType: sourceProvider?.rateUpstreamType ?? "sub2api",
+      newapiGroup: sourceProvider?.newapiGroup ?? "",
       cacheTtlPreference: sourceProvider?.cacheTtlPreference ?? "inherit",
       swapCacheTtlBilling: sourceProvider?.swapCacheTtlBilling ?? false,
       codexReasoningEffortPreference: sourceProvider?.codexReasoningEffortPreference ?? "inherit",
@@ -573,6 +579,10 @@ export function providerFormReducer(
       return { ...state, routing: { ...state.routing, rateMarkupType: action.payload } };
     case "SET_RATE_MARKUP_VALUE":
       return { ...state, routing: { ...state.routing, rateMarkupValue: action.payload } };
+    case "SET_RATE_UPSTREAM_TYPE":
+      return { ...state, routing: { ...state.routing, rateUpstreamType: action.payload } };
+    case "SET_NEWAPI_GROUP":
+      return { ...state, routing: { ...state.routing, newapiGroup: action.payload } };
     case "SET_CACHE_TTL_PREFERENCE":
       return { ...state, routing: { ...state.routing, cacheTtlPreference: action.payload } };
     case "SET_SWAP_CACHE_TTL_BILLING":

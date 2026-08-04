@@ -21,7 +21,7 @@ import type { AllowedModelRuleInput, ProviderModelRedirectRule, ProviderType } f
 import type { FilterOperation } from "@/lib/request-filter-types";
 import type { IpExtractionConfig } from "@/types/ip-extraction";
 import type { AuditCategory } from "@/types/audit-log";
-import type { RateMarkupType } from "@/types/upstream-billing";
+import type { RateMarkupType, UpstreamProbeType } from "@/types/upstream-billing";
 import type { RoutingTraceV1 } from "@/types/routing-trace";
 
 // Enums
@@ -216,6 +216,15 @@ export const providers = pgTable('providers', {
   // 最近一次探测到的上游倍率快照（resolved_rate_multiplier，仅观测用）
   upstreamRateMultiplier: numeric('upstream_rate_multiplier', { precision: 10, scale: 4 }),
   upstreamRateSyncedAt: timestamp('upstream_rate_synced_at', { withTimezone: true }),
+  // 上游探测协议：sub2api=/sub2api/billing；newapi=/api/pricing 倍率表 + /api/log/token 校准落组
+  rateUpstreamType: varchar('rate_upstream_type', { length: 10 })
+    .notNull()
+    .default('sub2api')
+    .$type<UpstreamProbeType>(),
+  // newapi 协议：用户指定的新 api 分组名（日志校准失败/无日志时的兜底；为空表示完全依赖日志发现）
+  newapiGroup: varchar('newapi_group', { length: 64 }),
+  // newapi 协议：最近一次探测观测到的实际落组分组（仅观测快照，由探测写回）
+  newapiDetectedGroup: varchar('newapi_detected_group', { length: 64 }),
 
   groupTag: varchar('group_tag', { length: 255 }),
 

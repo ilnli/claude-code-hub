@@ -31,6 +31,7 @@ import {
   ProviderBatchUpdateSchema,
   ProviderConfirmBodySchema,
   ProviderCreateSchema,
+  ProviderFetchUpstreamGroupsSchema,
   ProviderFetchUpstreamModelsSchema,
   ProviderGroupsQuerySchema,
   ProviderIdsBodySchema,
@@ -546,6 +547,21 @@ export async function fetchProviderUpstreamModels(c: Context): Promise<Response>
   );
 }
 
+export async function fetchProviderUpstreamGroups(c: Context): Promise<Response> {
+  const body = await parseJson(c, ProviderFetchUpstreamGroupsSchema);
+  if (body instanceof Response) return body;
+  const upstreamBillingActions = await import("@/actions/upstream-billing");
+  return actionJson(
+    c,
+    await callAction(
+      c,
+      upstreamBillingActions.fetchNewapiUpstreamGroups,
+      [body] as never[],
+      c.get("auth")
+    )
+  );
+}
+
 export async function getProviderModelSuggestions(c: Context): Promise<Response> {
   const query = ProviderModelSuggestionsQuerySchema.safeParse({
     providerGroup: c.req.query("providerGroup"),
@@ -668,6 +684,9 @@ function sanitizeProvider(
     rateMarkupValue: provider.rateMarkupValue,
     upstreamRateMultiplier: provider.upstreamRateMultiplier,
     upstreamRateSyncedAt: provider.upstreamRateSyncedAt?.toISOString() ?? null,
+    rateUpstreamType: provider.rateUpstreamType,
+    newapiGroup: provider.newapiGroup,
+    newapiDetectedGroup: provider.newapiDetectedGroup,
     groupTag: provider.groupTag,
     providerType: provider.providerType as ProviderSummaryResponse["providerType"],
     providerVendorId: provider.providerVendorId,

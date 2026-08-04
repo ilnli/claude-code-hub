@@ -52,6 +52,17 @@ export const ProviderSummarySchema = z
       .datetime({ offset: true })
       .nullable()
       .describe("Timestamp of the most recent successful upstream rate synchronization."),
+    rateUpstreamType: z
+      .enum(["sub2api", "newapi"])
+      .describe(
+        "Upstream rate probing protocol: sub2api (/sub2api/billing) or newapi (/api/pricing group ratio + /api/log/token group calibration)."
+      ),
+    newapiGroup: NullableStringSchema.describe(
+      "Configured new-api group name used as fallback when log-based group detection is unavailable."
+    ),
+    newapiDetectedGroup: NullableStringSchema.describe(
+      "Most recently observed new-api billing group from token consume logs."
+    ),
     groupTag: NullableStringSchema.describe("Provider group tag."),
     providerType: ProviderTypeSchema,
     providerVendorId: z.number().int().nullable().describe("Provider vendor id."),
@@ -376,6 +387,17 @@ export const ProviderFetchUpstreamModelsSchema = ProviderApiTestSchema.extend({
   providerType: ProviderTypeSchema.describe("Provider type."),
 }).strict();
 
+export const ProviderFetchUpstreamGroupsSchema = z
+  .object({
+    providerUrl: z.string().trim().url().describe("Provider base URL."),
+    proxyUrl: z.string().trim().nullable().optional().describe("Optional proxy URL."),
+    proxyFallbackToDirect: z
+      .boolean()
+      .optional()
+      .describe("Whether proxy failure can fall back to direct."),
+  })
+  .strict();
+
 export const ProviderModelSuggestionsQuerySchema = z.object({
   providerGroup: z.string().nullable().optional().describe("Provider group tag."),
 });
@@ -422,6 +444,21 @@ export const ProviderCreateSchema = z
       .max(100)
       .optional()
       .describe("Markup value applied to the upstream rate."),
+    rate_upstream_type: z
+      .enum(["sub2api", "newapi"])
+      .optional()
+      .describe(
+        "Upstream rate probing protocol: sub2api (/sub2api/billing) or newapi (/api/pricing group ratio + /api/log/token group calibration)."
+      ),
+    newapi_group: z
+      .string()
+      .trim()
+      .max(64)
+      .nullable()
+      .optional()
+      .describe(
+        "Configured new-api group name used as fallback when log-based group detection is unavailable."
+      ),
     group_tag: z.string().max(255).nullable().optional().describe("Provider group tag."),
     group_priorities: z
       .record(z.string(), z.number().int().min(0))

@@ -364,6 +364,12 @@ function ProviderFormContent({
           rate_default_multiplier: state.routing.rateDefaultMultiplier,
           rate_markup_type: state.routing.rateMarkupType,
           rate_markup_value: state.routing.rateMarkupValue,
+          rate_upstream_type: state.routing.rateUpstreamType,
+          // sub2api 协议不使用分组字段，提交时置空避免残留脏数据
+          newapi_group:
+            state.routing.rateUpstreamType === "newapi" && state.routing.newapiGroup.trim()
+              ? state.routing.newapiGroup.trim()
+              : null,
           group_tag: state.routing.groupTag.length > 0 ? state.routing.groupTag.join(",") : null,
           cache_ttl_preference: state.routing.cacheTtlPreference,
           swap_cache_ttl_billing: state.routing.swapCacheTtlBilling,

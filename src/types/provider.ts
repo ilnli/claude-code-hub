@@ -1,7 +1,7 @@
 // 供应商类型枚举
 
 import type { CacheTtlPreference } from "./cache";
-import type { RateMarkupType } from "./upstream-billing";
+import type { RateMarkupType, UpstreamProbeType } from "./upstream-billing";
 
 export type ProviderType =
   | "claude"
@@ -341,6 +341,12 @@ export interface Provider {
   // 最近一次探测到的上游倍率（仅观测用）
   upstreamRateMultiplier: number | null;
   upstreamRateSyncedAt: Date | null;
+  // 上游探测协议：sub2api / newapi
+  rateUpstreamType: UpstreamProbeType;
+  // newapi 协议：用户指定的分组名（日志校准不可用时的兜底）
+  newapiGroup: string | null;
+  // newapi 协议：最近一次探测观测到的实际落组分组（仅观测用）
+  newapiDetectedGroup: string | null;
   groupTag: string | null;
 
   // 供应商类型：扩展支持 4 种类型
@@ -470,6 +476,10 @@ export interface ProviderDisplay {
   rateMarkupValue: number;
   upstreamRateMultiplier: number | null;
   upstreamRateSyncedAt: Date | null;
+  // 上游探测协议与 newapi 分组观测
+  rateUpstreamType: UpstreamProbeType;
+  newapiGroup: string | null;
+  newapiDetectedGroup: string | null;
   groupTag: string | null;
   // 供应商类型
   providerType: ProviderType;
@@ -597,6 +607,9 @@ export interface CreateProviderData {
   rate_default_multiplier?: number | null;
   rate_markup_type?: RateMarkupType;
   rate_markup_value?: number;
+  // 上游探测协议（默认 sub2api）与 newapi 分组名（日志校准兜底）
+  rate_upstream_type?: UpstreamProbeType;
+  newapi_group?: string | null;
   group_tag?: string | null;
 
   // 供应商类型和模型配置
@@ -687,6 +700,9 @@ export interface UpdateProviderData {
   rate_default_multiplier?: number | null;
   rate_markup_type?: RateMarkupType;
   rate_markup_value?: number;
+  // 上游探测协议（默认 sub2api）与 newapi 分组名（日志校准兜底）
+  rate_upstream_type?: UpstreamProbeType;
+  newapi_group?: string | null;
   group_tag?: string | null;
 
   // 供应商类型和模型配置

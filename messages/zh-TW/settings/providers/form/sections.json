@@ -434,9 +434,27 @@
     "upstreamRate": {
       "follow": {
         "label": "跟隨上游倍率",
-        "desc": "定時探測上游 sub2api 的計費倍率並自動同步到成本倍數（需上游支援 GET /v1/sub2api/billing）"
+        "desc": "定時探測上游計費倍率並自動同步到成本倍數（在下方選擇探測協議：sub2api 或 new-api）"
       },
       "costAutoSync": "跟隨上游倍率已開啟，成本倍數由探測結果自動回寫（目前值即生效值）",
+      "probeType": {
+        "label": "探測協議",
+        "desc": "sub2api 探測 GET /v1/sub2api/billing；new-api 讀取匿名分組倍率表（/api/pricing），並透過 key 的消費日誌校準實際落組分組",
+        "options": {
+          "sub2api": "sub2api",
+          "newapi": "new-api"
+        }
+      },
+      "group": {
+        "label": "上游分組",
+        "desc": "該 key 在 new-api 站點的分組名。探測時以消費日誌觀測到的實際落組為準，日誌不可用（新 key 或站點關閉日誌）時回退到此配置；留空則完全依賴日誌發現",
+        "placeholder": "例如 default",
+        "fetch": "拉取分組",
+        "fetchNeedUrl": "請先填寫供應商 URL",
+        "fetchFailed": "拉取上游分組失敗",
+        "fetchEmpty": "上游匿名倍率表未暴露任何分組，可手動填寫組名",
+        "hint": "new-api 日誌端點按來源 IP 限流（預設 20 次/20 分鐘）。探測間隔建議 ≥5 分鐘；同一站點接入多把 key 時請調大間隔"
+      },
       "defaultRate": {
         "label": "預設倍率",
         "desc": "探測失敗或上游不支援時的兜底倍率，開啟跟隨前必須設定",
@@ -456,7 +474,8 @@
         "desc": "百分比方式填小數（0.1 表示 +10%），固定值方式直接加到倍率上",
         "placeholder": "0"
       },
-      "lastSync": "最近同步：上游倍率 {rate}，時間 {time}"
+      "lastSync": "最近同步：上游倍率 {rate}，時間 {time}",
+      "detectedGroup": "探測分組：{group}"
     },
     "activeTime": {
       "title": "排程時間窗口",

@@ -509,6 +509,16 @@ export const CreateProviderSchema = z
       .max(100, "加价数值不能超过 100")
       .optional()
       .default(0),
+    // 上游探测协议：sub2api=探测端点；newapi=倍率表+日志校准落组
+    rate_upstream_type: z.enum(["sub2api", "newapi"]).optional().default("sub2api"),
+    // newapi 协议：用户指定的分组名（日志校准不可用时的兜底；null=清除）
+    newapi_group: z
+      .string()
+      .trim()
+      .max(64, "上游分组名不能超过64个字符")
+      .nullable()
+      .optional()
+      .default(null),
     group_tag: z.string().max(255, "分组标签不能超过255个字符").nullable().optional(),
     // Codex 支持:供应商类型和模型重定向
     provider_type: z
@@ -784,6 +794,10 @@ export const UpdateProviderSchema = z
       .min(0, "加价数值不能为负数")
       .max(100, "加价数值不能超过 100")
       .optional(),
+    // 上游探测协议：sub2api=探测端点；newapi=倍率表+日志校准落组
+    rate_upstream_type: z.enum(["sub2api", "newapi"]).optional(),
+    // newapi 协议：用户指定的分组名（日志校准不可用时的兜底；null=清除）
+    newapi_group: z.string().trim().max(64, "上游分组名不能超过64个字符").nullable().optional(),
     group_tag: z.string().max(255, "分组标签不能超过255个字符").nullable().optional(),
     // Codex 支持:供应商类型和模型重定向
     provider_type: z

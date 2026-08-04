@@ -121,6 +121,9 @@ export function toProvider(dbProvider: any): Provider {
     upstreamRateSyncedAt: dbProvider?.upstreamRateSyncedAt
       ? new Date(dbProvider.upstreamRateSyncedAt)
       : null,
+    rateUpstreamType: dbProvider?.rateUpstreamType ?? "sub2api",
+    newapiGroup: dbProvider?.newapiGroup ?? null,
+    newapiDetectedGroup: dbProvider?.newapiDetectedGroup ?? null,
     groupTag: dbProvider?.groupTag ?? null,
     providerType: dbProvider?.providerType ?? "claude",
     preserveClientIp: dbProvider?.preserveClientIp ?? false,

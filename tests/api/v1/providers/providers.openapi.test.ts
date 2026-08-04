@@ -35,6 +35,7 @@ describe("v1 providers OpenAPI", () => {
     expect(doc.paths).toHaveProperty("/api/v1/providers/test:gemini");
     expect(doc.paths).toHaveProperty("/api/v1/providers/test:presets");
     expect(doc.paths).toHaveProperty("/api/v1/providers/upstream-models:fetch");
+    expect(doc.paths).toHaveProperty("/api/v1/providers/upstream-groups:fetch");
     expect(doc.paths).toHaveProperty("/api/v1/providers/model-suggestions");
     expect(doc.paths).toHaveProperty("/api/v1/providers/vendors:recluster");
     expect(JSON.stringify(doc.paths["/api/v1/providers"])).toContain("post");

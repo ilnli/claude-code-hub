@@ -3,8 +3,11 @@
 import { getSession } from "@/lib/auth";
 import { publishProviderCacheInvalidation } from "@/lib/cache/provider-cache";
 import { logger } from "@/lib/logger";
+import { isValidProxyUrl } from "@/lib/proxy-agent";
+import { getNewapiRatioTable } from "@/lib/upstream-billing/newapi-table-cache";
 import { syncAndTrackProviderUpstreamRate } from "@/lib/upstream-billing/probe-scheduler";
 import type { UpstreamRateSyncOutcome } from "@/lib/upstream-billing/sync";
+import { validateProviderUrlForConnectivity } from "@/lib/validation/provider-url";
 import { findProviderById } from "@/repository";
 import type { Provider } from "@/types/provider";
 import type { ActionResult } from "./types";
@@ -179,5 +182,69 @@ export async function syncProvidersUpstreamRateBatch(
       error: error instanceof Error ? error.message : String(error),
     });
     return { ok: false, error: "批量同步上游倍率失败" };
+  }
+}
+
+export interface NewapiUpstreamGroupItem {
+  name: string;
+  ratio: number;
+}
+
+/**
+ * 拉取 new-api 站点的匿名分组倍率表（GET {站点}/api/pricing 的 group_ratio），
+ * 供 provider 表单的「上游分组」选择器使用。
+ *
+ * 注意：匿名访问会被上游站点「用户可用分组」配置过滤，看不到的组不会出现在结果中
+ * （表单允许手填组名兜底）。倍率表进程内缓存 60s，此动作用 forceRefresh 强制刷新。
+ */
+export async function fetchNewapiUpstreamGroups(data: {
+  providerUrl: string;
+  proxyUrl?: string | null;
+  proxyFallbackToDirect?: boolean;
+}): Promise<ActionResult<{ groups: NewapiUpstreamGroupItem[] }>> {
+  try {
+    if (!(await requireAdmin())) {
+      return { ok: false, error: "无权限执行此操作" };
+    }
+
+    const urlValidation = validateProviderUrlForConnectivity(data.providerUrl);
+    if (!urlValidation.valid) {
+      return { ok: false, error: urlValidation.error.message };
+    }
+    if (data.proxyUrl && !isValidProxyUrl(data.proxyUrl)) {
+      return { ok: false, error: "代理地址格式无效" };
+    }
+
+    // 构造仅含探测所需字段的临时 provider（id=0 仅用于日志标识）
+    const probeTarget = {
+      id: 0,
+      name: "upstream-groups-probe",
+      url: urlValidation.normalizedUrl,
+      key: "",
+      proxyUrl: data.proxyUrl ?? null,
+      proxyFallbackToDirect: data.proxyFallbackToDirect ?? false,
+    } as Provider;
+
+    const result = await getNewapiRatioTable(probeTarget, { forceRefresh: true });
+    if (!result.ok) {
+      if (result.reason === "unsupported") {
+        return {
+          ok: false,
+          error: "上游未开放匿名倍率表（pricing 模块关闭或不是 new-api 站点）",
+        };
+      }
+      return { ok: false, error: result.error || `拉取上游分组失败（${result.reason}）` };
+    }
+
+    const groups = Object.entries(result.table)
+      .map(([name, ratio]) => ({ name, ratio }))
+      .sort((a, b) => a.ratio - b.ratio || a.name.localeCompare(b.name));
+
+    return { ok: true, data: { groups } };
+  } catch (error) {
+    logger.error("fetchNewapiUpstreamGroups failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return { ok: false, error: "拉取上游分组失败" };
   }
 }
