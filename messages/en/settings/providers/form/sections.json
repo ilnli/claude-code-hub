@@ -391,6 +391,10 @@
       "label": "Skip session reuse",
       "desc": "When enabled, the next request will ignore this provider's sticky binding and rerun priority and health checks. Useful when a cheap higher-priority provider should be retried as soon as it recovers."
     },
+    "modelMismatchAlertExempt": {
+      "label": "Exempt model mismatch alerts",
+      "desc": "Suppress model mismatch notifications when this provider returns a model different from the requested model."
+    },
     "options": {
       "title": "Options",
       "desc": "Additional provider options and overrides"

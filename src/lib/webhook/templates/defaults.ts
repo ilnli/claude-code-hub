@@ -49,6 +49,19 @@ export const DEFAULT_TEMPLATES = {
     topN: "{{top_n}}",
     generatedAt: "{{generated_at}}",
   },
+
+  model_mismatch_alert: {
+    title: "{{title}}",
+    provider: "{{provider_name}}",
+    providerId: "{{provider_id}}",
+    occurrenceCount: "{{occurrence_count}}",
+    requestedModels: "{{requested_models_json}}",
+    actualResponseModels: "{{actual_response_models_json}}",
+    mismatches: "{{mismatches_json}}",
+    windowStart: "{{window_start}}",
+    windowEnd: "{{window_end}}",
+    cooldownMinutes: "{{cooldown_minutes}}",
+  },
 } as const;
 
 export const DEFAULT_TEMPLATE_BY_NOTIFICATION_TYPE: Record<
@@ -59,4 +72,5 @@ export const DEFAULT_TEMPLATE_BY_NOTIFICATION_TYPE: Record<
   daily_leaderboard: DEFAULT_TEMPLATES.daily_leaderboard,
   cost_alert: DEFAULT_TEMPLATES.cost_alert,
   cache_hit_rate_alert: DEFAULT_TEMPLATES.cache_hit_rate_alert,
+  model_mismatch_alert: DEFAULT_TEMPLATES.model_mismatch_alert,
 };

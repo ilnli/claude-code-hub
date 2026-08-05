@@ -54,6 +54,8 @@ export interface NotificationSettingsState {
   cacheHitRateAlertDropAbs: number;
   cacheHitRateAlertCooldownMinutes: number;
   cacheHitRateAlertTopN: number;
+
+  modelMismatchAlertEnabled: boolean;
 }
 
 export interface WebhookTestResult {
@@ -114,6 +116,7 @@ export const NOTIFICATION_TYPES: NotificationType[] = [
   "daily_leaderboard",
   "cost_alert",
   "cache_hit_rate_alert",
+  "model_mismatch_alert",
 ];
 
 const INT32_MAX = 2_147_483_647;
@@ -205,6 +208,7 @@ function toClientSettings(raw: any): NotificationSettingsState {
       1440
     ),
     cacheHitRateAlertTopN: toBoundedInt(raw?.cacheHitRateAlertTopN, 10, 1, 100),
+    modelMismatchAlertEnabled: Boolean(raw?.modelMismatchAlertEnabled),
   };
 }
 
@@ -218,6 +222,7 @@ export function useNotificationsPageData() {
     daily_leaderboard: [],
     cost_alert: [],
     cache_hit_rate_alert: [],
+    model_mismatch_alert: [],
   }));
 
   const [isLoading, setIsLoading] = useState(true);
@@ -381,6 +386,10 @@ export function useNotificationsPageData() {
         if (nextValue !== undefined) {
           payload.cacheHitRateAlertTopN = nextValue;
         }
+      }
+
+      if (patch.modelMismatchAlertEnabled !== undefined) {
+        payload.modelMismatchAlertEnabled = patch.modelMismatchAlertEnabled;
       }
 
       const result = await updateNotificationSettingsAction(payload);

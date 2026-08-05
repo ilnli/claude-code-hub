@@ -97,6 +97,7 @@ function createMockState(
       groupTag: [],
       preserveClientIp: false,
       disableSessionReuse: false,
+      modelMismatchAlertExempt: false,
       modelRedirects: {},
       allowedModels: [],
       allowedClients: [],
@@ -238,6 +239,14 @@ describe("OptionsSection", () => {
       const { unmount } = renderSection();
 
       expect(document.getElementById("disable-session-reuse")).toBeTruthy();
+
+      unmount();
+    });
+
+    it("renders model mismatch alert exemption toggle", () => {
+      const { unmount } = renderSection();
+
+      expect(document.getElementById("model-mismatch-alert-exempt")).toBeTruthy();
 
       unmount();
     });
@@ -399,6 +408,22 @@ describe("OptionsSection", () => {
       unmount();
     });
 
+    it("dispatches SET_MODEL_MISMATCH_ALERT_EXEMPT on toggle", () => {
+      const { unmount } = renderSection();
+      const toggle = document.getElementById("model-mismatch-alert-exempt") as HTMLButtonElement;
+
+      act(() => {
+        toggle.click();
+      });
+
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: "SET_MODEL_MISMATCH_ALERT_EXEMPT",
+        payload: true,
+      });
+
+      unmount();
+    });
+
     it("dispatches active time start/end when enabling", () => {
       const { container, unmount } = renderSection();
       const toggle = getActiveTimeToggle(container);
@@ -507,7 +532,7 @@ describe("OptionsSection", () => {
         container.querySelectorAll('[data-testid="switch"]')
       ) as HTMLButtonElement[];
 
-      expect(switches).toHaveLength(4);
+      expect(switches).toHaveLength(5);
       for (const toggle of switches) {
         expect(toggle.hasAttribute("disabled")).toBe(true);
       }

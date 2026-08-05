@@ -4,6 +4,7 @@ import { buildCacheHitRateAlertMessage } from "./cache-hit-rate-alert";
 import { buildCircuitBreakerMessage } from "./circuit-breaker";
 import { buildCostAlertMessage } from "./cost-alert";
 import { buildDailyLeaderboardMessage } from "./daily-leaderboard";
+import { buildModelMismatchAlertMessage } from "./model-mismatch-alert";
 
 /**
  * 根据通知类型构建测试消息
@@ -99,5 +100,25 @@ export function buildTestMessage(type: NotificationJobType, timezone?: string): 
         },
         timezone
       );
+
+    case "model-mismatch-alert": {
+      const now = new Date();
+      return buildModelMismatchAlertMessage(
+        {
+          providerId: 1,
+          providerName: "测试供应商",
+          occurrenceCount: 3,
+          mismatches: [
+            { requestedModel: "requested-model-a", actualResponseModel: "actual-model-a" },
+            { requestedModel: "requested-model-b", actualResponseModel: "actual-model-b" },
+          ],
+          windowStart: new Date(now.getTime() - 10 * 60 * 1000).toISOString(),
+          windowEnd: now.toISOString(),
+          cooldownMinutes: 10,
+          generatedAt: now.toISOString(),
+        },
+        timezone
+      );
+    }
   }
 }

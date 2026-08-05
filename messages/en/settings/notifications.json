@@ -54,6 +54,11 @@
     "windowMode": "Window",
     "windowModeAuto": "Auto"
   },
+  "modelMismatchAlert": {
+    "title": "Model Mismatch Alert",
+    "description": "Notify when a provider returns a model different from the requested model; events are aggregated per provider for 10 minutes",
+    "enable": "Enable Model Mismatch Alerts"
+  },
   "dailyLeaderboard": {
     "description": "Send daily scheduled user consumption Top N leaderboard",
     "enable": "Enable Daily Leaderboard",

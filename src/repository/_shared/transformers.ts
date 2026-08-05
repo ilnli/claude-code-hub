@@ -128,6 +128,7 @@ export function toProvider(dbProvider: any): Provider {
     providerType: dbProvider?.providerType ?? "claude",
     preserveClientIp: dbProvider?.preserveClientIp ?? false,
     disableSessionReuse: dbProvider?.disableSessionReuse ?? false,
+    modelMismatchAlertExempt: dbProvider?.modelMismatchAlertExempt ?? false,
     modelRedirects: normalizeProviderModelRedirectRules(dbProvider?.modelRedirects),
     activeTimeStart: dbProvider?.activeTimeStart ?? null,
     activeTimeEnd: dbProvider?.activeTimeEnd ?? null,

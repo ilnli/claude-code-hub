@@ -146,6 +146,11 @@
     "minEligibleTokens": "最小可命中 Tokens",
     "topN": "Top N"
   },
+  "modelMismatchAlert": {
+    "title": "掺假检测通知",
+    "description": "当供应商实际响应模型与请求模型不一致时发送通知；同一供应商 10 分钟内的事件会聚合统计",
+    "enable": "启用掺假检测通知"
+  },
   "form": {
     "save": "保存设置",
     "saving": "保存中...",

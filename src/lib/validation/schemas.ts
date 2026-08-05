@@ -527,6 +527,7 @@ export const CreateProviderSchema = z
       .default("claude"),
     preserve_client_ip: z.boolean().optional().default(false),
     disable_session_reuse: z.boolean().optional().default(false),
+    model_mismatch_alert_exempt: z.boolean().optional().default(false),
     model_redirects: PROVIDER_MODEL_REDIRECT_RULES_SCHEMA,
     // Scheduled active time window (HH:mm format)
     active_time_start: z
@@ -805,6 +806,7 @@ export const UpdateProviderSchema = z
       .optional(),
     preserve_client_ip: z.boolean().optional(),
     disable_session_reuse: z.boolean().optional(),
+    model_mismatch_alert_exempt: z.boolean().optional(),
     model_redirects: PROVIDER_MODEL_REDIRECT_RULES_SCHEMA,
     active_time_start: z
       .string()

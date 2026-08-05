@@ -3,7 +3,13 @@ import { IsoDateTimeStringSchema } from "./_common";
 import { WebhookTargetSchema } from "./webhook-targets";
 
 export const NotificationTypeSchema = z
-  .enum(["circuit_breaker", "daily_leaderboard", "cost_alert", "cache_hit_rate_alert"])
+  .enum([
+    "circuit_breaker",
+    "daily_leaderboard",
+    "cost_alert",
+    "cache_hit_rate_alert",
+    "model_mismatch_alert",
+  ])
   .describe("Notification job type.");
 
 export const NotificationTypeParamSchema = z.object({
@@ -74,6 +80,9 @@ export const NotificationSettingsSchema = z
       .nullable()
       .describe("Alert cooldown in minutes."),
     cacheHitRateAlertTopN: z.number().int().nullable().describe("Top N cache hit-rate alerts."),
+    modelMismatchAlertEnabled: z
+      .boolean()
+      .describe("Whether request/response model mismatch alerts are enabled."),
     createdAt: IsoDateTimeStringSchema.nullable().describe("Creation time."),
     updatedAt: IsoDateTimeStringSchema.nullable().describe("Last update time."),
   })

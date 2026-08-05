@@ -38,6 +38,7 @@ export const notificationTypeEnum = pgEnum('notification_type', [
   'daily_leaderboard',
   'cost_alert',
   'cache_hit_rate_alert',
+  'model_mismatch_alert',
 ]);
 
 // Users table
@@ -242,6 +243,8 @@ export const providers = pgTable('providers', {
   preserveClientIp: boolean('preserve_client_ip').notNull().default(false),
   // 是否跳过当前供应商的 sticky session 复用
   disableSessionReuse: boolean('disable_session_reuse').notNull().default(false),
+  // 是否豁免该供应商的请求/响应模型不一致通知
+  modelMismatchAlertExempt: boolean('model_mismatch_alert_exempt').notNull().default(false),
 
   // 模型重定向：将请求的模型名称重定向到另一个模型
   modelRedirects: jsonb('model_redirects').$type<
@@ -1136,6 +1139,9 @@ export const notificationSettings = pgTable('notification_settings', {
   cacheHitRateAlertDropAbs: numeric('cache_hit_rate_alert_drop_abs', { precision: 5, scale: 4 }).default('0.1'),
   cacheHitRateAlertCooldownMinutes: integer('cache_hit_rate_alert_cooldown_minutes').default(30),
   cacheHitRateAlertTopN: integer('cache_hit_rate_alert_top_n').default(10),
+
+  // 请求模型与实际响应模型不一致告警配置
+  modelMismatchAlertEnabled: boolean('model_mismatch_alert_enabled').notNull().default(false),
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),

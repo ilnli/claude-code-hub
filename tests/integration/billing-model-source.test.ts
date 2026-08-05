@@ -67,6 +67,7 @@ vi.mock("@/repository/message", () => ({
   updateMessageRequestCostWithBreakdown: vi.fn(),
   updateMessageRequestDetails: vi.fn(),
   updateMessageRequestDetailsDurably: vi.fn(),
+  updateMessageRequestDetailsIfUnfinalized: vi.fn(async () => true),
   updateMessageRequestDuration: vi.fn(),
 }));
 

@@ -81,6 +81,37 @@ import {
   type StreamProtocolObservation,
 } from "./stream-gate/stream-protocol-observer";
 
+function createModelMismatchAlertEffect(
+  session: ProxySession,
+  provider: Provider,
+  statusCode: number,
+  actualResponseModel: string | null
+): (() => Promise<void>) | null {
+  const requestedModel = session.getCurrentModel()?.trim();
+  const actualModel = actualResponseModel?.trim();
+  if (
+    statusCode < 200 ||
+    statusCode >= 300 ||
+    provider.modelMismatchAlertExempt ||
+    !requestedModel ||
+    !actualModel ||
+    requestedModel === actualModel
+  ) {
+    return null;
+  }
+
+  return async () => {
+    const { recordModelMismatch } = await import("@/lib/notification/model-mismatch-alert");
+    await recordModelMismatch({
+      providerId: provider.id,
+      providerName: provider.name,
+      requestedModel,
+      actualResponseModel: actualModel,
+      modelMismatchAlertExempt: provider.modelMismatchAlertExempt,
+    });
+  };
+}
+
 const CLIENT_ABORT_DRAIN_MAX_MS = 60_000;
 const STREAM_STATS_MAX_BUFFER_BYTES = 10 * 1024 * 1024;
 const STREAM_STATS_HEAD_BYTES = 1024 * 1024;
@@ -3325,6 +3356,20 @@ export class ProxyResponseHandler {
 
         if (messageContext) {
           const duration = Date.now() - session.startTime;
+          const actualResponseModel = extractActualResponseModelForProvider(
+            provider.providerType,
+            false,
+            responseText
+          );
+          const modelMismatchAlertEffect = createModelMismatchAlertEffect(
+            session,
+            provider,
+            statusCode,
+            actualResponseModel
+          );
+          if (modelMismatchAlertEffect) {
+            postTerminalSideEffects.push(modelMismatchAlertEffect);
+          }
           const terminalDetails: MessageRequestTerminalDetails = {
             statusCode: statusCode,
             inputTokens: usageMetrics?.input_tokens,
@@ -3340,11 +3385,7 @@ export class ProxyResponseHandler {
             routingTrace: session.finalizeRoutingTrace(statusCode),
             ...(terminalErrorMessage ? { errorMessage: terminalErrorMessage } : {}),
             model: session.getCurrentModel() ?? undefined, // 更新重定向后的模型
-            actualResponseModel: extractActualResponseModelForProvider(
-              provider.providerType,
-              false,
-              responseText
-            ),
+            actualResponseModel,
             providerId: session.provider?.id, // 更新最终供应商ID（重试切换后）
             context1mApplied: session.getContext1mApplied(),
             swapCacheTtlApplied: session.provider?.swapCacheTtlBilling ?? false,
@@ -4678,6 +4719,15 @@ export class ProxyResponseHandler {
           : extractActualResponseModelForProvider(provider.providerType, true, allContent);
 
         const postTerminalSideEffects = [...latestStreamCommitSideEffects];
+        const modelMismatchAlertEffect = createModelMismatchAlertEffect(
+          session,
+          provider,
+          effectiveStatusCode,
+          finalActualResponseModel
+        );
+        if (modelMismatchAlertEffect) {
+          postTerminalSideEffects.push(modelMismatchAlertEffect);
+        }
         if (codexCacheBinding) {
           const { sessionId, promptCacheKey, providerId, keyId } = codexCacheBinding;
           postTerminalSideEffects.push(async () => {
@@ -6321,6 +6371,22 @@ export async function finalizeRequestStats(
     return null;
   }
   const resolvedIsStream = isStreaming ?? isSSEText(responseText);
+  const actualResponseModel = extractActualResponseModelForProvider(
+    provider.providerType,
+    resolvedIsStream,
+    responseText
+  );
+  const modelMismatchAlertEffect = createModelMismatchAlertEffect(
+    session,
+    provider,
+    statusCode,
+    actualResponseModel
+  );
+  const terminalOnCommitted = modelMismatchAlertEffect
+    ? async () => {
+        await Promise.all([onCommitted?.(), modelMismatchAlertEffect()]);
+      }
+    : onCommitted;
 
   const providerIdForPersistence = providerIdOverride ?? session.provider?.id;
   // Hedge-path (e.g. Gemini passthrough) winners reach finalization here instead of via
@@ -6395,19 +6461,15 @@ export async function finalizeRequestStats(
       providerChain: session.getProviderChain(),
       routingTrace: session.finalizeRoutingTrace(statusCode),
       model: session.getCurrentModel() ?? undefined,
-      actualResponseModel: extractActualResponseModelForProvider(
-        provider.providerType,
-        resolvedIsStream,
-        responseText
-      ),
+      actualResponseModel,
       providerId: providerIdForPersistence,
       context1mApplied: session.getContext1mApplied(),
       swapCacheTtlApplied: session.provider?.swapCacheTtlBilling ?? false,
       specialSettings: session.getSpecialSettings() ?? undefined,
     };
-    if (onCommitted) {
+    if (terminalOnCommitted) {
       await updateMessageRequestDetailsDurably(messageContext.id, terminalDetails, {
-        onCommitted,
+        onCommitted: terminalOnCommitted,
       });
     } else {
       await updateMessageRequestDetailsDurably(messageContext.id, terminalDetails);
@@ -6515,18 +6577,16 @@ export async function finalizeRequestStats(
     routingTrace: session.finalizeRoutingTrace(statusCode),
     ...(errorMessage ? { errorMessage } : {}),
     model: session.getCurrentModel() ?? undefined,
-    actualResponseModel: extractActualResponseModelForProvider(
-      provider.providerType,
-      resolvedIsStream,
-      responseText
-    ),
+    actualResponseModel,
     providerId: providerIdForPersistence, // 更新最终供应商ID（重试切换后）
     context1mApplied: session.getContext1mApplied(),
     swapCacheTtlApplied: provider.swapCacheTtlBilling ?? false,
     specialSettings: session.getSpecialSettings() ?? undefined,
   };
-  if (onCommitted) {
-    await updateMessageRequestDetailsDurably(messageContext.id, terminalDetails, { onCommitted });
+  if (terminalOnCommitted) {
+    await updateMessageRequestDetailsDurably(messageContext.id, terminalDetails, {
+      onCommitted: terminalOnCommitted,
+    });
   } else {
     await updateMessageRequestDetailsDurably(messageContext.id, terminalDetails);
   }

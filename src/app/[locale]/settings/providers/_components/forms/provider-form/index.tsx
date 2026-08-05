@@ -341,6 +341,7 @@ function ProviderFormContent({
           provider_type: state.routing.providerType,
           preserve_client_ip: state.routing.preserveClientIp,
           disable_session_reuse: state.routing.disableSessionReuse,
+          model_mismatch_alert_exempt: state.routing.modelMismatchAlertExempt,
           model_redirects:
             state.routing.modelRedirects.length > 0 ? state.routing.modelRedirects : null,
           allowed_models:

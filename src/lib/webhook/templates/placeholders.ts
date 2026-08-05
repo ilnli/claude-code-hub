@@ -3,6 +3,7 @@ import type {
   CircuitBreakerAlertData,
   CostAlertData,
   DailyLeaderboardData,
+  ModelMismatchAlertData,
   Section,
   SectionContent,
   StructuredMessage,
@@ -20,6 +21,7 @@ export const WEBHOOK_NOTIFICATION_TYPES = [
   "daily_leaderboard",
   "cost_alert",
   "cache_hit_rate_alert",
+  "model_mismatch_alert",
 ] as const satisfies readonly WebhookNotificationType[];
 
 export const TEMPLATE_PLACEHOLDERS = {
@@ -74,6 +76,21 @@ export const TEMPLATE_PLACEHOLDERS = {
     { key: "{{cooldown_minutes}}", label: "冷却分钟", description: "cooldownMinutes" },
     { key: "{{top_n}}", label: "TopN", description: "topN" },
     { key: "{{generated_at}}", label: "生成时间", description: "ISO 8601 格式" },
+  ],
+  model_mismatch_alert: [
+    { key: "{{provider_name}}", label: "供应商名称", description: "发生模型不一致的供应商" },
+    { key: "{{provider_id}}", label: "供应商ID", description: "供应商数字ID" },
+    { key: "{{occurrence_count}}", label: "发生次数", description: "上次通知后累计发生次数" },
+    { key: "{{requested_models_json}}", label: "请求模型", description: "JSON 格式请求模型列表" },
+    {
+      key: "{{actual_response_models_json}}",
+      label: "实际模型",
+      description: "JSON 格式实际响应模型列表",
+    },
+    { key: "{{mismatches_json}}", label: "模型组合", description: "JSON 格式请求与实际模型组合" },
+    { key: "{{window_start}}", label: "统计开始", description: "ISO 8601 格式" },
+    { key: "{{window_end}}", label: "统计结束", description: "ISO 8601 格式" },
+    { key: "{{cooldown_minutes}}", label: "冷却分钟", description: "固定冷却时间" },
   ],
 } as const satisfies Record<string, readonly TemplatePlaceholder[]>;
 
@@ -152,6 +169,26 @@ export function buildTemplateVariables(params: {
       ch?.settings?.cooldownMinutes !== undefined ? String(ch.settings.cooldownMinutes) : "";
     values["{{top_n}}"] = ch?.settings?.topN !== undefined ? String(ch.settings.topN) : "";
     values["{{generated_at}}"] = ch?.generatedAt ?? "";
+  }
+
+  if (notificationType === "model_mismatch_alert") {
+    const mm = data as Partial<ModelMismatchAlertData> | undefined;
+    const mismatches = mm?.mismatches ?? [];
+    values["{{provider_name}}"] = mm?.providerName ?? "";
+    values["{{provider_id}}"] = mm?.providerId !== undefined ? String(mm.providerId) : "";
+    values["{{occurrence_count}}"] =
+      mm?.occurrenceCount !== undefined ? String(mm.occurrenceCount) : "0";
+    values["{{requested_models_json}}"] = safeJsonStringify(
+      Array.from(new Set(mismatches.map((item) => item.requestedModel)))
+    );
+    values["{{actual_response_models_json}}"] = safeJsonStringify(
+      Array.from(new Set(mismatches.map((item) => item.actualResponseModel)))
+    );
+    values["{{mismatches_json}}"] = safeJsonStringify(mismatches);
+    values["{{window_start}}"] = mm?.windowStart ?? "";
+    values["{{window_end}}"] = mm?.windowEnd ?? "";
+    values["{{cooldown_minutes}}"] =
+      mm?.cooldownMinutes !== undefined ? String(mm.cooldownMinutes) : "";
   }
 
   return values;

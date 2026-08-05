@@ -1,6 +1,13 @@
 "use client";
 
-import { AlertTriangle, Database, DollarSign, Settings2, TrendingUp } from "lucide-react";
+import {
+  AlertTriangle,
+  Database,
+  DollarSign,
+  Settings2,
+  ShieldAlert,
+  TrendingUp,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { ComponentProps, ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
@@ -34,7 +41,12 @@ interface TypeConfig {
   iconColor: string;
   iconBgColor: string;
   borderColor: string;
-  IconComponent: typeof AlertTriangle | typeof TrendingUp | typeof DollarSign | typeof Database;
+  IconComponent:
+    | typeof AlertTriangle
+    | typeof TrendingUp
+    | typeof DollarSign
+    | typeof Database
+    | typeof ShieldAlert;
 }
 
 function getTypeConfig(type: NotificationType): TypeConfig {
@@ -66,6 +78,13 @@ function getTypeConfig(type: NotificationType): TypeConfig {
         iconBgColor: "bg-blue-500/10",
         borderColor: "border-blue-500/20 hover:border-blue-500/30",
         IconComponent: Database,
+      };
+    case "model_mismatch_alert":
+      return {
+        iconColor: "text-orange-400",
+        iconBgColor: "bg-orange-500/10",
+        borderColor: "border-orange-500/20 hover:border-orange-500/30",
+        IconComponent: ShieldAlert,
       };
   }
 }
@@ -186,7 +205,8 @@ export function NotificationTypeCard({
     | "circuitBreakerEnabled"
     | "dailyLeaderboardEnabled"
     | "costAlertEnabled"
-    | "cacheHitRateAlertEnabled";
+    | "cacheHitRateAlertEnabled"
+    | "modelMismatchAlertEnabled";
 
   type TypeMeta = {
     title: string;
@@ -229,6 +249,14 @@ export function NotificationTypeCard({
           enabled: settings.cacheHitRateAlertEnabled,
           enabledKey: "cacheHitRateAlertEnabled" as const,
           enableLabel: t("notifications.cacheHitRateAlert.enable"),
+        };
+      case "model_mismatch_alert":
+        return {
+          title: t("notifications.modelMismatchAlert.title"),
+          description: t("notifications.modelMismatchAlert.description"),
+          enabled: settings.modelMismatchAlertEnabled,
+          enabledKey: "modelMismatchAlertEnabled" as const,
+          enableLabel: t("notifications.modelMismatchAlert.enable"),
         };
     }
   }, [settings, t, type]);

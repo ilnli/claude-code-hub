@@ -10,6 +10,7 @@ export {
   buildCircuitBreakerMessage,
   buildCostAlertMessage,
   buildDailyLeaderboardMessage,
+  buildModelMismatchAlertMessage,
 } from "./templates";
 export type {
   CacheHitRateAlertAnomaly,
@@ -23,6 +24,8 @@ export type {
   DailyLeaderboardData,
   DailyLeaderboardEntry,
   MessageLevel,
+  ModelMismatchAlertData,
+  ModelMismatchPair,
   ProviderType,
   Section,
   SectionContent,

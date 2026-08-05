@@ -80,6 +80,7 @@ const NotificationTypeSchema = z.enum([
   "daily_leaderboard",
   "cost_alert",
   "cache_hit_rate_alert",
+  "model_mismatch_alert",
 ]);
 
 export type NotificationType = z.infer<typeof NotificationTypeSchema>;
@@ -248,6 +249,8 @@ function toJobType(type: NotificationType): NotificationJobType {
       return "cost-alert";
     case "cache_hit_rate_alert":
       return "cache-hit-rate-alert";
+    case "model_mismatch_alert":
+      return "model-mismatch-alert";
   }
 }
 
@@ -329,6 +332,22 @@ function buildTestData(type: NotificationType): unknown {
         },
         generatedAt: new Date().toISOString(),
       };
+    case "model_mismatch_alert": {
+      const now = new Date();
+      return {
+        providerId: 1,
+        providerName: "测试供应商",
+        occurrenceCount: 3,
+        mismatches: [
+          { requestedModel: "requested-model-a", actualResponseModel: "actual-model-a" },
+          { requestedModel: "requested-model-b", actualResponseModel: "actual-model-b" },
+        ],
+        windowStart: new Date(now.getTime() - 10 * 60 * 1000).toISOString(),
+        windowEnd: now.toISOString(),
+        cooldownMinutes: 10,
+        generatedAt: now.toISOString(),
+      };
+    }
   }
 }
 

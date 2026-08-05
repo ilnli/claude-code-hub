@@ -1922,6 +1922,7 @@ const { route: updateNotificationSettingsRoute, handler: updateNotificationSetti
           .max(100)
           .optional()
           .describe("TopN（最多返回/推送条数）"),
+        modelMismatchAlertEnabled: z.boolean().optional().describe("是否启用掺假检测通知"),
       }),
       summary: "更新通知设置",
       description: "更新通知开关与各类型通知配置（生产环境会触发重新调度定时任务）",
@@ -1960,6 +1961,7 @@ const WebhookNotificationTypeSchema = z.enum([
   "daily_leaderboard",
   "cost_alert",
   "cache_hit_rate_alert",
+  "model_mismatch_alert",
 ]);
 
 const WebhookTargetSchema = z.object({

@@ -692,6 +692,7 @@ function sanitizeProvider(
     providerVendorId: provider.providerVendorId,
     preserveClientIp: provider.preserveClientIp,
     disableSessionReuse: provider.disableSessionReuse,
+    modelMismatchAlertExempt: provider.modelMismatchAlertExempt,
     modelRedirects: provider.modelRedirects,
     activeTimeStart: provider.activeTimeStart,
     activeTimeEnd: provider.activeTimeEnd,

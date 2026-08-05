@@ -57,6 +57,7 @@ const settings = {
   cacheHitRateAlertDropAbs: null,
   cacheHitRateAlertCooldownMinutes: null,
   cacheHitRateAlertTopN: null,
+  modelMismatchAlertEnabled: true,
   createdAt: new Date("2026-04-28T00:00:00.000Z"),
   updatedAt: new Date("2026-04-28T00:00:00.000Z"),
 };
@@ -117,6 +118,7 @@ describe("v1 notification endpoints", () => {
       dailyLeaderboardWebhook: "[REDACTED]",
       costAlertWebhook: "[REDACTED]",
       cacheHitRateAlertWebhook: "[REDACTED]",
+      modelMismatchAlertEnabled: true,
       updatedAt: "2026-04-28T00:00:00.000Z",
     });
     expect(JSON.stringify(got.json)).not.toContain("circuit-secret");
@@ -128,7 +130,7 @@ describe("v1 notification endpoints", () => {
       method: "PUT",
       pathname: "/api/v1/notifications/settings",
       headers: { Authorization: "Bearer admin-token" },
-      body: { enabled: false },
+      body: { enabled: false, modelMismatchAlertEnabled: false },
     });
     expect(updated.response.status).toBe(200);
     expect(updated.json).toMatchObject({
@@ -137,7 +139,10 @@ describe("v1 notification endpoints", () => {
       costAlertWebhook: "[REDACTED]",
       cacheHitRateAlertWebhook: "[REDACTED]",
     });
-    expect(updateNotificationSettingsActionMock).toHaveBeenCalledWith({ enabled: false });
+    expect(updateNotificationSettingsActionMock).toHaveBeenCalledWith({
+      enabled: false,
+      modelMismatchAlertEnabled: false,
+    });
   });
 
   test("preserves legacy notification webhooks when redacted values are echoed", async () => {

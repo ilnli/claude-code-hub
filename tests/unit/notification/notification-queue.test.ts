@@ -5,6 +5,8 @@ const mockGetNotificationSettings = vi.fn();
 const mockGenerateDailyLeaderboard = vi.fn();
 const mockGenerateCostAlerts = vi.fn();
 const mockSendWebhookMessage = vi.fn();
+const mockBuildModelMismatchAlertMessage = vi.fn(() => ({}));
+const mockFindProviderById = vi.fn();
 const mockGetEnabledBindingsByType = vi.fn(async () => []);
 
 const queueAdd = vi.fn(async () => ({}));
@@ -63,6 +65,7 @@ function makeSettings(overrides: Record<string, unknown> = {}) {
     cacheHitRateAlertDropAbs: "0.1",
     cacheHitRateAlertCooldownMinutes: 30,
     cacheHitRateAlertTopN: 10,
+    modelMismatchAlertEnabled: false,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
@@ -89,6 +92,10 @@ beforeEach(() => {
     getWebhookTargetById: vi.fn(async () => ({ isEnabled: true })),
   }));
 
+  vi.doMock("@/repository/provider", () => ({
+    findProviderById: mockFindProviderById,
+  }));
+
   vi.doMock("@/lib/notification/tasks/daily-leaderboard", () => ({
     generateDailyLeaderboard: mockGenerateDailyLeaderboard,
   }));
@@ -109,6 +116,7 @@ beforeEach(() => {
     buildCircuitBreakerMessage: vi.fn(() => ({})),
     buildCostAlertMessage: vi.fn(() => ({})),
     buildDailyLeaderboardMessage: vi.fn(() => ({})),
+    buildModelMismatchAlertMessage: mockBuildModelMismatchAlertMessage,
     sendWebhookMessage: mockSendWebhookMessage,
   }));
 
@@ -131,6 +139,7 @@ beforeEach(() => {
   mockGenerateDailyLeaderboard.mockResolvedValue({ date: "2026-06-02", entries: [] });
   mockGenerateCostAlerts.mockResolvedValue([{ providerName: "p" }]);
   mockGetEnabledBindingsByType.mockResolvedValue([]);
+  mockFindProviderById.mockResolvedValue({ modelMismatchAlertExempt: false });
   queueGetRepeatableJobs.mockResolvedValue([]);
 });
 
@@ -296,6 +305,69 @@ describe("notification queue processor - circuit-breaker", () => {
 
     expect(result).toEqual({ success: true });
     expect(mockSendWebhookMessage).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("notification queue processor - model-mismatch-alert", () => {
+  const data = {
+    providerId: 7,
+    providerName: "Provider A",
+    occurrenceCount: 3,
+    mismatches: [{ requestedModel: "requested", actualResponseModel: "actual" }],
+    windowStart: "2026-08-05T10:00:00.000Z",
+    windowEnd: "2026-08-05T10:10:01.000Z",
+    cooldownMinutes: 10,
+    generatedAt: "2026-08-05T10:10:01.000Z",
+  };
+
+  it("sends an enabled model mismatch alert to its target", async () => {
+    mockGetNotificationSettings.mockResolvedValue(
+      makeSettings({ enabled: true, useLegacyMode: false, modelMismatchAlertEnabled: true })
+    );
+
+    const handler = await loadProcessor();
+    const result = await handler(
+      makeJob({ type: "model-mismatch-alert", targetId: 101, bindingId: 11, data })
+    );
+
+    expect(result).toEqual({ success: true });
+    expect(mockFindProviderById).toHaveBeenCalledWith(7);
+    expect(mockBuildModelMismatchAlertMessage).toHaveBeenCalledWith(data, "UTC");
+    expect(mockSendWebhookMessage).toHaveBeenCalledWith(
+      { isEnabled: true },
+      {},
+      expect.objectContaining({ notificationType: "model_mismatch_alert", data })
+    );
+  });
+
+  it("skips queued alerts after the provider becomes exempt", async () => {
+    mockGetNotificationSettings.mockResolvedValue(
+      makeSettings({ enabled: true, useLegacyMode: false, modelMismatchAlertEnabled: true })
+    );
+    mockFindProviderById.mockResolvedValueOnce({ modelMismatchAlertExempt: true });
+
+    const handler = await loadProcessor();
+    const result = await handler(
+      makeJob({ type: "model-mismatch-alert", targetId: 101, bindingId: 11, data })
+    );
+
+    expect(result).toEqual({ success: true, skipped: true });
+    expect(mockSendWebhookMessage).not.toHaveBeenCalled();
+  });
+
+  it("skips queued alerts after switching to legacy mode", async () => {
+    mockGetNotificationSettings.mockResolvedValue(
+      makeSettings({ enabled: true, useLegacyMode: true, modelMismatchAlertEnabled: true })
+    );
+
+    const handler = await loadProcessor();
+    const result = await handler(
+      makeJob({ type: "model-mismatch-alert", targetId: 101, bindingId: 11, data })
+    );
+
+    expect(result).toEqual({ success: true, skipped: true });
+    expect(mockFindProviderById).not.toHaveBeenCalled();
+    expect(mockSendWebhookMessage).not.toHaveBeenCalled();
   });
 });
 

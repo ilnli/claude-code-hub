@@ -3,6 +3,7 @@ export { buildCircuitBreakerMessage } from "./circuit-breaker";
 export { buildCostAlertMessage } from "./cost-alert";
 export { buildDailyLeaderboardMessage } from "./daily-leaderboard";
 export { DEFAULT_TEMPLATE_BY_NOTIFICATION_TYPE, DEFAULT_TEMPLATES } from "./defaults";
+export { buildModelMismatchAlertMessage } from "./model-mismatch-alert";
 export {
   buildTemplateVariables,
   getTemplatePlaceholders,

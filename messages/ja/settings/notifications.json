@@ -54,6 +54,11 @@
     "windowMode": "ウィンドウ",
     "windowModeAuto": "自動"
   },
+  "modelMismatchAlert": {
+    "title": "モデル不一致通知",
+    "description": "プロバイダーの実際の応答モデルがリクエストモデルと異なる場合に通知します。同じプロバイダーのイベントは 10 分間集約されます",
+    "enable": "モデル不一致通知を有効化"
+  },
   "dailyLeaderboard": {
     "description": "毎日定時でユーザー消費トップNランキングを送信",
     "enable": "日次ランキングを有効にする",

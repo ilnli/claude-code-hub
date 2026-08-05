@@ -47,6 +47,9 @@ export interface NotificationSettings {
   cacheHitRateAlertCooldownMinutes: number | null;
   cacheHitRateAlertTopN: number | null;
 
+  // 请求模型与实际响应模型不一致告警配置
+  modelMismatchAlertEnabled: boolean;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -83,6 +86,8 @@ export interface UpdateNotificationSettingsInput {
   cacheHitRateAlertDropAbs?: string;
   cacheHitRateAlertCooldownMinutes?: number;
   cacheHitRateAlertTopN?: number;
+
+  modelMismatchAlertEnabled?: boolean;
 }
 
 /**
@@ -253,6 +258,7 @@ function createFallbackSettings(): NotificationSettings {
     cacheHitRateAlertDropAbs: "0.1",
     cacheHitRateAlertCooldownMinutes: 30,
     cacheHitRateAlertTopN: 10,
+    modelMismatchAlertEnabled: false,
     createdAt: now,
     updatedAt: now,
   };
@@ -270,6 +276,7 @@ export async function getNotificationSettings(): Promise<NotificationSettings> {
         ...settings,
         useLegacyMode: settings.useLegacyMode ?? false,
         cacheHitRateAlertEnabled: settings.cacheHitRateAlertEnabled ?? false,
+        modelMismatchAlertEnabled: settings.modelMismatchAlertEnabled ?? false,
         cacheHitRateAlertWindowMode: normalizeCacheHitRateAlertWindowMode(
           settings.cacheHitRateAlertWindowMode
         ),
@@ -301,6 +308,7 @@ export async function getNotificationSettings(): Promise<NotificationSettings> {
         cacheHitRateAlertDropAbs: "0.1",
         cacheHitRateAlertCooldownMinutes: 30,
         cacheHitRateAlertTopN: 10,
+        modelMismatchAlertEnabled: false,
       })
       .onConflictDoNothing()
       .returning();
@@ -310,6 +318,7 @@ export async function getNotificationSettings(): Promise<NotificationSettings> {
         ...created,
         useLegacyMode: created.useLegacyMode ?? false,
         cacheHitRateAlertEnabled: created.cacheHitRateAlertEnabled ?? false,
+        modelMismatchAlertEnabled: created.modelMismatchAlertEnabled ?? false,
         cacheHitRateAlertWindowMode: normalizeCacheHitRateAlertWindowMode(
           created.cacheHitRateAlertWindowMode
         ),
@@ -329,6 +338,7 @@ export async function getNotificationSettings(): Promise<NotificationSettings> {
       ...fallback,
       useLegacyMode: fallback.useLegacyMode ?? false,
       cacheHitRateAlertEnabled: fallback.cacheHitRateAlertEnabled ?? false,
+      modelMismatchAlertEnabled: fallback.modelMismatchAlertEnabled ?? false,
       cacheHitRateAlertWindowMode: normalizeCacheHitRateAlertWindowMode(
         fallback.cacheHitRateAlertWindowMode
       ),
@@ -445,6 +455,10 @@ export async function updateNotificationSettings(
     }
     if (payload.cacheHitRateAlertTopN !== undefined) {
       updates.cacheHitRateAlertTopN = payload.cacheHitRateAlertTopN;
+    }
+
+    if (payload.modelMismatchAlertEnabled !== undefined) {
+      updates.modelMismatchAlertEnabled = payload.modelMismatchAlertEnabled;
     }
 
     const [updated] = await db

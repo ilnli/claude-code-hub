@@ -4261,7 +4261,7 @@ export interface operations {
                      * @description Notification type used for sending a test webhook message.
                      * @enum {string}
                      */
-                    notificationType: "circuit_breaker" | "daily_leaderboard" | "cost_alert" | "cache_hit_rate_alert";
+                    notificationType: "circuit_breaker" | "daily_leaderboard" | "cost_alert" | "cache_hit_rate_alert" | "model_mismatch_alert";
                 };
             };
         };
@@ -4479,6 +4479,8 @@ export interface operations {
                             preserveClientIp: boolean;
                             /** @description Whether sticky session reuse is disabled. */
                             disableSessionReuse: boolean;
+                            /** @description Whether model mismatch alerts are suppressed for this provider. */
+                            modelMismatchAlertExempt: boolean;
                             /** @description Model redirect rules. */
                             modelRedirects: unknown[] | null;
                             /** @description Scheduled active start time in HH:mm. */
@@ -4811,6 +4813,8 @@ export interface operations {
                     preserve_client_ip?: boolean;
                     /** @description Whether sticky session reuse is disabled. */
                     disable_session_reuse?: boolean;
+                    /** @description Whether model mismatch alerts are suppressed for this provider. */
+                    model_mismatch_alert_exempt?: boolean;
                     /** @description Model redirect rules. */
                     model_redirects?: unknown[] | null;
                     /** @description Scheduled active start time. */
@@ -4989,6 +4993,8 @@ export interface operations {
                         preserveClientIp: boolean;
                         /** @description Whether sticky session reuse is disabled. */
                         disableSessionReuse: boolean;
+                        /** @description Whether model mismatch alerts are suppressed for this provider. */
+                        modelMismatchAlertExempt: boolean;
                         /** @description Model redirect rules. */
                         modelRedirects: unknown[] | null;
                         /** @description Scheduled active start time in HH:mm. */
@@ -5338,6 +5344,8 @@ export interface operations {
                         preserveClientIp: boolean;
                         /** @description Whether sticky session reuse is disabled. */
                         disableSessionReuse: boolean;
+                        /** @description Whether model mismatch alerts are suppressed for this provider. */
+                        modelMismatchAlertExempt: boolean;
                         /** @description Model redirect rules. */
                         modelRedirects: unknown[] | null;
                         /** @description Scheduled active start time in HH:mm. */
@@ -5845,6 +5853,8 @@ export interface operations {
                     preserve_client_ip?: boolean;
                     /** @description Whether sticky session reuse is disabled. */
                     disable_session_reuse?: boolean;
+                    /** @description Whether model mismatch alerts are suppressed for this provider. */
+                    model_mismatch_alert_exempt?: boolean;
                     /** @description Model redirect rules. */
                     model_redirects?: unknown[] | null;
                     /** @description Scheduled active start time. */
@@ -6029,6 +6039,8 @@ export interface operations {
                         preserveClientIp: boolean;
                         /** @description Whether sticky session reuse is disabled. */
                         disableSessionReuse: boolean;
+                        /** @description Whether model mismatch alerts are suppressed for this provider. */
+                        modelMismatchAlertExempt: boolean;
                         /** @description Model redirect rules. */
                         modelRedirects: unknown[] | null;
                         /** @description Scheduled active start time in HH:mm. */
@@ -11983,6 +11995,8 @@ export interface operations {
                         cacheHitRateAlertCooldownMinutes: number | null;
                         /** @description Top N cache hit-rate alerts. */
                         cacheHitRateAlertTopN: number | null;
+                        /** @description Whether request/response model mismatch alerts are enabled. */
+                        modelMismatchAlertEnabled: boolean;
                         /**
                          * Format: date-time
                          * @description Creation time.
@@ -12170,6 +12184,8 @@ export interface operations {
                     cacheHitRateAlertCooldownMinutes?: number | null;
                     /** @description Top N cache hit-rate alerts. */
                     cacheHitRateAlertTopN?: number | null;
+                    /** @description Whether request/response model mismatch alerts are enabled. */
+                    modelMismatchAlertEnabled?: boolean;
                 };
             };
         };
@@ -12231,6 +12247,8 @@ export interface operations {
                         cacheHitRateAlertCooldownMinutes: number | null;
                         /** @description Top N cache hit-rate alerts. */
                         cacheHitRateAlertTopN: number | null;
+                        /** @description Whether request/response model mismatch alerts are enabled. */
+                        modelMismatchAlertEnabled: boolean;
                         /**
                          * Format: date-time
                          * @description Creation time.
@@ -12379,7 +12397,7 @@ export interface operations {
                      * @description Notification job type.
                      * @enum {string}
                      */
-                    type: "circuit_breaker" | "daily_leaderboard" | "cost_alert" | "cache_hit_rate_alert";
+                    type: "circuit_breaker" | "daily_leaderboard" | "cost_alert" | "cache_hit_rate_alert" | "model_mismatch_alert";
                 };
             };
         };
@@ -12517,7 +12535,7 @@ export interface operations {
             header?: never;
             path: {
                 /** @description Notification job type. */
-                type: "circuit_breaker" | "daily_leaderboard" | "cost_alert" | "cache_hit_rate_alert";
+                type: "circuit_breaker" | "daily_leaderboard" | "cost_alert" | "cache_hit_rate_alert" | "model_mismatch_alert";
             };
             cookie?: never;
         };
@@ -12538,7 +12556,7 @@ export interface operations {
                              * @description Notification job type.
                              * @enum {string}
                              */
-                            notificationType: "circuit_breaker" | "daily_leaderboard" | "cost_alert" | "cache_hit_rate_alert";
+                            notificationType: "circuit_breaker" | "daily_leaderboard" | "cost_alert" | "cache_hit_rate_alert" | "model_mismatch_alert";
                             /** @description Webhook target id. */
                             targetId: number;
                             /** @description Whether this binding is enabled. */
@@ -12740,7 +12758,7 @@ export interface operations {
             };
             path: {
                 /** @description Notification job type. */
-                type: "circuit_breaker" | "daily_leaderboard" | "cost_alert" | "cache_hit_rate_alert";
+                type: "circuit_breaker" | "daily_leaderboard" | "cost_alert" | "cache_hit_rate_alert" | "model_mismatch_alert";
             };
             cookie?: never;
         };

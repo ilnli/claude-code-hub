@@ -17,10 +17,12 @@ import {
   buildCircuitBreakerMessage,
   buildCostAlertMessage,
   buildDailyLeaderboardMessage,
+  buildModelMismatchAlertMessage,
   type CacheHitRateAlertData,
   type CircuitBreakerAlertData,
   type CostAlertData,
   type DailyLeaderboardData,
+  type ModelMismatchAlertData,
   type StructuredMessage,
   sendWebhookMessage,
   type WebhookNotificationType,
@@ -37,7 +39,12 @@ export interface NotificationJobData {
   // 新模式使用（多目标）
   targetId?: number;
   bindingId?: number;
-  data?: CircuitBreakerAlertData | DailyLeaderboardData | CostAlertData | CacheHitRateAlertData; // 可选：定时任务会在执行时动态生成
+  data?:
+    | CircuitBreakerAlertData
+    | DailyLeaderboardData
+    | CostAlertData
+    | CacheHitRateAlertData
+    | ModelMismatchAlertData; // 可选：定时任务会在执行时动态生成
 }
 
 function toWebhookNotificationType(type: NotificationJobType): WebhookNotificationType {
@@ -50,6 +57,8 @@ function toWebhookNotificationType(type: NotificationJobType): WebhookNotificati
       return "cost_alert";
     case "cache-hit-rate-alert":
       return "cache_hit_rate_alert";
+    case "model-mismatch-alert":
+      return "model_mismatch_alert";
   }
 }
 
@@ -395,6 +404,7 @@ function setupQueueProcessor(queue: Queue.Queue<NotificationJobData>): void {
         | DailyLeaderboardData
         | CostAlertData
         | CacheHitRateAlertData
+        | ModelMismatchAlertData
         | undefined = data;
       let cooldownCommit: { keys: string[]; cooldownMinutes: number } | undefined;
       switch (type) {
@@ -544,6 +554,36 @@ function setupQueueProcessor(queue: Queue.Queue<NotificationJobData>): void {
           };
           break;
         }
+        case "model-mismatch-alert": {
+          const payload = data as ModelMismatchAlertData | undefined;
+          const { getNotificationSettings } = await import("@/repository/notifications");
+          const settings = await getNotificationSettings();
+
+          if (
+            !settings.enabled ||
+            settings.useLegacyMode ||
+            !settings.modelMismatchAlertEnabled ||
+            !payload
+          ) {
+            logger.info({ action: "model_mismatch_alert_disabled", jobId: job.id });
+            return { success: true, skipped: true };
+          }
+
+          const { findProviderById } = await import("@/repository/provider");
+          const currentProvider = await findProviderById(payload.providerId);
+          if (!currentProvider || currentProvider.modelMismatchAlertExempt) {
+            logger.info({
+              action: "model_mismatch_alert_exempt",
+              jobId: job.id,
+              providerId: payload.providerId,
+            });
+            return { success: true, skipped: true };
+          }
+
+          templateData = payload;
+          message = buildModelMismatchAlertMessage(payload, timezone);
+          break;
+        }
         default:
           throw new Error(`Unknown notification type: ${type}`);
       }
@@ -647,7 +687,12 @@ function setupQueueProcessor(queue: Queue.Queue<NotificationJobData>): void {
 export async function addNotificationJob(
   type: NotificationJobType,
   webhookUrl: string,
-  data: CircuitBreakerAlertData | DailyLeaderboardData | CostAlertData | CacheHitRateAlertData
+  data:
+    | CircuitBreakerAlertData
+    | DailyLeaderboardData
+    | CostAlertData
+    | CacheHitRateAlertData
+    | ModelMismatchAlertData
 ): Promise<void> {
   try {
     const queue = getNotificationQueue();
@@ -677,7 +722,12 @@ export async function addNotificationJobForTarget(
   type: NotificationJobType,
   targetId: number,
   bindingId: number | null,
-  data: CircuitBreakerAlertData | DailyLeaderboardData | CostAlertData | CacheHitRateAlertData
+  data:
+    | CircuitBreakerAlertData
+    | DailyLeaderboardData
+    | CostAlertData
+    | CacheHitRateAlertData
+    | ModelMismatchAlertData
 ): Promise<void> {
   try {
     const queue = getNotificationQueue();

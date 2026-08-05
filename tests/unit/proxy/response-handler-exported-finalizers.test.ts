@@ -9,7 +9,15 @@ import type { Provider } from "@/types/provider";
 
 const mocks = vi.hoisted(() => ({
   addLoserCost: vi.fn<(id: number, cost: object, entry: object) => Promise<void>>(),
-  durable: vi.fn<(id: number, details: object) => Promise<void>>(),
+  durable:
+    vi.fn<
+      (
+        id: number,
+        details: object,
+        options?: { onCommitted?: () => void | Promise<void> }
+      ) => Promise<void>
+    >(),
+  recordModelMismatch: vi.fn<() => Promise<void>>(),
   updateCost: vi.fn<(id: number, cost: object, breakdown: object) => Promise<void>>(),
 }));
 
@@ -30,6 +38,9 @@ vi.mock("@/repository/message", () => ({
   updateMessageRequestDetailsIfUnfinalized: vi.fn(),
   updateMessageRequestDuration: vi.fn(),
   updateMessageRequestWinnerCost: vi.fn(),
+}));
+vi.mock("@/lib/notification/model-mismatch-alert", () => ({
+  recordModelMismatch: mocks.recordModelMismatch,
 }));
 
 const CREATED_AT = new Date(0);
@@ -80,6 +91,7 @@ function createProvider(): Provider {
     maxRetryAttempts: null,
     mcpPassthroughType: "none",
     mcpPassthroughUrl: null,
+    modelMismatchAlertExempt: false,
     modelRedirects: null,
     name: "finalizer-provider",
     preserveClientIp: false,
@@ -143,6 +155,7 @@ describe("exported response finalizers", () => {
     vi.clearAllMocks();
     mocks.addLoserCost.mockResolvedValue(undefined);
     mocks.durable.mockResolvedValue(undefined);
+    mocks.recordModelMismatch.mockResolvedValue(undefined);
     mocks.updateCost.mockResolvedValue(undefined);
   });
 
@@ -165,6 +178,36 @@ describe("exported response finalizers", () => {
     expect(mocks.durable).toHaveBeenCalledWith(
       71,
       expect.objectContaining({ inputTokens: 2, outputTokens: 3, statusCode: 200 })
+    );
+  });
+
+  it("records a model mismatch only after durable terminal commit", async () => {
+    const provider = createProvider();
+    const session = await createSession(provider);
+    const responseText = JSON.stringify({
+      model: "claude-actual",
+      usage: { input_tokens: 2, output_tokens: 3 },
+    });
+    mocks.durable.mockImplementationOnce(async (_id, _details, options) => {
+      await options?.onCommitted?.();
+    });
+
+    await finalizeRequestStats(session, responseText, 200, 15);
+
+    expect(mocks.durable).toHaveBeenCalledWith(
+      71,
+      expect.objectContaining({ actualResponseModel: "claude-actual", model: "claude-test" }),
+      expect.objectContaining({ onCommitted: expect.any(Function) })
+    );
+    expect(mocks.recordModelMismatch).toHaveBeenCalledWith({
+      providerId: provider.id,
+      providerName: provider.name,
+      requestedModel: "claude-test",
+      actualResponseModel: "claude-actual",
+      modelMismatchAlertExempt: false,
+    });
+    expect(mocks.durable.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.recordModelMismatch.mock.invocationCallOrder[0]
     );
   });
 

@@ -156,6 +156,22 @@ export interface CacheHitRateAlertData {
   generatedAt: string;
 }
 
+export interface ModelMismatchPair {
+  requestedModel: string;
+  actualResponseModel: string;
+}
+
+export interface ModelMismatchAlertData {
+  providerId: number;
+  providerName: string;
+  occurrenceCount: number;
+  mismatches: ModelMismatchPair[];
+  windowStart: string;
+  windowEnd: string;
+  cooldownMinutes: number;
+  generatedAt: string;
+}
+
 /**
  * Webhook 相关类型
  */
@@ -166,7 +182,8 @@ export type WebhookNotificationType =
   | "circuit_breaker"
   | "daily_leaderboard"
   | "cost_alert"
-  | "cache_hit_rate_alert";
+  | "cache_hit_rate_alert"
+  | "model_mismatch_alert";
 
 export interface WebhookTargetConfig {
   id?: number;

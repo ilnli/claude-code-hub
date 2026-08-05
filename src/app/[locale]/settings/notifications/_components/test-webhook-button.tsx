@@ -19,6 +19,7 @@ const TEST_NOTIFICATION_TYPES = [
   "daily_leaderboard",
   "cost_alert",
   "cache_hit_rate_alert",
+  "model_mismatch_alert",
 ] as const satisfies readonly NotificationType[];
 
 function isNotificationType(value: string): value is NotificationType {
@@ -42,6 +43,10 @@ export function TestWebhookButton({ targetId, disabled, onTest }: TestWebhookBut
       { value: "daily_leaderboard" as const, label: t("notifications.dailyLeaderboard.title") },
       { value: "cost_alert" as const, label: t("notifications.costAlert.title") },
       { value: "cache_hit_rate_alert" as const, label: t("notifications.cacheHitRateAlert.title") },
+      {
+        value: "model_mismatch_alert" as const,
+        label: t("notifications.modelMismatchAlert.title"),
+      },
     ],
     [t]
   );

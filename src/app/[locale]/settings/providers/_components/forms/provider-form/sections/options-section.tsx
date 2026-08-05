@@ -90,6 +90,22 @@ export function OptionsSection({ subSectionRefs }: OptionsSectionProps) {
                 />
               </ToggleRow>
 
+              {!isBatch && (
+                <ToggleRow
+                  label={t("sections.routing.modelMismatchAlertExempt.label")}
+                  description={t("sections.routing.modelMismatchAlertExempt.desc")}
+                >
+                  <Switch
+                    id={isEdit ? "edit-model-mismatch-alert-exempt" : "model-mismatch-alert-exempt"}
+                    checked={state.routing.modelMismatchAlertExempt}
+                    onCheckedChange={(checked) =>
+                      dispatch({ type: "SET_MODEL_MISMATCH_ALERT_EXEMPT", payload: checked })
+                    }
+                    disabled={state.ui.isPending}
+                  />
+                </ToggleRow>
+              )}
+
               {/* Swap Cache TTL Billing */}
               <ToggleRow
                 label={t("sections.routing.swapCacheTtlBilling.label")}
