@@ -311,6 +311,9 @@ function BatchEditDialogContent({
           <ProviderBatchPreviewStep
             rows={previewResult?.rows ?? []}
             summary={previewResult?.summary ?? { providerCount: 0, fieldCount: 0, skipCount: 0 }}
+            affectedWeightAdjustmentMemberships={
+              previewResult?.affectedWeightAdjustmentMemberships ?? []
+            }
             excludedProviderIds={excludedProviderIds}
             onExcludeToggle={handleExcludeToggle}
             isLoading={isLoadingPreview}

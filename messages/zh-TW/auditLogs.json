@@ -48,6 +48,29 @@
       "delete": "刪除供應商",
       "key_reveal": "查看供應商金鑰"
     },
+    "provider_weight_adjustment": {
+      "interval": {
+        "update": "更新供應商權重調整週期"
+      }
+    },
+    "provider_weight_adjustment_rule": {
+      "create": "建立供應商權重調整規則",
+      "update": "更新供應商權重調整規則",
+      "delete": "刪除供應商權重調整規則",
+      "enable": "啟用供應商權重調整規則",
+      "disable": "停用供應商權重調整規則",
+      "enable_all": "啟用全部供應商權重調整規則",
+      "disable_all": "停用全部供應商權重調整規則",
+      "run": "執行供應商權重調整規則",
+      "members": {
+        "replace": "取代供應商權重調整規則成員"
+      },
+      "member": {
+        "auto_remove": "從權重調整規則自動移除供應商",
+        "detach_for_manual_weight": "手動修改權重時移除供應商",
+        "detach_for_batch_edit": "批次編輯時移除供應商"
+      }
+    },
     "provider_group": {
       "create": "建立供應商分組",
       "update": "更新供應商分組",

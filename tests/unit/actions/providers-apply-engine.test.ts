@@ -8,6 +8,7 @@ const findProviderBatchApplyOperationMock = vi.fn();
 const applyProviderBatchOperationIfUnchangedMock = vi.fn();
 const consumeProviderBatchUndoMock = vi.fn();
 const publishCacheInvalidationMock = vi.fn();
+const listProviderWeightAdjustmentMembershipsMock = vi.fn();
 const redisStore = new Map<string, { value: string; expiresAt: number }>();
 const applyLedger = new Map<
   string,
@@ -66,6 +67,10 @@ vi.mock("@/repository/provider", () => ({
   applyProviderBatchOperationIfUnchanged: applyProviderBatchOperationIfUnchangedMock,
   consumeProviderBatchUndo: consumeProviderBatchUndoMock,
   deleteProvidersBatch: vi.fn(),
+}));
+
+vi.mock("@/repository/provider-weight-adjustment", () => ({
+  listProviderWeightAdjustmentMemberships: listProviderWeightAdjustmentMembershipsMock,
 }));
 
 vi.mock("@/lib/cache/provider-cache", () => ({
@@ -232,6 +237,7 @@ describe("Apply Provider Batch Patch Engine", () => {
     redisEvalMock.mockClear();
     getSessionMock.mockResolvedValue({ user: { id: 1, role: "admin" } });
     findAllProvidersFreshMock.mockResolvedValue([]);
+    listProviderWeightAdjustmentMembershipsMock.mockResolvedValue([]);
     updateProvidersBatchMock.mockResolvedValue(0);
     installApplyLedgerMocks();
     consumeProviderBatchUndoMock.mockResolvedValue({ status: "consumed" });

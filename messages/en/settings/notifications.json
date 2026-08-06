@@ -59,6 +59,11 @@
     "description": "Notify when a provider returns a model different from the requested model; events are aggregated per provider for 10 minutes",
     "enable": "Enable Model Mismatch Alerts"
   },
+  "weightAdjustmentAlert": {
+    "title": "Provider weight adjustment alerts",
+    "description": "Send one alert per weight adjustment fault episode and another when the rule recovers",
+    "enable": "Enable weight adjustment alerts"
+  },
   "dailyLeaderboard": {
     "description": "Send daily scheduled user consumption Top N leaderboard",
     "enable": "Enable Daily Leaderboard",

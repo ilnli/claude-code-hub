@@ -172,6 +172,16 @@ export interface ModelMismatchAlertData {
   generatedAt: string;
 }
 
+export interface ProviderWeightAdjustmentAlertData {
+  event: "fault" | "recovery";
+  ruleId: number;
+  ruleName: string;
+  runId?: number;
+  faultKind?: string;
+  message?: string;
+  generatedAt: string;
+}
+
 /**
  * Webhook 相关类型
  */
@@ -183,7 +193,8 @@ export type WebhookNotificationType =
   | "daily_leaderboard"
   | "cost_alert"
   | "cache_hit_rate_alert"
-  | "model_mismatch_alert";
+  | "model_mismatch_alert"
+  | "weight_adjustment_alert";
 
 export interface WebhookTargetConfig {
   id?: number;

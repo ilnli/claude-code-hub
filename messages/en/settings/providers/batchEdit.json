@@ -36,6 +36,9 @@
     "providerHeader": "{name}",
     "fieldChanged": "{field}: {before} -> {after}",
     "fieldSkipped": "{field}: skipped ({reason})",
+    "weightRulesTitle": "Weight rule memberships will be removed",
+    "weightRulesDescription": "Applying these priority or manual weight changes will atomically remove the affected providers from enabled weight adjustment rules.",
+    "weightRuleItem": "{provider} from {rule}",
     "nullValue": "(empty)",
     "back": "Back",
     "apply": "Apply Changes"

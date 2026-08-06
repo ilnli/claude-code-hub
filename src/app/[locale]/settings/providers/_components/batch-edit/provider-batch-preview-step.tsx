@@ -21,7 +21,10 @@ const FIELD_LABEL_KEYS: Record<string, string> = {
 };
 
 import { Checkbox } from "@/components/ui/checkbox";
-import type { ProviderBatchPreviewRow } from "@/lib/api-client/v1/actions/providers";
+import type {
+  PreviewProviderBatchPatchResult,
+  ProviderBatchPreviewRow,
+} from "@/lib/api-client/v1/actions/providers";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -30,6 +33,7 @@ import type { ProviderBatchPreviewRow } from "@/lib/api-client/v1/actions/provid
 export interface ProviderBatchPreviewStepProps {
   rows: ProviderBatchPreviewRow[];
   summary: { providerCount: number; fieldCount: number; skipCount: number };
+  affectedWeightAdjustmentMemberships?: PreviewProviderBatchPatchResult["affectedWeightAdjustmentMemberships"];
   excludedProviderIds: Set<number>;
   onExcludeToggle: (providerId: number) => void;
   isLoading?: boolean;
@@ -52,6 +56,7 @@ interface ProviderGroup {
 export function ProviderBatchPreviewStep({
   rows,
   summary,
+  affectedWeightAdjustmentMemberships = [],
   excludedProviderIds,
   onExcludeToggle,
   isLoading,
@@ -110,6 +115,23 @@ export function ProviderBatchPreviewStep({
           skipCount: summary.skipCount,
         })}
       </p>
+
+      {affectedWeightAdjustmentMemberships.length > 0 && (
+        <div className="border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
+          <div className="font-medium">{t("preview.weightRulesTitle")}</div>
+          <p className="mt-1 text-muted-foreground">{t("preview.weightRulesDescription")}</p>
+          <ul className="mt-2 space-y-1">
+            {affectedWeightAdjustmentMemberships.map((membership) => (
+              <li key={`${membership.providerId}-${membership.ruleId}`}>
+                {t("preview.weightRuleItem", {
+                  provider: membership.providerName,
+                  rule: membership.ruleName,
+                })}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Provider groups */}
       <div className="max-h-[var(--cch-viewport-height-50)] space-y-3 overflow-y-auto">

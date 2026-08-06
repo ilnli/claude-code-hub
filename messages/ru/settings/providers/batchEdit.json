@@ -36,6 +36,9 @@
     "providerHeader": "{name}",
     "fieldChanged": "{field}: {before} -> {after}",
     "fieldSkipped": "{field}: пропущено ({reason})",
+    "weightRulesTitle": "Участники будут удалены из правил весов",
+    "weightRulesDescription": "При применении изменений приоритета или ручного веса затронутые Provider будут атомарно удалены из включенных правил корректировки весов.",
+    "weightRuleItem": "{provider} из правила {rule}",
     "nullValue": "(пусто)",
     "back": "Назад",
     "apply": "Применить изменения"

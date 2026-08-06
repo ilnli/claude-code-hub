@@ -1,0 +1,14 @@
+{
+  "trigger": "權重規則", "title": "Provider 權重調整規則", "description": "管理明確的 Provider 群組，依成本倍率定期調整路由權重。",
+  "interval": "調整週期", "intervals": { "10": "10 分鐘", "30": "30 分鐘", "60": "1 小時", "360": "6 小時", "1440": "24 小時" },
+  "intervalSaved": "調整週期已更新", "enableAll": "全部啟用", "disableAll": "全數停用", "enabledAll": "可執行規則已啟用", "disabledAll": "全部規則已停用", "create": "新增規則",
+  "fault": "異常", "enabled": "已啟用", "disabled": "停用中", "empty": "尚無權重調整規則", "scope": "{type} · 優先級 {priority} · {members} 個成員",
+  "operationFailed": "無法完成操作", "saved": "規則已儲存", "cancel": "取消操作", "save": "儲存", "noDescription": "無描述", "edit": "編輯規則", "runNow": "立即執行", "runComplete": "規則執行完成", "delete": "刪除規則", "deleteConfirm": "確認刪除規則「{name}」？目前權重不會還原。", "deleted": "規則已刪除", "enabledSuccess": "規則已啟用", "disabledSuccess": "規則已停用", "notScheduled": "未排程", "invalid": "無效", "selectRule": "請選擇規則或新增規則",
+  "form": { "name": "規則名稱", "description": "說明", "providerType": "Provider 類型", "priority": "全域優先級", "members": "規則成員", "selected": "已選擇 {count} 個", "costWeight": "成本 {cost} · 權重 {weight}", "noEligibleProviders": "沒有符合此類型和全域優先級的 Provider" },
+  "providerTypes": { "claude": "Claude", "codex": "Codex", "gemini": "Gemini", "openaiCompatible": "OpenAI 相容" },
+  "summary": { "members": "成員", "participants": "有效參與者", "changes": "預計變更", "nextRun": "下次執行" },
+  "preview": { "title": "預覽", "shareNote": "預計占比僅表示本規則內部比例，並非實際全域流量機率。", "provider": "Provider", "cost": "費用倍率", "currentWeight": "目前權重", "projectedWeight": "預計權重", "internalShare": "規則內占比", "status": "狀態", "participating": "參與調整" },
+  "history": { "title": "執行歷史", "time": "開始時間", "trigger": "觸發方式", "status": "狀態", "changed": "已變更", "skipped": "已略過", "triggers": { "scheduled": "排程", "manual": "手動" }, "statuses": { "running": "執行中", "succeeded": "執行成功", "succeeded_with_warning": "執行成功但有警告", "failed": "失敗", "skipped": "已略過" } },
+  "skipReasons": { "disabled": "Provider 已停用", "type_mismatch": "類型已變更", "priority_mismatch": "優先級已變更", "invalid_cost": "成本倍率無效", "insufficient_participants": "有效參與者不足" },
+  "faultKinds": { "run_failed": "權重交易執行失敗", "coordination_failed": "分散式協調無法使用", "scheduler_failed": "排程器未能執行規則", "overlap": "上一次執行仍在進行", "insufficient_participants": "有效參與者少於兩個", "cache_invalidation_failed": "權重已提交但快取失效失敗" }
+}

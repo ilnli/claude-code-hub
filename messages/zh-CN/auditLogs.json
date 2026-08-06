@@ -48,6 +48,29 @@
       "delete": "删除供应商",
       "key_reveal": "查看供应商密钥"
     },
+    "provider_weight_adjustment": {
+      "interval": {
+        "update": "更新供应商权重调整周期"
+      }
+    },
+    "provider_weight_adjustment_rule": {
+      "create": "创建供应商权重调整规则",
+      "update": "更新供应商权重调整规则",
+      "delete": "删除供应商权重调整规则",
+      "enable": "启用供应商权重调整规则",
+      "disable": "停用供应商权重调整规则",
+      "enable_all": "启用全部供应商权重调整规则",
+      "disable_all": "停用全部供应商权重调整规则",
+      "run": "执行供应商权重调整规则",
+      "members": {
+        "replace": "替换供应商权重调整规则成员"
+      },
+      "member": {
+        "auto_remove": "从权重调整规则自动移除供应商",
+        "detach_for_manual_weight": "手工修改权重时移除供应商",
+        "detach_for_batch_edit": "批量编辑时移除供应商"
+      }
+    },
     "provider_group": {
       "create": "创建供应商分组",
       "update": "更新供应商分组",

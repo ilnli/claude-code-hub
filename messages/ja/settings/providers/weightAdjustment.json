@@ -1,0 +1,14 @@
+{
+  "trigger": "ウェイトルール", "title": "Provider ウェイト調整ルール", "description": "明示的な Provider グループを管理し、コスト倍率に応じてルーティングウェイトを定期調整します。",
+  "interval": "調整間隔", "intervals": { "10": "10 分", "30": "30 分", "60": "1 時間", "360": "6 時間", "1440": "24 時間" },
+  "intervalSaved": "調整間隔を更新しました", "enableAll": "すべて有効化", "disableAll": "すべて無効化", "enabledAll": "実行可能なルールを有効化しました", "disabledAll": "すべてのルールを無効化しました", "create": "新規ルール",
+  "fault": "障害", "enabled": "有効", "disabled": "無効", "empty": "ウェイト調整ルールはありません", "scope": "{type} · 優先度 {priority} · {members} メンバー",
+  "operationFailed": "操作を完了できませんでした", "saved": "ルールを保存しました", "cancel": "キャンセル", "save": "変更を保存", "noDescription": "説明なし", "edit": "ルールを編集", "runNow": "今すぐ実行", "runComplete": "ルールの実行が完了しました", "delete": "ルールを削除", "deleteConfirm": "ルール「{name}」を削除しますか？現在のウェイトは復元されません。", "deleted": "ルールを削除しました", "enabledSuccess": "ルールを有効化しました", "disabledSuccess": "ルールを無効化しました", "notScheduled": "未スケジュール", "invalid": "無効", "selectRule": "ルールを選択するか新規作成してください",
+  "form": { "name": "ルール名", "description": "説明", "providerType": "Provider タイプ", "priority": "グローバル優先度", "members": "ルールメンバー", "selected": "{count} 件選択", "costWeight": "コスト {cost} · ウェイト {weight}", "noEligibleProviders": "このタイプとグローバル優先度に一致する Provider はありません" },
+  "providerTypes": { "claude": "Claude", "codex": "Codex", "gemini": "Gemini", "openaiCompatible": "OpenAI 互換" },
+  "summary": { "members": "メンバー", "participants": "有効な参加者", "changes": "変更予定", "nextRun": "次回実行" },
+  "preview": { "title": "プレビュー", "shareNote": "予測シェアはこのルール内の比率のみで、実際のグローバルトラフィック確率ではありません。", "provider": "Provider", "cost": "コスト倍率", "currentWeight": "現在のウェイト", "projectedWeight": "予測ウェイト", "internalShare": "ルール内シェア", "status": "状態", "participating": "調整対象" },
+  "history": { "title": "実行履歴", "time": "開始時刻", "trigger": "トリガー", "status": "状態", "changed": "変更", "skipped": "スキップ", "triggers": { "scheduled": "スケジュール", "manual": "手動" }, "statuses": { "running": "実行中", "succeeded": "正常終了", "succeeded_with_warning": "警告付き成功", "failed": "失敗", "skipped": "スキップ" } },
+  "skipReasons": { "disabled": "Provider が無効", "type_mismatch": "タイプが変更済み", "priority_mismatch": "優先度が変更済み", "invalid_cost": "コスト倍率が無効", "insufficient_participants": "有効な参加者が不足" },
+  "faultKinds": { "run_failed": "ウェイトトランザクションに失敗しました", "coordination_failed": "分散調整を利用できません", "scheduler_failed": "スケジューラーがルールを実行できませんでした", "overlap": "前回の実行が継続中です", "insufficient_participants": "有効な参加者が 2 件未満です", "cache_invalidation_failed": "ウェイトは保存されましたがキャッシュ無効化に失敗しました" }
+}

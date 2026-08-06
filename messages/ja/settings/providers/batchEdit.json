@@ -36,6 +36,9 @@
     "providerHeader": "{name}",
     "fieldChanged": "{field}: {before} -> {after}",
     "fieldSkipped": "{field}: スキップ ({reason})",
+    "weightRulesTitle": "ウェイトルールのメンバーシップが削除されます",
+    "weightRulesDescription": "これらの優先度または手動ウェイト変更を適用すると、対象 Provider は有効なウェイト調整ルールから同一トランザクション内で削除されます。",
+    "weightRuleItem": "{provider}（ルール: {rule}）",
     "nullValue": "（空）",
     "back": "戻る",
     "apply": "変更を適用"

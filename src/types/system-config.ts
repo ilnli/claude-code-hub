@@ -69,6 +69,9 @@ export interface SystemSettings {
   upstreamBillingProbeEnabled: boolean;
   upstreamBillingProbeIntervalMinutes: number;
 
+  // Shared interval for all provider weight adjustment rules.
+  providerWeightAdjustmentIntervalMinutes: number;
+
   // 供应商不可用时是否返回详细错误信息
   verboseProviderError: boolean;
 
@@ -226,6 +229,7 @@ export interface UpdateSystemSettingsInput {
   // 上游倍率探测（可选）
   upstreamBillingProbeEnabled?: boolean;
   upstreamBillingProbeIntervalMinutes?: number;
+  providerWeightAdjustmentIntervalMinutes?: number;
 
   // 供应商不可用时是否返回详细错误信息（可选）
   verboseProviderError?: boolean;

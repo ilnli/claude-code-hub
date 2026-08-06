@@ -36,6 +36,9 @@
     "providerHeader": "{name}",
     "fieldChanged": "{field}: {before} -> {after}",
     "fieldSkipped": "{field}: 已跳過 ({reason})",
+    "weightRulesTitle": "將移除權重規則成員關係",
+    "weightRulesDescription": "套用這些優先級或手動權重變更時，會以原子方式將受影響的 Provider 移出已啟用的權重調整規則。",
+    "weightRuleItem": "{provider}，來自規則 {rule}",
     "nullValue": "（空白）",
     "back": "返回",
     "apply": "套用變更"

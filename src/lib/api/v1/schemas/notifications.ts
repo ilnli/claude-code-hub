@@ -9,6 +9,7 @@ export const NotificationTypeSchema = z
     "cost_alert",
     "cache_hit_rate_alert",
     "model_mismatch_alert",
+    "weight_adjustment_alert",
   ])
   .describe("Notification job type.");
 
@@ -83,6 +84,9 @@ export const NotificationSettingsSchema = z
     modelMismatchAlertEnabled: z
       .boolean()
       .describe("Whether request/response model mismatch alerts are enabled."),
+    weightAdjustmentAlertEnabled: z
+      .boolean()
+      .describe("Whether provider weight adjustment fault and recovery alerts are enabled."),
     createdAt: IsoDateTimeStringSchema.nullable().describe("Creation time."),
     updatedAt: IsoDateTimeStringSchema.nullable().describe("Last update time."),
   })

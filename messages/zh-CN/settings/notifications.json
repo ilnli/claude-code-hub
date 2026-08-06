@@ -151,6 +151,11 @@
     "description": "当供应商实际响应模型与请求模型不一致时发送通知；同一供应商 10 分钟内的事件会聚合统计",
     "enable": "启用掺假检测通知"
   },
+  "weightAdjustmentAlert": {
+    "title": "Provider 权重调整通知",
+    "description": "权重调整规则发生故障时每个故障阶段发送一次，并在恢复后再次通知",
+    "enable": "启用权重调整通知"
+  },
   "form": {
     "save": "保存设置",
     "saving": "保存中...",

@@ -10,4 +10,5 @@ export {
   TEMPLATE_PLACEHOLDERS,
   WEBHOOK_NOTIFICATION_TYPES,
 } from "./placeholders";
+export { buildProviderWeightAdjustmentAlertMessage } from "./provider-weight-adjustment-alert";
 export { buildTestMessage } from "./test-messages";

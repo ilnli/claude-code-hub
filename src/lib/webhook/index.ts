@@ -11,6 +11,7 @@ export {
   buildCostAlertMessage,
   buildDailyLeaderboardMessage,
   buildModelMismatchAlertMessage,
+  buildProviderWeightAdjustmentAlertMessage,
 } from "./templates";
 export type {
   CacheHitRateAlertAnomaly,
@@ -27,6 +28,7 @@ export type {
   ModelMismatchAlertData,
   ModelMismatchPair,
   ProviderType,
+  ProviderWeightAdjustmentAlertData,
   Section,
   SectionContent,
   StructuredMessage,

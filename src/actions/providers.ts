@@ -776,6 +776,7 @@ export async function editProvider(
     key?: string;
     is_enabled?: boolean;
     weight?: number;
+    detach_from_weight_adjustment_rule?: boolean;
     priority?: number;
     cost_multiplier?: number;
     rate_follow_upstream?: boolean;
@@ -849,7 +850,9 @@ export async function editProvider(
       };
     }
 
-    const validated = UpdateProviderSchema.parse(data);
+    const { detach_from_weight_adjustment_rule: detachWeightAdjustmentRule, ...providerInput } =
+      data;
+    const validated = UpdateProviderSchema.parse(providerInput);
 
     // 如果 website_url 被更新，重新生成 favicon URL
     let faviconUrl: string | null | undefined; // undefined 表示不更新
@@ -887,6 +890,37 @@ export async function editProvider(
     if (!currentProvider) {
       return { ok: false, error: "供应商不存在" };
     }
+
+    const { getProviderWeightAdjustmentMembership } = await import(
+      "@/repository/provider-weight-adjustment"
+    );
+    const weightAdjustmentMembership = await getProviderWeightAdjustmentMembership(providerId);
+    const weightChanged =
+      validated.weight !== undefined && validated.weight !== currentProvider.weight;
+    const scopeChanged =
+      (validated.provider_type !== undefined &&
+        validated.provider_type !== currentProvider.providerType) ||
+      (validated.priority !== undefined && validated.priority !== currentProvider.priority);
+    if (
+      weightChanged &&
+      weightAdjustmentMembership?.ruleEnabled &&
+      detachWeightAdjustmentRule !== true
+    ) {
+      return {
+        ok: false,
+        error: "Provider belongs to an enabled weight adjustment rule.",
+        errorCode: "provider_weight_adjustment_detach_required",
+        errorParams: {
+          ruleId: weightAdjustmentMembership.ruleId,
+          ruleName: weightAdjustmentMembership.ruleName,
+        },
+      };
+    }
+    const shouldDetachWeightAdjustmentMembership =
+      scopeChanged ||
+      (weightChanged &&
+        weightAdjustmentMembership?.ruleEnabled === true &&
+        detachWeightAdjustmentRule === true);
 
     // 上游倍率跟随开关与默认倍率不变量处理
     const nextRateFollowUpstream =
@@ -942,7 +976,9 @@ export async function editProvider(
       preimageFields[providerKey] = currentValue;
     }
 
-    const provider = await updateProvider(providerId, payload);
+    const provider = shouldDetachWeightAdjustmentMembership
+      ? await updateProvider(providerId, payload, { detachWeightAdjustmentMembership: true })
+      : await updateProvider(providerId, payload);
 
     if (!provider) {
       return { ok: false, error: "供应商不存在" };
@@ -1042,6 +1078,20 @@ export async function editProvider(
       success: true,
       redactExtraKeys: ["key", "custom_headers", "customHeaders"],
     });
+    if (shouldDetachWeightAdjustmentMembership && weightAdjustmentMembership) {
+      emitActionAudit({
+        category: "provider",
+        action: scopeChanged
+          ? "provider_weight_adjustment_rule.member.auto_remove"
+          : "provider_weight_adjustment_rule.member.detach_for_manual_weight",
+        targetType: "provider_weight_adjustment_rule",
+        targetId: weightAdjustmentMembership.ruleId,
+        targetName: weightAdjustmentMembership.ruleName,
+        before: { providerId, member: true },
+        after: { providerId, member: false },
+        success: true,
+      });
+    }
     return {
       ok: true,
       data: {
@@ -1075,6 +1125,10 @@ export async function removeProvider(
     }
 
     const provider = await findProviderById(providerId);
+    const { getProviderWeightAdjustmentMembership } = await import(
+      "@/repository/provider-weight-adjustment"
+    );
+    const weightAdjustmentMembership = await getProviderWeightAdjustmentMembership(providerId);
     await deleteProvider(providerId);
 
     await SessionManager.terminateStickySessionsForProviders([providerId], "removeProvider");
@@ -1130,6 +1184,18 @@ export async function removeProvider(
         : undefined,
       success: true,
     });
+    if (weightAdjustmentMembership) {
+      emitActionAudit({
+        category: "provider",
+        action: "provider_weight_adjustment_rule.member.auto_remove",
+        targetType: "provider_weight_adjustment_rule",
+        targetId: weightAdjustmentMembership.ruleId,
+        targetName: weightAdjustmentMembership.ruleName,
+        before: { providerId, member: true },
+        after: { providerId, member: false, reason: "provider_deleted" },
+        success: true,
+      });
+    }
     return {
       ok: true,
       data: {
@@ -1249,9 +1315,38 @@ export async function autoSortProviderPriority(args: {
     }
 
     if (changes.length > 0) {
+      const { listProviderWeightAdjustmentMemberships } = await import(
+        "@/repository/provider-weight-adjustment"
+      );
+      const affectedMemberships = await listProviderWeightAdjustmentMemberships(
+        changes.map((change) => change.providerId)
+      );
       await updateProviderPrioritiesBatch(
         changes.map((change) => ({ id: change.providerId, priority: change.newPriority }))
       );
+      const changeByProviderId = new Map(changes.map((change) => [change.providerId, change]));
+      for (const membership of affectedMemberships) {
+        const change = changeByProviderId.get(membership.providerId);
+        if (!change) continue;
+        emitActionAudit({
+          category: "provider",
+          action: "provider_weight_adjustment_rule.member.auto_remove",
+          targetType: "provider_weight_adjustment_rule",
+          targetId: membership.ruleId,
+          targetName: membership.ruleName,
+          before: {
+            providerId: membership.providerId,
+            priority: change.oldPriority,
+            member: true,
+          },
+          after: {
+            providerId: membership.providerId,
+            priority: change.newPriority,
+            member: false,
+          },
+          success: true,
+        });
+      }
       try {
         await publishProviderCacheInvalidation();
       } catch (error) {
@@ -1441,6 +1536,13 @@ export interface PreviewProviderBatchPatchResult {
   providerIds: number[];
   changedFields: ProviderBatchPatchField[];
   rows: ProviderBatchPreviewRow[];
+  affectedWeightAdjustmentMemberships: Array<{
+    providerId: number;
+    providerName: string;
+    ruleId: number;
+    ruleName: string;
+    reason: "priority_change" | "manual_weight";
+  }>;
   summary: {
     providerCount: number;
     fieldCount: number;
@@ -1494,6 +1596,7 @@ interface ProviderBatchPatchPreviewSnapshot {
   rows: ProviderBatchPreviewRow[];
   providerTypes: Record<number, ProviderType>;
   providerEnabled: Record<number, boolean>;
+  affectedWeightAdjustmentMemberships: PreviewProviderBatchPatchResult["affectedWeightAdjustmentMemberships"];
 }
 
 interface ProviderPatchUndoSnapshot {
@@ -2275,6 +2378,33 @@ export async function previewProviderBatchPatch(
     const matchedProviders = allProviders.filter((p) => providerIdSet.has(p.id));
     const rows = generatePreviewRows(matchedProviders, normalizedPatch.data, changedFields);
     const skipCount = rows.filter((r) => r.status === "skipped").length;
+    const { listProviderWeightAdjustmentMemberships } = await import(
+      "@/repository/provider-weight-adjustment"
+    );
+    const memberships = await listProviderWeightAdjustmentMemberships(providerIds);
+    const providerNames = new Map(matchedProviders.map((provider) => [provider.id, provider.name]));
+    const priorityChanged = changedFields.includes("priority");
+    const weightChanged = changedFields.includes("weight");
+    const affectedWeightAdjustmentMemberships: PreviewProviderBatchPatchResult["affectedWeightAdjustmentMemberships"] =
+      memberships.flatMap((membership) => {
+        const reason: "priority_change" | "manual_weight" | null = priorityChanged
+          ? "priority_change"
+          : weightChanged && membership.ruleEnabled
+            ? "manual_weight"
+            : null;
+        return reason
+          ? [
+              {
+                providerId: membership.providerId,
+                providerName:
+                  providerNames.get(membership.providerId) ?? String(membership.providerId),
+                ruleId: membership.ruleId,
+                ruleName: membership.ruleName,
+                reason,
+              },
+            ]
+          : [];
+      });
 
     const previewToken = createProviderBatchPreviewToken();
     const previewRevision = `${nowMs}:${providerIds.join(",")}:${changedFields.join(",")}`;
@@ -2294,6 +2424,7 @@ export async function previewProviderBatchPatch(
       providerEnabled: Object.fromEntries(
         matchedProviders.map((provider) => [provider.id, provider.isEnabled])
       ),
+      affectedWeightAdjustmentMemberships,
     });
 
     return {
@@ -2305,6 +2436,7 @@ export async function previewProviderBatchPatch(
         providerIds,
         changedFields,
         rows,
+        affectedWeightAdjustmentMemberships,
         summary: {
           providerCount: providerIds.length,
           fieldCount: changedFields.length,
@@ -2490,6 +2622,12 @@ export async function applyProviderBatchPatch(
       groups: updateGroups,
       expectedPreimages: preimages.expected,
       effectiveProviderIds,
+      detachWeightAdjustmentMemberships: snapshot.affectedWeightAdjustmentMemberships
+        .filter((membership) => effectiveProviderIds.includes(membership.providerId))
+        .map((membership) => ({
+          providerId: membership.providerId,
+          ruleId: membership.ruleId,
+        })),
       undoPreimage: durableUndoPreimage,
       undoRestorable,
       postCommitEffects: {
@@ -2514,6 +2652,21 @@ export async function applyProviderBatchPatch(
     }
     if (operation.status === "idempotency_conflict" || operation.status === "preview_consumed") {
       return buildProviderBatchConflictError(operation.status, Boolean(parsed.data.idempotencyKey));
+    }
+    if (operation.status === "applied") {
+      for (const membership of snapshot.affectedWeightAdjustmentMemberships) {
+        if (!effectiveProviderIds.includes(membership.providerId)) continue;
+        emitActionAudit({
+          category: "provider",
+          action: "provider_weight_adjustment_rule.member.detach_for_batch_edit",
+          targetType: "provider_weight_adjustment_rule",
+          targetId: membership.ruleId,
+          targetName: membership.ruleName,
+          before: { providerId: membership.providerId, member: true },
+          after: { providerId: membership.providerId, member: false, reason: membership.reason },
+          success: true,
+        });
+      }
     }
     return completeProviderBatchApply(
       operation.result,

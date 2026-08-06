@@ -29,6 +29,7 @@ import providersSort from "./providers/sort.json";
 import providersStrings from "./providers/strings.json";
 import providersProviderGroups from "./providers/providerGroups.json";
 import providersTypes from "./providers/types.json";
+import providersWeightAdjustment from "./providers/weightAdjustment.json";
 
 import providersFormApiTest from "./providers/form/apiTest.json";
 import providersFormAllowedModelRules from "./providers/form/allowedModelRules.json";
@@ -99,6 +100,7 @@ const providers = {
   section: providersSection,
   sort: providersSort,
   types: providersTypes,
+  weightAdjustment: providersWeightAdjustment,
 };
 
 export default {

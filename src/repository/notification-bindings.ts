@@ -11,7 +11,8 @@ export type NotificationType =
   | "daily_leaderboard"
   | "cost_alert"
   | "cache_hit_rate_alert"
-  | "model_mismatch_alert";
+  | "model_mismatch_alert"
+  | "weight_adjustment_alert";
 
 export interface NotificationBinding {
   id: number;

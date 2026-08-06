@@ -48,6 +48,29 @@
       "delete": "Delete provider",
       "key_reveal": "Reveal provider key"
     },
+    "provider_weight_adjustment": {
+      "interval": {
+        "update": "Update provider weight adjustment interval"
+      }
+    },
+    "provider_weight_adjustment_rule": {
+      "create": "Create provider weight adjustment rule",
+      "update": "Update provider weight adjustment rule",
+      "delete": "Delete provider weight adjustment rule",
+      "enable": "Enable provider weight adjustment rule",
+      "disable": "Disable provider weight adjustment rule",
+      "enable_all": "Enable all provider weight adjustment rules",
+      "disable_all": "Disable all provider weight adjustment rules",
+      "run": "Run provider weight adjustment rule",
+      "members": {
+        "replace": "Replace provider weight adjustment rule members"
+      },
+      "member": {
+        "auto_remove": "Remove provider from weight adjustment rule",
+        "detach_for_manual_weight": "Detach provider for manual weight update",
+        "detach_for_batch_edit": "Detach providers during batch edit"
+      }
+    },
     "provider_group": {
       "create": "Create provider group",
       "update": "Update provider group",

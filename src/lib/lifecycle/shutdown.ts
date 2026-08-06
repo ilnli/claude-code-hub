@@ -140,6 +140,18 @@ export async function runApplicationCleanup(
       "stopUpstreamBillingProbeScheduler"
     );
 
+    // 2c. 供应商权重调整调度器
+    await awaitQuiescenceBestEffort(
+      (async () => {
+        const { stopProviderWeightAdjustmentScheduler } = await import(
+          "@/lib/provider-weight-adjustment/scheduler"
+        );
+        await stopProviderWeightAdjustmentScheduler();
+      })(),
+      stepMs,
+      "stopProviderWeightAdjustmentScheduler"
+    );
+
     // 3. 公共状态重建调度器
     await awaitQuiescenceBestEffort(
       (async () => {

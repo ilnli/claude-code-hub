@@ -70,6 +70,18 @@ export const ACTION_MIGRATION_MATRIX = [
     exportPolicy: "all-action-exports",
   },
   {
+    module: "provider-weight-adjustment",
+    sourceFile: "provider-weight-adjustment.ts",
+    resource: "provider-weight-adjustment",
+    endpointFamilies: [
+      "/api/v1/provider-weight-adjustment-rules",
+      "/api/v1/provider-weight-adjustment-runs/{runId}/details",
+      "/api/v1/provider-weight-adjustment-settings",
+    ],
+    access: "admin",
+    exportPolicy: "all-action-exports",
+  },
+  {
     module: "upstream-billing",
     sourceFile: "upstream-billing.ts",
     resource: "providers",

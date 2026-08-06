@@ -11,6 +11,7 @@ import { DispatchSimulatorDialog } from "./_components/dispatch-simulator-dialog
 import { ProviderManagerLoader } from "./_components/provider-manager-loader";
 import { ReclusterVendorsDialog } from "./_components/recluster-vendors-dialog";
 import { SchedulingRulesDialog } from "./_components/scheduling-rules-dialog";
+import { WeightAdjustmentRulesDialog } from "./_components/weight-adjustment-rules-dialog";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +43,7 @@ export default async function SettingsProvidersPage({
             <AutoSortPriorityDialog />
             <ReclusterVendorsDialog />
             <SchedulingRulesDialog />
+            <WeightAdjustmentRulesDialog providers={providers} />
             <DispatchSimulatorDialog providers={providers} />
           </>
         }

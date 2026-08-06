@@ -59,6 +59,11 @@
     "description": "供應商實際回應模型與請求模型不一致時傳送通知；同一供應商 10 分鐘內的事件會彙總統計",
     "enable": "啟用摻假偵測通知"
   },
+  "weightAdjustmentAlert": {
+    "title": "Provider 權重調整通知",
+    "description": "權重調整規則發生故障時每個故障階段傳送一次，並在恢復後再次通知",
+    "enable": "啟用權重調整通知"
+  },
   "dailyLeaderboard": {
     "description": "每天定時發送使用者消費 Top N 排行榜",
     "enable": "啟用每日排行榜",

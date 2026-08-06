@@ -624,6 +624,10 @@ export const ProviderUpdateSchema = ProviderCreateSchema.omit({ key: true })
       .optional()
       .describe("Provider API key. Write-only."),
     provider_type: ProviderTypeSchema.optional(),
+    detach_from_weight_adjustment_rule: z
+      .boolean()
+      .optional()
+      .describe("Explicitly detach from an enabled weight adjustment rule when editing weight."),
   })
   .partial()
   .strict()

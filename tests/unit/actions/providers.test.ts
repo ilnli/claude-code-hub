@@ -9,6 +9,7 @@ const createProviderMock = vi.fn();
 const updateProviderMock = vi.fn();
 const deleteProviderMock = vi.fn();
 const updateProviderPrioritiesBatchMock = vi.fn();
+const listProviderWeightAdjustmentMembershipsMock = vi.fn();
 
 const publishProviderCacheInvalidationMock = vi.fn();
 const saveProviderCircuitConfigMock = vi.fn();
@@ -37,6 +38,11 @@ vi.mock("@/repository/provider", () => ({
   resetProviderTotalCostResetAt: vi.fn(async () => {}),
   updateProvider: updateProviderMock,
   updateProviderPrioritiesBatch: updateProviderPrioritiesBatchMock,
+}));
+
+vi.mock("@/repository/provider-weight-adjustment", () => ({
+  getProviderWeightAdjustmentMembership: vi.fn(),
+  listProviderWeightAdjustmentMemberships: listProviderWeightAdjustmentMembershipsMock,
 }));
 
 vi.mock("@/lib/cache/provider-cache", () => ({
@@ -105,6 +111,7 @@ describe("Provider Actions - Async Optimization", () => {
     vi.clearAllMocks();
 
     getSessionMock.mockResolvedValue({ user: { id: 1, role: "admin" } });
+    listProviderWeightAdjustmentMembershipsMock.mockResolvedValue([]);
 
     findAllProvidersFreshMock.mockResolvedValue([
       {
@@ -587,7 +594,8 @@ describe("Provider Actions - Async Optimization", () => {
         expect.objectContaining({
           url: nextUrl,
           provider_type: "codex",
-        })
+        }),
+        { detachWeightAdjustmentMembership: true }
       );
       expect(publishProviderCacheInvalidationMock).toHaveBeenCalledTimes(1);
       expect(terminateProviderSessionsBatchMock).toHaveBeenCalledWith([1], "editProvider");

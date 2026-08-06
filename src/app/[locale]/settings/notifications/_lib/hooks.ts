@@ -56,6 +56,7 @@ export interface NotificationSettingsState {
   cacheHitRateAlertTopN: number;
 
   modelMismatchAlertEnabled: boolean;
+  weightAdjustmentAlertEnabled: boolean;
 }
 
 export interface WebhookTestResult {
@@ -117,6 +118,7 @@ export const NOTIFICATION_TYPES: NotificationType[] = [
   "cost_alert",
   "cache_hit_rate_alert",
   "model_mismatch_alert",
+  "weight_adjustment_alert",
 ];
 
 const INT32_MAX = 2_147_483_647;
@@ -209,6 +211,7 @@ function toClientSettings(raw: any): NotificationSettingsState {
     ),
     cacheHitRateAlertTopN: toBoundedInt(raw?.cacheHitRateAlertTopN, 10, 1, 100),
     modelMismatchAlertEnabled: Boolean(raw?.modelMismatchAlertEnabled),
+    weightAdjustmentAlertEnabled: Boolean(raw?.weightAdjustmentAlertEnabled),
   };
 }
 
@@ -223,6 +226,7 @@ export function useNotificationsPageData() {
     cost_alert: [],
     cache_hit_rate_alert: [],
     model_mismatch_alert: [],
+    weight_adjustment_alert: [],
   }));
 
   const [isLoading, setIsLoading] = useState(true);
@@ -390,6 +394,9 @@ export function useNotificationsPageData() {
 
       if (patch.modelMismatchAlertEnabled !== undefined) {
         payload.modelMismatchAlertEnabled = patch.modelMismatchAlertEnabled;
+      }
+      if (patch.weightAdjustmentAlertEnabled !== undefined) {
+        payload.weightAdjustmentAlertEnabled = patch.weightAdjustmentAlertEnabled;
       }
 
       const result = await updateNotificationSettingsAction(payload);

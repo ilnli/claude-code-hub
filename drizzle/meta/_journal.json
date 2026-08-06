@@ -855,6 +855,13 @@
       "when": 1785947164743,
       "tag": "0121_dapper_scarecrow",
       "breakpoints": true
+    },
+    {
+      "idx": 122,
+      "version": "7",
+      "when": 1786018851175,
+      "tag": "0122_romantic_scorpion",
+      "breakpoints": true
     }
   ]
 }

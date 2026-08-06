@@ -158,6 +158,7 @@ function createFallbackSettings(): SystemSettings {
     enableClientVersionCheck: false,
     upstreamBillingProbeEnabled: false,
     upstreamBillingProbeIntervalMinutes: 30,
+    providerWeightAdjustmentIntervalMinutes: 30,
     verboseProviderError: false,
     passThroughUpstreamErrorMessage: true,
     enableHttp2: false,
@@ -284,6 +285,14 @@ const RECENT_COLUMN_LADDER: ReadonlyArray<{
   // 本层更新失败（仍有列缺失）时记录的告警
   updateWarn: string;
 }> = [
+  {
+    key: "providerWeightAdjustmentIntervalMinutes",
+    column: systemSettings.providerWeightAdjustmentIntervalMinutes,
+    selectWarn:
+      "system_settings 表除 providerWeightAdjustmentIntervalMinutes 外仍有列缺失，继续回退到上一代字段集。",
+    updateWarn:
+      "system_settings 表除 providerWeightAdjustmentIntervalMinutes 外仍有列缺失，继续降级更新。",
+  },
   {
     key: "upstreamBillingProbeIntervalMinutes",
     column: systemSettings.upstreamBillingProbeIntervalMinutes,
@@ -775,6 +784,10 @@ export async function updateSystemSettings(
     }
     if (payload.upstreamBillingProbeIntervalMinutes !== undefined) {
       updates.upstreamBillingProbeIntervalMinutes = payload.upstreamBillingProbeIntervalMinutes;
+    }
+    if (payload.providerWeightAdjustmentIntervalMinutes !== undefined) {
+      updates.providerWeightAdjustmentIntervalMinutes =
+        payload.providerWeightAdjustmentIntervalMinutes;
     }
 
     // 供应商错误详情配置字段（如果提供）

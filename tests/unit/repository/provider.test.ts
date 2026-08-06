@@ -1,5 +1,11 @@
 import { describe, expect, test, vi } from "vitest";
 
+const detachProviderFromWeightAdjustmentRuleMock = vi.hoisted(() => vi.fn());
+
+vi.mock("@/repository/provider-weight-adjustment", () => ({
+  detachProviderFromWeightAdjustmentRule: detachProviderFromWeightAdjustmentRuleMock,
+}));
+
 function sqlToString(sqlObj: unknown): string {
   const stack = new Set<object>();
 
@@ -50,12 +56,14 @@ function sqlToString(sqlObj: unknown): string {
 describe("provider repository - updateProviderPrioritiesBatch", () => {
   test("returns 0 and does not execute SQL when updates is empty", async () => {
     vi.resetModules();
+    vi.clearAllMocks();
 
     const executeMock = vi.fn(async () => []);
 
     vi.doMock("@/drizzle/db", () => ({
       db: {
         execute: executeMock,
+        transaction: vi.fn(),
       },
     }));
 
@@ -68,12 +76,14 @@ describe("provider repository - updateProviderPrioritiesBatch", () => {
 
   test("generates CASE batch update SQL and returns affected rows", async () => {
     vi.resetModules();
+    vi.clearAllMocks();
 
     const executeMock = vi.fn(async () => [{ id: 1 }, { id: 2 }]);
 
     vi.doMock("@/drizzle/db", () => ({
       db: {
-        execute: executeMock,
+        transaction: (run: (tx: { execute: typeof executeMock }) => Promise<unknown>) =>
+          run({ execute: executeMock }),
       },
     }));
 
@@ -85,6 +95,7 @@ describe("provider repository - updateProviderPrioritiesBatch", () => {
 
     expect(result).toBe(2);
     expect(executeMock).toHaveBeenCalledTimes(1);
+    expect(detachProviderFromWeightAdjustmentRuleMock).toHaveBeenCalledTimes(2);
 
     const queryArg = executeMock.mock.calls[0]?.[0];
     const sqlText = sqlToString(queryArg).replaceAll(/\s+/g, " ").trim();
@@ -101,12 +112,14 @@ describe("provider repository - updateProviderPrioritiesBatch", () => {
 
   test("deduplicates provider ids (last update wins)", async () => {
     vi.resetModules();
+    vi.clearAllMocks();
 
     const executeMock = vi.fn(async () => [{ id: 1 }]);
 
     vi.doMock("@/drizzle/db", () => ({
       db: {
-        execute: executeMock,
+        transaction: (run: (tx: { execute: typeof executeMock }) => Promise<unknown>) =>
+          run({ execute: executeMock }),
       },
     }));
 
@@ -118,6 +131,7 @@ describe("provider repository - updateProviderPrioritiesBatch", () => {
 
     expect(result).toBe(1);
     expect(executeMock).toHaveBeenCalledTimes(1);
+    expect(detachProviderFromWeightAdjustmentRuleMock).toHaveBeenCalledTimes(1);
 
     const queryArg = executeMock.mock.calls[0]?.[0];
     const sqlText = sqlToString(queryArg).replaceAll(/\s+/g, " ").trim();
@@ -129,6 +143,7 @@ describe("provider repository - updateProviderPrioritiesBatch", () => {
 
   test("propagates db.execute errors", async () => {
     vi.resetModules();
+    vi.clearAllMocks();
 
     const executeMock = vi.fn(async () => {
       throw new Error("DB connection failed");
@@ -136,7 +151,8 @@ describe("provider repository - updateProviderPrioritiesBatch", () => {
 
     vi.doMock("@/drizzle/db", () => ({
       db: {
-        execute: executeMock,
+        transaction: (run: (tx: { execute: typeof executeMock }) => Promise<unknown>) =>
+          run({ execute: executeMock }),
       },
     }));
 

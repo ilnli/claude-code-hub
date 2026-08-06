@@ -8,6 +8,7 @@ export const NotificationTypeSchema = z.enum([
   "cost_alert",
   "cache_hit_rate_alert",
   "model_mismatch_alert",
+  "weight_adjustment_alert",
 ]);
 export type NotificationType = z.infer<typeof NotificationTypeSchema>;
 

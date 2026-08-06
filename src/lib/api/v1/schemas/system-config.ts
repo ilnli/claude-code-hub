@@ -156,6 +156,11 @@ export const SystemSettingsSchema = z
       .min(1)
       .max(1440)
       .describe("Interval between scheduled upstream billing-rate probes in minutes."),
+    providerWeightAdjustmentIntervalMinutes: z
+      .number()
+      .int()
+      .refine((value) => [10, 30, 60, 360, 1440].includes(value))
+      .describe("Shared interval for provider weight adjustment rules in minutes."),
     verboseProviderError: z
       .boolean()
       .describe("Whether provider errors include extra diagnostics."),
@@ -252,6 +257,7 @@ export const SystemSettingsUpdateSchema = SystemSettingsSchema.omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+  providerWeightAdjustmentIntervalMinutes: true,
 })
   .extend({
     timezone: TimeZoneSchema.nullable()

@@ -62,6 +62,16 @@ export const DEFAULT_TEMPLATES = {
     windowEnd: "{{window_end}}",
     cooldownMinutes: "{{cooldown_minutes}}",
   },
+  weight_adjustment_alert: {
+    title: "{{title}}",
+    event: "{{event}}",
+    ruleId: "{{rule_id}}",
+    ruleName: "{{rule_name}}",
+    runId: "{{run_id}}",
+    faultKind: "{{fault_kind}}",
+    message: "{{message}}",
+    generatedAt: "{{generated_at}}",
+  },
 } as const;
 
 export const DEFAULT_TEMPLATE_BY_NOTIFICATION_TYPE: Record<
@@ -73,4 +83,5 @@ export const DEFAULT_TEMPLATE_BY_NOTIFICATION_TYPE: Record<
   cost_alert: DEFAULT_TEMPLATES.cost_alert,
   cache_hit_rate_alert: DEFAULT_TEMPLATES.cache_hit_rate_alert,
   model_mismatch_alert: DEFAULT_TEMPLATES.model_mismatch_alert,
+  weight_adjustment_alert: DEFAULT_TEMPLATES.weight_adjustment_alert,
 };

@@ -23,6 +23,7 @@ import type { IpExtractionConfig } from "@/types/ip-extraction";
 import type { AuditCategory } from "@/types/audit-log";
 import type { RateMarkupType, UpstreamProbeType } from "@/types/upstream-billing";
 import type { RoutingTraceV1 } from "@/types/routing-trace";
+import type { ProviderWeightAdjustmentRunSummary } from "@/types/provider-weight-adjustment";
 
 // Enums
 export const dailyResetModeEnum = pgEnum('daily_reset_mode', ['fixed', 'rolling']);
@@ -39,6 +40,7 @@ export const notificationTypeEnum = pgEnum('notification_type', [
   'cost_alert',
   'cache_hit_rate_alert',
   'model_mismatch_alert',
+  'weight_adjustment_alert',
 ]);
 
 // Users table
@@ -413,6 +415,121 @@ export const providers = pgTable('providers', {
     sql`${table.deletedAt} IS NULL AND ${table.isEnabled} = true AND ${table.providerVendorId} IS NOT NULL AND ${table.providerVendorId} > 0`
   ),
 }));
+
+// Cost-aware provider weight adjustment rules. Rules are soft-deleted so their
+// immutable run snapshots remain available for the fixed history retention window.
+export const providerWeightAdjustmentRules = pgTable(
+  'provider_weight_adjustment_rules',
+  {
+    id: serial('id').primaryKey(),
+    name: varchar('name', { length: 128 }).notNull(),
+    description: text('description'),
+    providerType: varchar('provider_type', { length: 20 }).notNull().$type<ProviderType>(),
+    priority: integer('priority').notNull(),
+    isEnabled: boolean('is_enabled').notNull().default(false),
+    revision: integer('revision').notNull().default(1),
+    nextRunAt: timestamp('next_run_at', { withTimezone: true }),
+    activeRunId: integer('active_run_id'),
+    faultActive: boolean('fault_active').notNull().default(false),
+    faultKind: varchar('fault_kind', { length: 40 }),
+    faultMessage: text('fault_message'),
+    faultStartedAt: timestamp('fault_started_at', { withTimezone: true }),
+    lastRunAt: timestamp('last_run_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  },
+  (table) => ({
+    activeNameUnique: uniqueIndex('uq_provider_weight_adjustment_rules_active_name')
+      .on(table.name)
+      .where(sql`${table.deletedAt} IS NULL`),
+    dueRulesIdx: index('idx_provider_weight_adjustment_rules_due')
+      .on(table.isEnabled, table.nextRunAt)
+      .where(sql`${table.deletedAt} IS NULL`),
+  })
+);
+
+export const providerWeightAdjustmentRuleMembers = pgTable(
+  'provider_weight_adjustment_rule_members',
+  {
+    id: serial('id').primaryKey(),
+    ruleId: integer('rule_id')
+      .notNull()
+      .references(() => providerWeightAdjustmentRules.id, { onDelete: 'cascade' }),
+    providerId: integer('provider_id')
+      .notNull()
+      .references(() => providers.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    providerUnique: uniqueIndex('uq_provider_weight_adjustment_rule_members_provider').on(
+      table.providerId
+    ),
+    ruleProviderUnique: uniqueIndex('uq_provider_weight_adjustment_rule_members_rule_provider').on(
+      table.ruleId,
+      table.providerId
+    ),
+    ruleIdx: index('idx_provider_weight_adjustment_rule_members_rule').on(table.ruleId),
+  })
+);
+
+export const providerWeightAdjustmentRuns = pgTable(
+  'provider_weight_adjustment_runs',
+  {
+    id: serial('id').primaryKey(),
+    ruleId: integer('rule_id')
+      .notNull()
+      .references(() => providerWeightAdjustmentRules.id, { onDelete: 'restrict' }),
+    trigger: varchar('trigger', { length: 16 }).notNull(),
+    status: varchar('status', { length: 32 }).notNull(),
+    idempotencyKey: varchar('idempotency_key', { length: 200 }),
+    ruleName: varchar('rule_name', { length: 128 }).notNull(),
+    providerType: varchar('provider_type', { length: 20 }).notNull().$type<ProviderType>(),
+    priority: integer('priority').notNull(),
+    ruleRevision: integer('rule_revision').notNull(),
+    summary: jsonb('summary').$type<ProviderWeightAdjustmentRunSummary>().notNull(),
+    errorMessage: text('error_message'),
+    startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  },
+  (table) => ({
+    manualIdempotencyUnique: uniqueIndex(
+      'uq_provider_weight_adjustment_runs_manual_idempotency'
+    )
+      .on(table.ruleId, table.idempotencyKey)
+      .where(sql`${table.idempotencyKey} IS NOT NULL`),
+    activeRuleUnique: uniqueIndex('uq_provider_weight_adjustment_runs_active_rule')
+      .on(table.ruleId)
+      .where(sql`${table.status} = 'running'`),
+    ruleStartedIdx: index('idx_provider_weight_adjustment_runs_rule_started').on(
+      table.ruleId,
+      table.startedAt
+    ),
+    expiresIdx: index('idx_provider_weight_adjustment_runs_expires').on(table.expiresAt),
+  })
+);
+
+export const providerWeightAdjustmentRunDetails = pgTable(
+  'provider_weight_adjustment_run_details',
+  {
+    id: serial('id').primaryKey(),
+    runId: integer('run_id')
+      .notNull()
+      .references(() => providerWeightAdjustmentRuns.id, { onDelete: 'cascade' }),
+    providerId: integer('provider_id').notNull(),
+    providerName: varchar('provider_name').notNull(),
+    outcome: varchar('outcome', { length: 16 }).notNull(),
+    costMultiplier: numeric('cost_multiplier', { precision: 20, scale: 10 }),
+    previousWeight: integer('previous_weight').notNull(),
+    projectedWeight: integer('projected_weight'),
+    reason: text('reason'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    runIdx: index('idx_provider_weight_adjustment_run_details_run').on(table.runId),
+  })
+);
 
 // Provider batch apply durable ledger
 //
@@ -958,6 +1075,13 @@ export const systemSettings = pgTable('system_settings', {
     .notNull()
     .default(30),
 
+  // Shared interval for all cost-aware provider weight adjustment rules.
+  providerWeightAdjustmentIntervalMinutes: integer(
+    'provider_weight_adjustment_interval_minutes'
+  )
+    .notNull()
+    .default(30),
+
   // 供应商不可用时是否返回详细错误信息
   verboseProviderError: boolean('verbose_provider_error').notNull().default(false),
 
@@ -1142,6 +1266,11 @@ export const notificationSettings = pgTable('notification_settings', {
 
   // 请求模型与实际响应模型不一致告警配置
   modelMismatchAlertEnabled: boolean('model_mismatch_alert_enabled').notNull().default(false),
+
+  // 成本感知权重调整故障与恢复通知
+  weightAdjustmentAlertEnabled: boolean('weight_adjustment_alert_enabled')
+    .notNull()
+    .default(false),
 
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
@@ -1428,7 +1557,51 @@ export const providersRelations = relations(providers, ({ many, one }) => ({
     references: [providerVendors.id],
   }),
   messageRequests: many(messageRequest),
+  weightAdjustmentMemberships: many(providerWeightAdjustmentRuleMembers),
 }));
+
+export const providerWeightAdjustmentRulesRelations = relations(
+  providerWeightAdjustmentRules,
+  ({ many }) => ({
+    members: many(providerWeightAdjustmentRuleMembers),
+    runs: many(providerWeightAdjustmentRuns),
+  })
+);
+
+export const providerWeightAdjustmentRuleMembersRelations = relations(
+  providerWeightAdjustmentRuleMembers,
+  ({ one }) => ({
+    rule: one(providerWeightAdjustmentRules, {
+      fields: [providerWeightAdjustmentRuleMembers.ruleId],
+      references: [providerWeightAdjustmentRules.id],
+    }),
+    provider: one(providers, {
+      fields: [providerWeightAdjustmentRuleMembers.providerId],
+      references: [providers.id],
+    }),
+  })
+);
+
+export const providerWeightAdjustmentRunsRelations = relations(
+  providerWeightAdjustmentRuns,
+  ({ one, many }) => ({
+    rule: one(providerWeightAdjustmentRules, {
+      fields: [providerWeightAdjustmentRuns.ruleId],
+      references: [providerWeightAdjustmentRules.id],
+    }),
+    details: many(providerWeightAdjustmentRunDetails),
+  })
+);
+
+export const providerWeightAdjustmentRunDetailsRelations = relations(
+  providerWeightAdjustmentRunDetails,
+  ({ one }) => ({
+    run: one(providerWeightAdjustmentRuns, {
+      fields: [providerWeightAdjustmentRunDetails.runId],
+      references: [providerWeightAdjustmentRuns.id],
+    }),
+  })
+);
 
 export const providerVendorsRelations = relations(providerVendors, ({ many }) => ({
   providers: many(providers),

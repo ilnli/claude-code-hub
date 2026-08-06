@@ -8,6 +8,7 @@ const updateProviderMock = vi.fn();
 const updateProvidersBatchMock = vi.fn();
 const undoProviderBatchOperationMock = vi.fn();
 const findProviderBatchUndoOperationMock = vi.fn();
+const getProviderWeightAdjustmentMembershipMock = vi.fn();
 const publishCacheInvalidationMock = vi.fn();
 const clearProviderStateMock = vi.fn();
 const clearConfigCacheMock = vi.fn();
@@ -27,6 +28,10 @@ vi.mock("@/repository/provider", () => ({
   undoProviderBatchOperation: undoProviderBatchOperationMock,
   findProviderBatchUndoOperation: findProviderBatchUndoOperationMock,
   deleteProvidersBatch: vi.fn(),
+}));
+
+vi.mock("@/repository/provider-weight-adjustment", () => ({
+  getProviderWeightAdjustmentMembership: getProviderWeightAdjustmentMembershipMock,
 }));
 
 vi.mock("@/repository", () => ({
@@ -139,6 +144,7 @@ describe("Provider Single Edit Undo Actions", () => {
     updateProviderMock.mockResolvedValue(makeProvider(1, { name: "After Name", key: "sk-new" }));
     updateProvidersBatchMock.mockResolvedValue(1);
     findProviderBatchUndoOperationMock.mockResolvedValue({ status: "expired" });
+    getProviderWeightAdjustmentMembershipMock.mockResolvedValue(null);
     publishCacheInvalidationMock.mockResolvedValue(undefined);
     clearProviderStateMock.mockReturnValue(undefined);
     clearConfigCacheMock.mockReturnValue(undefined);

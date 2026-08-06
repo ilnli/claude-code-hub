@@ -99,6 +99,7 @@ describe("v1 action migration matrix", () => {
       "provider-cache-effectiveness",
       "provider-endpoints",
       "provider-groups",
+      "provider-weight-adjustment",
       "model-prices",
       "usage-logs",
       "my-usage",

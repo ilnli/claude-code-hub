@@ -48,6 +48,29 @@
       "delete": "プロバイダー削除",
       "key_reveal": "プロバイダーキー表示"
     },
+    "provider_weight_adjustment": {
+      "interval": {
+        "update": "プロバイダーウェイト調整間隔を更新"
+      }
+    },
+    "provider_weight_adjustment_rule": {
+      "create": "プロバイダーウェイト調整ルールを作成",
+      "update": "プロバイダーウェイト調整ルールを更新",
+      "delete": "プロバイダーウェイト調整ルールを削除",
+      "enable": "プロバイダーウェイト調整ルールを有効化",
+      "disable": "プロバイダーウェイト調整ルールを無効化",
+      "enable_all": "すべてのプロバイダーウェイト調整ルールを有効化",
+      "disable_all": "すべてのプロバイダーウェイト調整ルールを無効化",
+      "run": "プロバイダーウェイト調整ルールを実行",
+      "members": {
+        "replace": "プロバイダーウェイト調整ルールのメンバーを置換"
+      },
+      "member": {
+        "auto_remove": "プロバイダーをウェイト調整ルールから自動削除",
+        "detach_for_manual_weight": "手動ウェイト更新のためプロバイダーを除外",
+        "detach_for_batch_edit": "一括編集時にプロバイダーを除外"
+      }
+    },
     "provider_group": {
       "create": "プロバイダーグループ作成",
       "update": "プロバイダーグループ更新",

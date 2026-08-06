@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   Database,
   DollarSign,
+  Scale,
   Settings2,
   ShieldAlert,
   TrendingUp,
@@ -46,7 +47,8 @@ interface TypeConfig {
     | typeof TrendingUp
     | typeof DollarSign
     | typeof Database
-    | typeof ShieldAlert;
+    | typeof ShieldAlert
+    | typeof Scale;
 }
 
 function getTypeConfig(type: NotificationType): TypeConfig {
@@ -85,6 +87,13 @@ function getTypeConfig(type: NotificationType): TypeConfig {
         iconBgColor: "bg-orange-500/10",
         borderColor: "border-orange-500/20 hover:border-orange-500/30",
         IconComponent: ShieldAlert,
+      };
+    case "weight_adjustment_alert":
+      return {
+        iconColor: "text-cyan-400",
+        iconBgColor: "bg-cyan-500/10",
+        borderColor: "border-cyan-500/20 hover:border-cyan-500/30",
+        IconComponent: Scale,
       };
   }
 }
@@ -206,7 +215,8 @@ export function NotificationTypeCard({
     | "dailyLeaderboardEnabled"
     | "costAlertEnabled"
     | "cacheHitRateAlertEnabled"
-    | "modelMismatchAlertEnabled";
+    | "modelMismatchAlertEnabled"
+    | "weightAdjustmentAlertEnabled";
 
   type TypeMeta = {
     title: string;
@@ -257,6 +267,14 @@ export function NotificationTypeCard({
           enabled: settings.modelMismatchAlertEnabled,
           enabledKey: "modelMismatchAlertEnabled" as const,
           enableLabel: t("notifications.modelMismatchAlert.enable"),
+        };
+      case "weight_adjustment_alert":
+        return {
+          title: t("notifications.weightAdjustmentAlert.title"),
+          description: t("notifications.weightAdjustmentAlert.description"),
+          enabled: settings.weightAdjustmentAlertEnabled,
+          enabledKey: "weightAdjustmentAlertEnabled" as const,
+          enableLabel: t("notifications.weightAdjustmentAlert.enable"),
         };
     }
   }, [settings, t, type]);

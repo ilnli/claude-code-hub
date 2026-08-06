@@ -18,11 +18,13 @@ import {
   buildCostAlertMessage,
   buildDailyLeaderboardMessage,
   buildModelMismatchAlertMessage,
+  buildProviderWeightAdjustmentAlertMessage,
   type CacheHitRateAlertData,
   type CircuitBreakerAlertData,
   type CostAlertData,
   type DailyLeaderboardData,
   type ModelMismatchAlertData,
+  type ProviderWeightAdjustmentAlertData,
   type StructuredMessage,
   sendWebhookMessage,
   type WebhookNotificationType,
@@ -44,7 +46,8 @@ export interface NotificationJobData {
     | DailyLeaderboardData
     | CostAlertData
     | CacheHitRateAlertData
-    | ModelMismatchAlertData; // 可选：定时任务会在执行时动态生成
+    | ModelMismatchAlertData
+    | ProviderWeightAdjustmentAlertData; // 可选：定时任务会在执行时动态生成
 }
 
 function toWebhookNotificationType(type: NotificationJobType): WebhookNotificationType {
@@ -59,6 +62,8 @@ function toWebhookNotificationType(type: NotificationJobType): WebhookNotificati
       return "cache_hit_rate_alert";
     case "model-mismatch-alert":
       return "model_mismatch_alert";
+    case "weight-adjustment-alert":
+      return "weight_adjustment_alert";
   }
 }
 
@@ -405,6 +410,7 @@ function setupQueueProcessor(queue: Queue.Queue<NotificationJobData>): void {
         | CostAlertData
         | CacheHitRateAlertData
         | ModelMismatchAlertData
+        | ProviderWeightAdjustmentAlertData
         | undefined = data;
       let cooldownCommit: { keys: string[]; cooldownMinutes: number } | undefined;
       switch (type) {
@@ -584,6 +590,23 @@ function setupQueueProcessor(queue: Queue.Queue<NotificationJobData>): void {
           message = buildModelMismatchAlertMessage(payload, timezone);
           break;
         }
+        case "weight-adjustment-alert": {
+          const payload = data as ProviderWeightAdjustmentAlertData | undefined;
+          const { getNotificationSettings } = await import("@/repository/notifications");
+          const settings = await getNotificationSettings();
+          if (
+            !settings.enabled ||
+            settings.useLegacyMode ||
+            !settings.weightAdjustmentAlertEnabled ||
+            !payload
+          ) {
+            logger.info({ action: "weight_adjustment_alert_disabled", jobId: job.id });
+            return { success: true, skipped: true };
+          }
+          templateData = payload;
+          message = buildProviderWeightAdjustmentAlertMessage(payload);
+          break;
+        }
         default:
           throw new Error(`Unknown notification type: ${type}`);
       }
@@ -693,6 +716,7 @@ export async function addNotificationJob(
     | CostAlertData
     | CacheHitRateAlertData
     | ModelMismatchAlertData
+    | ProviderWeightAdjustmentAlertData
 ): Promise<void> {
   try {
     const queue = getNotificationQueue();
@@ -728,6 +752,7 @@ export async function addNotificationJobForTarget(
     | CostAlertData
     | CacheHitRateAlertData
     | ModelMismatchAlertData
+    | ProviderWeightAdjustmentAlertData
 ): Promise<void> {
   try {
     const queue = getNotificationQueue();

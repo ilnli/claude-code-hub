@@ -4,6 +4,7 @@ import type {
   CostAlertData,
   DailyLeaderboardData,
   ModelMismatchAlertData,
+  ProviderWeightAdjustmentAlertData,
   Section,
   SectionContent,
   StructuredMessage,
@@ -22,6 +23,7 @@ export const WEBHOOK_NOTIFICATION_TYPES = [
   "cost_alert",
   "cache_hit_rate_alert",
   "model_mismatch_alert",
+  "weight_adjustment_alert",
 ] as const satisfies readonly WebhookNotificationType[];
 
 export const TEMPLATE_PLACEHOLDERS = {
@@ -91,6 +93,15 @@ export const TEMPLATE_PLACEHOLDERS = {
     { key: "{{window_start}}", label: "统计开始", description: "ISO 8601 格式" },
     { key: "{{window_end}}", label: "统计结束", description: "ISO 8601 格式" },
     { key: "{{cooldown_minutes}}", label: "冷却分钟", description: "固定冷却时间" },
+  ],
+  weight_adjustment_alert: [
+    { key: "{{event}}", label: "事件", description: "fault 或 recovery" },
+    { key: "{{rule_id}}", label: "规则ID", description: "权重调整规则 ID" },
+    { key: "{{rule_name}}", label: "规则名称", description: "权重调整规则名称" },
+    { key: "{{run_id}}", label: "运行ID", description: "关联运行 ID" },
+    { key: "{{fault_kind}}", label: "故障类型", description: "故障分类" },
+    { key: "{{message}}", label: "详情", description: "故障详情" },
+    { key: "{{generated_at}}", label: "生成时间", description: "ISO 8601 格式" },
   ],
 } as const satisfies Record<string, readonly TemplatePlaceholder[]>;
 
@@ -189,6 +200,17 @@ export function buildTemplateVariables(params: {
     values["{{window_end}}"] = mm?.windowEnd ?? "";
     values["{{cooldown_minutes}}"] =
       mm?.cooldownMinutes !== undefined ? String(mm.cooldownMinutes) : "";
+  }
+
+  if (notificationType === "weight_adjustment_alert") {
+    const alert = data as Partial<ProviderWeightAdjustmentAlertData> | undefined;
+    values["{{event}}"] = alert?.event ?? "";
+    values["{{rule_id}}"] = alert?.ruleId !== undefined ? String(alert.ruleId) : "";
+    values["{{rule_name}}"] = alert?.ruleName ?? "";
+    values["{{run_id}}"] = alert?.runId !== undefined ? String(alert.runId) : "";
+    values["{{fault_kind}}"] = alert?.faultKind ?? "";
+    values["{{message}}"] = alert?.message ?? "";
+    values["{{generated_at}}"] = alert?.generatedAt ?? "";
   }
 
   return values;

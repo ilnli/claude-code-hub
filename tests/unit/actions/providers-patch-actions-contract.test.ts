@@ -10,6 +10,7 @@ const findProviderBatchApplyOperationMock = vi.fn();
 const applyProviderBatchOperationIfUnchangedMock = vi.fn();
 const undoProviderBatchOperationMock = vi.fn();
 const findProviderBatchUndoOperationMock = vi.fn();
+const listProviderWeightAdjustmentMembershipsMock = vi.fn();
 const { store: redisStore, mocks: redisMocks } = createRedisStore();
 const applyLedger = new Map<
   string,
@@ -33,6 +34,10 @@ vi.mock("@/repository/provider", () => ({
   undoProviderBatchOperation: undoProviderBatchOperationMock,
   findProviderBatchUndoOperation: findProviderBatchUndoOperationMock,
   deleteProvidersBatch: vi.fn(),
+}));
+
+vi.mock("@/repository/provider-weight-adjustment", () => ({
+  listProviderWeightAdjustmentMemberships: listProviderWeightAdjustmentMembershipsMock,
 }));
 
 vi.mock("@/lib/cache/provider-cache", () => ({
@@ -180,6 +185,7 @@ describe("Provider Batch Patch Action Contracts", () => {
     applyLedger.clear();
     getSessionMock.mockResolvedValue({ user: { id: 1, role: "admin" } });
     findAllProvidersFreshMock.mockResolvedValue([]);
+    listProviderWeightAdjustmentMembershipsMock.mockResolvedValue([]);
     updateProvidersBatchMock.mockResolvedValue(0);
     findProviderBatchUndoOperationMock.mockResolvedValue({ status: "expired" });
     installApplyLedgerMocks();

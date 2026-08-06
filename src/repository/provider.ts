@@ -8,6 +8,8 @@ import {
   providerBatchApplyOperations,
   providerEndpoints,
   providers,
+  providerWeightAdjustmentRuleMembers,
+  providerWeightAdjustmentRules,
 } from "@/drizzle/schema";
 import { normalizeAllowedModelRules } from "@/lib/allowed-model-rules";
 import { getCachedProviders } from "@/lib/cache/provider-cache";
@@ -33,6 +35,7 @@ import {
   syncProviderEndpointOnProviderEdit,
   tryDeleteProviderVendorIfEmpty,
 } from "./provider-endpoints";
+import { detachProviderFromWeightAdjustmentRule } from "./provider-weight-adjustment";
 
 type ProviderTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -686,7 +689,8 @@ export async function findProviderById(id: number): Promise<Provider | null> {
 
 export async function updateProvider(
   id: number,
-  providerData: UpdateProviderData
+  providerData: UpdateProviderData,
+  options: { detachWeightAdjustmentMembership?: boolean } = {}
 ): Promise<Provider | null> {
   if (Object.keys(providerData).length === 0) {
     return findProviderById(id);
@@ -959,6 +963,10 @@ export async function updateProvider(
     if (!provider) return null;
     const transformed = normalizeProviderRuntimeFields(toProvider(provider));
 
+    if (options.detachWeightAdjustmentMembership) {
+      await detachProviderFromWeightAdjustmentRule(id, tx);
+    }
+
     if (shouldSyncEndpoint && transformed.providerVendorId) {
       // 注意：即使 provider 当前处于禁用态，只要 vendor/type/url 发生变化也同步 endpoint pool：
       // - 避免旧 URL 残留为 orphan endpoints（#781）
@@ -1070,8 +1078,13 @@ export async function updateProviderPrioritiesBatch(
     RETURNING id
   `;
 
-  const result = await db.execute(query);
-  return Array.from(result).length;
+  return db.transaction(async (tx) => {
+    const result = await tx.execute(query);
+    for (const id of ids) {
+      await detachProviderFromWeightAdjustmentRule(id, tx);
+    }
+    return Array.from(result).length;
+  });
 }
 
 export async function deleteProvider(id: number): Promise<boolean> {
@@ -1101,6 +1114,8 @@ export async function deleteProvider(id: number): Promise<boolean> {
     if (result.length === 0) {
       return false;
     }
+
+    await detachProviderFromWeightAdjustmentRule(id, tx);
 
     if (current.providerVendorId != null && current.url) {
       const [activeReference] = await tx
@@ -1586,6 +1601,8 @@ export interface ApplyProviderBatchOperationIfUnchangedInput
   expectedPreimages: ProviderBatchExpectedPreimage[];
   /** Providers left after applying the caller's exclusion list. */
   effectiveProviderIds: number[];
+  /** Exact memberships that the confirmed preview explicitly detaches in this transaction. */
+  detachWeightAdjustmentMemberships?: Array<{ providerId: number; ruleId: number }>;
   /** Exact provider-keyed values needed to rebuild the undo snapshot. */
   undoPreimage: Record<number, Record<string, unknown>>;
   undoRestorable: boolean;
@@ -1838,6 +1855,63 @@ export async function applyProviderBatchOperationIfUnchanged(
         for (const [key, expectedValue] of Object.entries(expected.values)) {
           const providerKey = key as keyof Provider;
           if (!isProviderBatchPreimageValueEqual(current[providerKey], expectedValue)) {
+            throw new ProviderBatchPreimageMismatchError();
+          }
+        }
+      }
+
+      const priorityUpdateIds = new Set(
+        input.groups.flatMap((group) => (group.updates.priority === undefined ? [] : group.ids))
+      );
+      const weightUpdateIds = new Set(
+        input.groups.flatMap((group) => (group.updates.weight === undefined ? [] : group.ids))
+      );
+      if (priorityUpdateIds.size > 0 || weightUpdateIds.size > 0) {
+        const currentMemberships = await tx
+          .select({
+            providerId: providerWeightAdjustmentRuleMembers.providerId,
+            ruleId: providerWeightAdjustmentRuleMembers.ruleId,
+            ruleEnabled: providerWeightAdjustmentRules.isEnabled,
+          })
+          .from(providerWeightAdjustmentRuleMembers)
+          .innerJoin(
+            providerWeightAdjustmentRules,
+            eq(providerWeightAdjustmentRuleMembers.ruleId, providerWeightAdjustmentRules.id)
+          )
+          .where(
+            and(
+              inArray(providerWeightAdjustmentRuleMembers.providerId, effectiveProviderIds),
+              isNull(providerWeightAdjustmentRules.deletedAt)
+            )
+          )
+          .for("update");
+        const affectedMembershipKeys = currentMemberships
+          .filter(
+            (membership) =>
+              priorityUpdateIds.has(membership.providerId) ||
+              (weightUpdateIds.has(membership.providerId) && membership.ruleEnabled)
+          )
+          .map((membership) => `${membership.providerId}:${membership.ruleId}`)
+          .sort();
+        const expectedMemberships = (input.detachWeightAdjustmentMemberships ?? [])
+          .filter((membership) => effectiveIdSet.has(membership.providerId))
+          .sort((left, right) => left.providerId - right.providerId || left.ruleId - right.ruleId);
+        const expectedMembershipKeys = expectedMemberships.map(
+          (membership) => `${membership.providerId}:${membership.ruleId}`
+        );
+        if (
+          affectedMembershipKeys.length !== expectedMembershipKeys.length ||
+          affectedMembershipKeys.some((key, index) => key !== expectedMembershipKeys[index])
+        ) {
+          throw new ProviderBatchPreimageMismatchError();
+        }
+        for (const membership of expectedMemberships) {
+          const detached = await detachProviderFromWeightAdjustmentRule(
+            membership.providerId,
+            tx,
+            membership.ruleId
+          );
+          if (!detached) {
             throw new ProviderBatchPreimageMismatchError();
           }
         }

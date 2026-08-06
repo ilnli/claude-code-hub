@@ -59,6 +59,11 @@
     "description": "プロバイダーの実際の応答モデルがリクエストモデルと異なる場合に通知します。同じプロバイダーのイベントは 10 分間集約されます",
     "enable": "モデル不一致通知を有効化"
   },
+  "weightAdjustmentAlert": {
+    "title": "Provider ウェイト調整通知",
+    "description": "ウェイト調整ルールの障害エピソードごとに一度通知し、復旧時にも通知します",
+    "enable": "ウェイト調整通知を有効化"
+  },
   "dailyLeaderboard": {
     "description": "毎日定時でユーザー消費トップNランキングを送信",
     "enable": "日次ランキングを有効にする",

@@ -8,5 +8,6 @@
   "invalidUrl": "Please enter a valid API address",
   "urlRequired": "Please enter an API address",
   "invalidWebsiteUrl": "Please enter a valid provider website URL",
-  "updateFailed": "Failed to update provider"
+  "updateFailed": "Failed to update provider",
+  "weightAdjustmentDetachConfirm": "This provider belongs to enabled rule “{ruleName}”. Saving the manual weight will remove it from that rule. Continue?"
 }

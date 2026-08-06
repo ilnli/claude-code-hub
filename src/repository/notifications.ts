@@ -50,6 +50,9 @@ export interface NotificationSettings {
   // 请求模型与实际响应模型不一致告警配置
   modelMismatchAlertEnabled: boolean;
 
+  // 成本感知权重调整故障与恢复通知
+  weightAdjustmentAlertEnabled: boolean;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -88,6 +91,7 @@ export interface UpdateNotificationSettingsInput {
   cacheHitRateAlertTopN?: number;
 
   modelMismatchAlertEnabled?: boolean;
+  weightAdjustmentAlertEnabled?: boolean;
 }
 
 /**
@@ -259,6 +263,7 @@ function createFallbackSettings(): NotificationSettings {
     cacheHitRateAlertCooldownMinutes: 30,
     cacheHitRateAlertTopN: 10,
     modelMismatchAlertEnabled: false,
+    weightAdjustmentAlertEnabled: false,
     createdAt: now,
     updatedAt: now,
   };
@@ -277,6 +282,7 @@ export async function getNotificationSettings(): Promise<NotificationSettings> {
         useLegacyMode: settings.useLegacyMode ?? false,
         cacheHitRateAlertEnabled: settings.cacheHitRateAlertEnabled ?? false,
         modelMismatchAlertEnabled: settings.modelMismatchAlertEnabled ?? false,
+        weightAdjustmentAlertEnabled: settings.weightAdjustmentAlertEnabled ?? false,
         cacheHitRateAlertWindowMode: normalizeCacheHitRateAlertWindowMode(
           settings.cacheHitRateAlertWindowMode
         ),
@@ -309,6 +315,7 @@ export async function getNotificationSettings(): Promise<NotificationSettings> {
         cacheHitRateAlertCooldownMinutes: 30,
         cacheHitRateAlertTopN: 10,
         modelMismatchAlertEnabled: false,
+        weightAdjustmentAlertEnabled: false,
       })
       .onConflictDoNothing()
       .returning();
@@ -319,6 +326,7 @@ export async function getNotificationSettings(): Promise<NotificationSettings> {
         useLegacyMode: created.useLegacyMode ?? false,
         cacheHitRateAlertEnabled: created.cacheHitRateAlertEnabled ?? false,
         modelMismatchAlertEnabled: created.modelMismatchAlertEnabled ?? false,
+        weightAdjustmentAlertEnabled: created.weightAdjustmentAlertEnabled ?? false,
         cacheHitRateAlertWindowMode: normalizeCacheHitRateAlertWindowMode(
           created.cacheHitRateAlertWindowMode
         ),
@@ -339,6 +347,7 @@ export async function getNotificationSettings(): Promise<NotificationSettings> {
       useLegacyMode: fallback.useLegacyMode ?? false,
       cacheHitRateAlertEnabled: fallback.cacheHitRateAlertEnabled ?? false,
       modelMismatchAlertEnabled: fallback.modelMismatchAlertEnabled ?? false,
+      weightAdjustmentAlertEnabled: fallback.weightAdjustmentAlertEnabled ?? false,
       cacheHitRateAlertWindowMode: normalizeCacheHitRateAlertWindowMode(
         fallback.cacheHitRateAlertWindowMode
       ),
@@ -459,6 +468,9 @@ export async function updateNotificationSettings(
 
     if (payload.modelMismatchAlertEnabled !== undefined) {
       updates.modelMismatchAlertEnabled = payload.modelMismatchAlertEnabled;
+    }
+    if (payload.weightAdjustmentAlertEnabled !== undefined) {
+      updates.weightAdjustmentAlertEnabled = payload.weightAdjustmentAlertEnabled;
     }
 
     const [updated] = await db

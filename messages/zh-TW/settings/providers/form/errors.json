@@ -8,5 +8,6 @@
   "invalidUrl": "請輸入有效的 API 位址",
   "urlRequired": "請先填寫供應商 URL",
   "invalidWebsiteUrl": "請輸入有效的供應商官網",
-  "updateFailed": "更新供應商失敗"
+  "updateFailed": "更新供應商失敗",
+  "weightAdjustmentDetachConfirm": "此 Provider 屬於已啟用規則「{ruleName}」。儲存手動權重會將其移出該規則，是否繼續？"
 }

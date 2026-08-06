@@ -413,7 +413,17 @@ function ProviderFormContent({
         if (isEdit && provider) {
           // For edit: only include key if user provided a new one
           const editFormData = trimmedKey ? { ...baseFormData, key: trimmedKey } : baseFormData;
-          const res = await editProvider(provider.id, editFormData);
+          let res = await editProvider(provider.id, editFormData);
+          if (!res.ok && res.errorCode === "provider_weight_adjustment_detach_required") {
+            const ruleName = String(res.errorParams?.ruleName ?? "");
+            if (!window.confirm(t("errors.weightAdjustmentDetachConfirm", { ruleName }))) {
+              return;
+            }
+            res = await editProvider(provider.id, {
+              ...editFormData,
+              detach_from_weight_adjustment_rule: true,
+            });
+          }
           if (!res.ok) {
             toast.error(res.error || t("errors.updateFailed"));
             return;

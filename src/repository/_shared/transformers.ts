@@ -288,6 +288,8 @@ export function toSystemSettings(dbSettings: any): SystemSettings {
     enableClientVersionCheck: dbSettings?.enableClientVersionCheck ?? false,
     upstreamBillingProbeEnabled: dbSettings?.upstreamBillingProbeEnabled ?? false,
     upstreamBillingProbeIntervalMinutes: dbSettings?.upstreamBillingProbeIntervalMinutes ?? 30,
+    providerWeightAdjustmentIntervalMinutes:
+      dbSettings?.providerWeightAdjustmentIntervalMinutes ?? 30,
     verboseProviderError: dbSettings?.verboseProviderError ?? false,
     passThroughUpstreamErrorMessage: dbSettings?.passThroughUpstreamErrorMessage ?? true,
     enableHttp2: dbSettings?.enableHttp2 ?? false,

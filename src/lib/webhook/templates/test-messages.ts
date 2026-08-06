@@ -5,6 +5,7 @@ import { buildCircuitBreakerMessage } from "./circuit-breaker";
 import { buildCostAlertMessage } from "./cost-alert";
 import { buildDailyLeaderboardMessage } from "./daily-leaderboard";
 import { buildModelMismatchAlertMessage } from "./model-mismatch-alert";
+import { buildProviderWeightAdjustmentAlertMessage } from "./provider-weight-adjustment-alert";
 
 /**
  * 根据通知类型构建测试消息
@@ -120,5 +121,15 @@ export function buildTestMessage(type: NotificationJobType, timezone?: string): 
         timezone
       );
     }
+    case "weight-adjustment-alert":
+      return buildProviderWeightAdjustmentAlertMessage({
+        event: "fault",
+        ruleId: 1,
+        ruleName: "Example rule",
+        runId: 1,
+        faultKind: "run_failed",
+        message: "Example failure",
+        generatedAt: new Date().toISOString(),
+      });
   }
 }

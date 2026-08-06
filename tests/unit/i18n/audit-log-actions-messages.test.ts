@@ -50,19 +50,19 @@ function collectEmittedAuditActionTypes(): string[] {
   const files = walkFiles(srcRoot).filter((file) => file.endsWith(".ts") || file.endsWith(".tsx"));
   const actions = new Set<string>();
 
-  const patterns = [
-    /emitActionAudit\(\s*\{[\s\S]*?action:\s*"([^"]+)"/g,
-    /createAuditLogAsync\(\s*\{[\s\S]*?actionType:\s*"([^"]+)"/g,
-  ];
-
   for (const file of files) {
     const content = readFileSync(file, "utf8");
-    for (const pattern of patterns) {
-      let match: RegExpExecArray | null;
-      pattern.lastIndex = 0;
-      while ((match = pattern.exec(content)) !== null) {
-        actions.add(match[1]);
+    for (const match of content.matchAll(
+      /emitActionAudit\(\s*\{[\s\S]*?action:\s*([\s\S]*?),\s*targetType:/g
+    )) {
+      for (const action of match[1].matchAll(/"([^"]+)"/g)) {
+        actions.add(action[1]);
       }
+    }
+    for (const match of content.matchAll(
+      /createAuditLogAsync\(\s*\{[\s\S]*?actionType:\s*"([^"]+)"/g
+    )) {
+      actions.add(match[1]);
     }
   }
 

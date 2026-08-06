@@ -218,6 +218,7 @@ export async function getCachedSystemSettings(): Promise<SystemSettings> {
       enableClientVersionCheck: false,
       upstreamBillingProbeEnabled: false,
       upstreamBillingProbeIntervalMinutes: 30,
+      providerWeightAdjustmentIntervalMinutes: 30,
       enableHttp2: DEFAULT_SETTINGS.enableHttp2,
       enableOpenaiResponsesWebsocket: DEFAULT_SETTINGS.enableOpenaiResponsesWebsocket,
       enableHighConcurrencyMode: DEFAULT_SETTINGS.enableHighConcurrencyMode,

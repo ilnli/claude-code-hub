@@ -3,6 +3,7 @@ import type { Provider } from "@/types/provider";
 
 const getSessionMock = vi.fn();
 const findAllProvidersFreshMock = vi.fn();
+const listProviderWeightAdjustmentMembershipsMock = vi.fn();
 
 vi.mock("@/lib/auth", () => ({
   getSession: getSessionMock,
@@ -13,6 +14,10 @@ vi.mock("@/repository/provider", () => ({
   updateProvidersBatch: vi.fn(),
   updateProviderBatchGroupsIfUnchanged: vi.fn(),
   deleteProvidersBatch: vi.fn(),
+}));
+
+vi.mock("@/repository/provider-weight-adjustment", () => ({
+  listProviderWeightAdjustmentMemberships: listProviderWeightAdjustmentMembershipsMock,
 }));
 
 vi.mock("@/lib/cache/provider-cache", () => ({
@@ -101,6 +106,7 @@ describe("Provider Batch Preview Engine - Row Generation", () => {
     vi.clearAllMocks();
     vi.resetModules();
     getSessionMock.mockResolvedValue({ user: { id: 1, role: "admin" } });
+    listProviderWeightAdjustmentMembershipsMock.mockResolvedValue([]);
   });
 
   it("generates correct before/after row for single provider single field change", async () => {

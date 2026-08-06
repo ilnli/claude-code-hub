@@ -8,5 +8,6 @@
   "rateDefaultRequired": "开启跟随上游倍率时必须填写默认倍率",
   "addFailed": "添加服务商失败",
   "updateFailed": "更新服务商失败",
-  "deleteFailed": "删除服务商失败"
+  "deleteFailed": "删除服务商失败",
+  "weightAdjustmentDetachConfirm": "该 Provider 属于已启用规则“{ruleName}”。保存手工权重会将其移出该规则，是否继续？"
 }

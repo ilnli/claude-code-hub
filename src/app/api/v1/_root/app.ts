@@ -14,6 +14,7 @@ import { modelPricesRouter } from "../resources/model-prices/router";
 import { notificationsRouter } from "../resources/notifications/router";
 import { providerEndpointsRouter } from "../resources/provider-endpoints/router";
 import { providerGroupsRouter } from "../resources/provider-groups/router";
+import { providerWeightAdjustmentRouter } from "../resources/provider-weight-adjustment/router";
 import { providersRouter } from "../resources/providers/router";
 import { publicRouter } from "../resources/public/router";
 import { requestFiltersRouter } from "../resources/request-filters/router";
@@ -138,6 +139,7 @@ app.openapi(csrfRoute, async (c) => {
 
 app.route("/", webhookTargetsRouter);
 app.route("/", providersRouter);
+app.route("/", providerWeightAdjustmentRouter);
 app.route("/", notificationsRouter);
 app.route("/", systemRouter);
 app.route("/", sensitiveWordsRouter);
