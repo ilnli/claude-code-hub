@@ -263,6 +263,371 @@
     {
       "key": "myUsage.stats.modal.performanceLow",
       "reason": "single CJK char 低; same meaning in zh-TW and ja"
+    },
+    {
+      "locale": "ja",
+      "key": "prices.details.fields.maxTokens",
+      "reason": "valid Japanese term identical to zh-CN: 最大 Tokens"
+    },
+    {
+      "locale": "ja",
+      "key": "providers.form.sections.routing.anthropicOverrides.adaptiveThinking.effort.options.high",
+      "reason": "single CJK character 高 has the same meaning in Japanese"
+    },
+    {
+      "locale": "ja",
+      "key": "providers.providerGroups.save",
+      "reason": "valid Japanese UI term identical to zh-CN: 保存"
+    },
+    {
+      "locale": "ja",
+      "key": "requestFilters.table.actions",
+      "reason": "valid Japanese UI term identical to zh-CN: 操作"
+    },
+    {
+      "locale": "ja",
+      "key": "statusPage.public.fresh",
+      "reason": "valid Japanese status term identical to zh-CN: 最新"
+    },
+    {
+      "locale": "ja",
+      "key": "dashboard.leaderboard.userInsights.timeRange.today",
+      "reason": "valid Japanese time-range term identical to zh-CN: 今日"
+    },
+    {
+      "locale": "ja",
+      "key": "dashboard.limitRules.confirm",
+      "reason": "valid Japanese UI term identical to zh-CN: 保存"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "config.form.streamGateModeOptions.shadow",
+      "reason": "valid Traditional Chinese technical term: 影子模式"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "config.form.fakeStreaming.modelLabel",
+      "reason": "valid Traditional Chinese term: 模型"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "prices.conflict.diff.mode",
+      "reason": "valid Traditional Chinese UI term: 模式"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "prices.details.booleanTrue",
+      "reason": "valid Traditional Chinese boolean label: 是"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "prices.details.booleanFalse",
+      "reason": "valid Traditional Chinese boolean label: 否"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "prices.details.fields.mode",
+      "reason": "valid Traditional Chinese UI term: 模式"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "prices.details.fields.maxTokens",
+      "reason": "valid Traditional Chinese term: 最大 Tokens"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "prices.details.fields.modelFamily",
+      "reason": "valid Traditional Chinese term: 模型系列"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "prices.providerPricing.pinned",
+      "reason": "valid Traditional Chinese pricing status: 已固化"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "prices.providerPricing.official",
+      "reason": "valid Traditional Chinese status term: 官方"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "providers.batchEdit.actions.syncRate",
+      "reason": "valid Traditional Chinese action: 同步倍率"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "providers.batchEdit.preview.back",
+      "reason": "valid Traditional Chinese navigation term: 返回"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "providers.batchEdit.mixedValues.label",
+      "reason": "valid Traditional Chinese batch-edit label: (混合值)"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "providers.batchTest.summary.green",
+      "reason": "valid Traditional Chinese status with preserved count token"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "providers.batchTest.filter.all",
+      "reason": "valid Traditional Chinese filter label: 全部"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "providers.batchTest.filter.green",
+      "reason": "valid Traditional Chinese status term: 可用"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "providers.batchTest.status.pending",
+      "reason": "valid Traditional Chinese status term: 等待中"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "providers.batchTest.status.green",
+      "reason": "valid Traditional Chinese status term: 可用"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "providers.batchTest.status.red",
+      "reason": "valid Traditional Chinese status term: 不可用"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "providers.batchTest.status.canceled",
+      "reason": "valid Traditional Chinese status term: 已取消"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "providers.dispatchSimulator.modelPlaceholder",
+      "reason": "model identifier example is language-independent"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "providers.form.allowedModelRules.add",
+      "reason": "valid Traditional Chinese action: 新增"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "providers.form.allowedModelRules.matchTypeLabel",
+      "reason": "valid Traditional Chinese form label: 匹配方式"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "providers.form.allowedModelRules.patternLabel",
+      "reason": "valid Traditional Chinese form label: 模型匹配模式"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "providers.form.allowedModelRules.patternPlaceholder",
+      "reason": "model identifier and regex example are language-independent"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "providers.form.matchTester.matchType",
+      "reason": "valid Traditional Chinese form label: 匹配方式"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "providers.form.sections.routing.clientRestrictions.allowedPlaceholder",
+      "reason": "client identifier example is language-independent"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "providers.form.sections.routing.clientRestrictions.blockedPlaceholder",
+      "reason": "client identifier example is language-independent"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "providers.form.sections.routing.clientRestrictions.customAllowedPlaceholder",
+      "reason": "client identifier examples are language-independent"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "providers.form.sections.routing.clientRestrictions.customBlockedPlaceholder",
+      "reason": "client identifier example is language-independent"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "providers.form.sections.routing.clientRestrictions.presetClients.claude-code",
+      "reason": "product name plus valid Traditional Chinese term 全部"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "providers.form.sections.routing.clientRestrictions.subClients.all",
+      "reason": "valid Traditional Chinese filter label: 全部"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "providers.form.sections.routing.upstreamRate.defaultRate.placeholder",
+      "reason": "numeric example is language-independent"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "providers.form.sections.routing.anthropicOverrides.adaptiveThinking.effort.options.high",
+      "reason": "single CJK character 高 is valid Traditional Chinese"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "providers.list.actionSyncUpstreamRate",
+      "reason": "valid Traditional Chinese action: 立即同步倍率"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "providers.list.syncRateSuccess",
+      "reason": "valid Traditional Chinese success message"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "providers.list.syncRateSuccessDesc",
+      "reason": "valid Traditional Chinese message with preserved tokens"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "providers.providerGroups.costMultiplier",
+      "reason": "valid Traditional Chinese term: 成本倍率"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "providers.providerGroups.descriptionLabel",
+      "reason": "valid Traditional Chinese form label: 描述"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "providers.providerGroups.cancel",
+      "reason": "valid Traditional Chinese action: 取消"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "requestFilters.executionPhase.guard",
+      "reason": "valid Traditional Chinese phase label with technical term Guard"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "requestFilters.dialog.operations",
+      "reason": "valid Traditional Chinese label with technical term JSON"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "requestFilters.table.mode",
+      "reason": "valid Traditional Chinese UI term: 模式"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "statusPage.form.sortOrder",
+      "reason": "valid Traditional Chinese form label: 排序"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "statusPage.public.operational",
+      "reason": "valid Traditional Chinese status term: 可用"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "statusPage.public.fresh",
+      "reason": "valid Traditional Chinese status term: 最新"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "statusPage.public.rebuilding",
+      "reason": "valid Traditional Chinese status term: 重建中"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "statusPage.public.statusBadge.operational",
+      "reason": "valid Traditional Chinese status term: 可用"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "statusPage.public.tooltip.availability",
+      "reason": "valid Traditional Chinese metric term: 可用率"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "statusPage.public.modelsLabel",
+      "reason": "valid Traditional Chinese term: 模型"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "dashboard.logs.details.modelAudit.unifiedLabel",
+      "reason": "valid Traditional Chinese term: 模型"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "dashboard.logs.details.performanceTab.segmentTtft",
+      "reason": "valid Traditional Chinese latency label with technical term Token"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "dashboard.leaderboard.columns.unknownModel",
+      "reason": "valid Traditional Chinese status term: 未知"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "dashboard.leaderboard.userInsights.backToLeaderboard",
+      "reason": "valid Traditional Chinese navigation action"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "dashboard.leaderboard.userInsights.timeRange.today",
+      "reason": "valid Traditional Chinese time-range term: 今日"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "dashboard.leaderboard.userInsights.timeRange.7days",
+      "reason": "valid Traditional Chinese time-range label"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "dashboard.leaderboard.userInsights.timeRange.30days",
+      "reason": "valid Traditional Chinese time-range label"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "dashboard.leaderboard.userInsights.timeRange.thisMonth",
+      "reason": "valid Traditional Chinese time-range term: 本月"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "dashboard.leaderboard.userInsights.unknownModel",
+      "reason": "valid Traditional Chinese term: 未知模型"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "dashboard.leaderboard.userInsights.model",
+      "reason": "valid Traditional Chinese term: 模型"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "dashboard.leaderboard.userInsights.allModels",
+      "reason": "valid Traditional Chinese term: 全部模型"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "dashboard.sessions.details.snapshotSourceUpstream",
+      "reason": "valid Traditional Chinese source label: 上游"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "dashboard.sessions.requestList.unknownModel",
+      "reason": "valid Traditional Chinese term: 未知模型"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "dashboard.userManagement.userEditSection.presetClients.claude-code",
+      "reason": "product name plus valid Traditional Chinese term 全部"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "dashboard.userManagement.userEditSection.subClients.all",
+      "reason": "valid Traditional Chinese filter label: 全部"
+    },
+    {
+      "locale": "zh-TW",
+      "key": "dashboard.limitRules.cancel",
+      "reason": "valid Traditional Chinese action: 取消"
     }
   ],
   "glossary": []

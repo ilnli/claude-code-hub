@@ -27,7 +27,8 @@ Locales：`zh-CN` 为 canonical。其他支持的 locales：`en`、`ja`、`ru`�
 
 Allowlist（可审计、保持最小）：
 - `scripts/audit-settings-placeholders.allowlist.json`
-- 支持的过滤器：`key`、`keyPrefix`、`keyRegex`、`valueRegex`，以及 `glossary` terms。
+- 支持的过滤器：可选的 `locale` 可与 `key`、`keyPrefix`、`keyRegex` 或
+  `valueRegex` 组合使用，另支持 `glossary` terms。
 
 ## Rule R2：必须保留 placeholders/tokens
 

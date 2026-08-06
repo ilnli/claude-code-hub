@@ -160,7 +160,7 @@ describe("scripts/audit-settings-placeholders.js", () => {
     }
   });
 
-  test("allowlist filters false positives (exact/keyPrefix/keyRegex/valueRegex/glossary)", () => {
+  test("allowlist filters false positives (locale/exact/keyPrefix/keyRegex/valueRegex/glossary)", () => {
     const tmpRoot = path.join(
       process.cwd(),
       "tests",
@@ -179,6 +179,8 @@ describe("scripts/audit-settings-placeholders.js", () => {
       writeJson(allowlistPath, {
         entries: [
           { key: "config.form.exactKey", reason: "test-exact" },
+          { locale: "en", key: "config.form.localeAllowed", reason: "test-locale-match" },
+          { locale: "ja", key: "config.form.localeRejected", reason: "test-locale-mismatch" },
           { keyPrefix: "config.form.prefix.", reason: "test-prefix" },
           { keyRegex: "^config\\.form\\.re\\.", reason: "test-key-regex" },
           { valueRegex: "KEEP_AS_CN$", reason: "test-value-regex" },
@@ -189,6 +191,8 @@ describe("scripts/audit-settings-placeholders.js", () => {
       writeJson(path.join(messagesDir, "zh-CN", "settings", "config.json"), {
         form: {
           exactKey: "精确豁免",
+          localeAllowed: "语言精确豁免",
+          localeRejected: "语言不匹配",
           prefix: {
             a: "前缀豁免",
           },
@@ -202,6 +206,8 @@ describe("scripts/audit-settings-placeholders.js", () => {
       writeJson(path.join(messagesDir, "en", "settings", "config.json"), {
         form: {
           exactKey: "精确豁免",
+          localeAllowed: "语言精确豁免",
+          localeRejected: "语言不匹配",
           prefix: {
             a: "前缀豁免",
           },
@@ -219,7 +225,9 @@ describe("scripts/audit-settings-placeholders.js", () => {
         scopes: ["settings"],
         allowlistPath,
       });
-      expect(report.rows).toEqual([]);
+      expect(report.rows).toEqual([
+        expect.objectContaining({ locale: "en", key: "config.form.localeRejected" }),
+      ]);
     } finally {
       fs.rmSync(tmpRoot, { recursive: true, force: true });
     }

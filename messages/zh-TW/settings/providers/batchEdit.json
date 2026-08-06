@@ -36,7 +36,7 @@
     "providerHeader": "{name}",
     "fieldChanged": "{field}: {before} -> {after}",
     "fieldSkipped": "{field}: 已跳過 ({reason})",
-    "nullValue": "(空)",
+    "nullValue": "（空白）",
     "back": "返回",
     "apply": "套用變更"
   },

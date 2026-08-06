@@ -75,7 +75,7 @@
       "noData": "データなし"
     },
     "tooltip": {
-      "availability": "可用率",
+      "availability": "稼働率",
       "ttft": "TTFT",
       "tps": "TPS",
       "samples": "サンプル数",

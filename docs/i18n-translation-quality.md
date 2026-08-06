@@ -27,7 +27,8 @@ Executable check:
 
 Allowlist (auditable, minimal):
 - `scripts/audit-settings-placeholders.allowlist.json`
-- Supported filters: `key`, `keyPrefix`, `keyRegex`, `valueRegex`, plus `glossary` terms.
+- Supported filters: optional `locale` combined with `key`, `keyPrefix`, `keyRegex`, or
+  `valueRegex`, plus `glossary` terms.
 
 ## Rule R2: Placeholders/tokens must be preserved
 

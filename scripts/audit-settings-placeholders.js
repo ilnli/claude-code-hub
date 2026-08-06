@@ -86,6 +86,8 @@ function isAllowedByAllowlist(row, allowlist) {
     if (!entry || typeof entry !== "object") continue;
     const reason = typeof entry.reason === "string" && entry.reason ? entry.reason : "allowlisted";
 
+    if (typeof entry.locale === "string" && entry.locale !== row.locale) continue;
+
     if (typeof entry.key === "string" && entry.key === row.key) {
       return { allowed: true, allowReason: `key:${reason}` };
     }
