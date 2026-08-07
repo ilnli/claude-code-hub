@@ -231,6 +231,11 @@ export const SystemSettingsSchema = z
       .describe(
         "Stream content gate mode for ordinary requests: buffer until the first valid content frame and fail over on error or empty streams (enforce), observe divergence only (shadow), or disable (off). Replay owners always retain the pre-content safety gate."
       ),
+    semanticErrorRoutingMode: z
+      .enum(["legacy", "shadow", "enforce"])
+      .describe(
+        "Rollout mode for reviewed semantic error rules. Core request errors are always enforced."
+      ),
     affinityIgnoreClientSessionId: z
       .boolean()
       .describe(

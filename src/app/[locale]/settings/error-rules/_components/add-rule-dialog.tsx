@@ -26,8 +26,10 @@ import {
 import { createErrorRuleAction } from "@/lib/api-client/v1/actions/error-rules";
 import { cn } from "@/lib/utils";
 import type { ErrorOverrideResponse } from "@/repository/error-rules";
+import type { RoutingDisposition } from "@/types/routing-error";
 import { OverrideSection } from "./override-section";
 import { RegexTester } from "./regex-tester";
+import { RoutingDispositionSelect } from "./routing-disposition-select";
 
 export function AddRuleDialog() {
   const t = useTranslations("settings");
@@ -37,6 +39,7 @@ export function AddRuleDialog() {
   const [pattern, setPattern] = useState("");
   const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");
+  const [routingDisposition, setRoutingDisposition] = useState<RoutingDisposition | "">("");
   const [enableOverride, setEnableOverride] = useState(false);
   const [overrideResponse, setOverrideResponse] = useState("");
   const [overrideStatusCode, setOverrideStatusCode] = useState<string>("");
@@ -51,6 +54,11 @@ export function AddRuleDialog() {
 
     if (!category.trim()) {
       toast.error(t("errorRules.dialog.categoryRequired"));
+      return;
+    }
+
+    if (!routingDisposition) {
+      toast.error(t("errorRules.dialog.routingDispositionRequired"));
       return;
     }
 
@@ -79,7 +87,8 @@ export function AddRuleDialog() {
       // Parse override status code
       if (overrideStatusCode.trim()) {
         const code = parseInt(overrideStatusCode.trim(), 10);
-        if (Number.isNaN(code) || code < 400 || code > 599) {
+        const maxStatusCode = routingDisposition === "request_terminal" ? 499 : 599;
+        if (Number.isNaN(code) || code < 400 || code > maxStatusCode) {
           toast.error(t("errorRules.dialog.invalidStatusCode"));
           return;
         }
@@ -103,6 +112,7 @@ export function AddRuleDialog() {
         description: description.trim() || undefined,
         overrideResponse: parsedOverrideResponse ?? null,
         overrideStatusCode: parsedStatusCode ?? null,
+        routingDisposition,
       });
 
       if (result.ok) {
@@ -113,6 +123,7 @@ export function AddRuleDialog() {
         setPattern("");
         setCategory("");
         setDescription("");
+        setRoutingDisposition("");
         setEnableOverride(false);
         setOverrideResponse("");
         setOverrideStatusCode("");
@@ -163,6 +174,12 @@ export function AddRuleDialog() {
               />
               <p className="text-xs text-muted-foreground">{t("errorRules.dialog.patternHint")}</p>
             </div>
+
+            <RoutingDispositionSelect
+              id="routing-disposition"
+              value={routingDisposition}
+              onValueChange={setRoutingDisposition}
+            />
 
             <div className="space-y-2">
               <Label

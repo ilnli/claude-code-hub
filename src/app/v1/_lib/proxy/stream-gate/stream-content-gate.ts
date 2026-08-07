@@ -32,10 +32,8 @@ export type StreamGateFailureReason =
   | "idle_timeout";
 
 /**
- * 门控 precommit 错误。继承 ProxyError（statusCode 502）——
- * categorizeErrorAsync 将其归为 PROVIDER_ERROR：计入熔断器并切换供应商，
- * 无需改动现有错误分类逻辑。gate_error 时把上游错误帧原文带入
- * upstreamError.body，供错误规则匹配（如不可重试的客户端输入错误）与审计。
+ * 门控 precommit 错误。继承 ProxyError，并用本地 502 携带失败。
+ * gate_error 时保留上游错误帧，业务分类器会先判断请求语义，再决定是否重试或计入熔断。
  */
 export class StreamPrecommitError extends ProxyError {
   readonly gateReason: StreamGateFailureReason;
@@ -57,6 +55,8 @@ export class StreamPrecommitError extends ProxyError {
       body: buildGateErrorBody(reason, detail),
       providerId: detail.providerId,
       providerName: detail.providerName,
+      origin: "stream_gate_precommit",
+      originalStatusCode: 200,
     });
     this.name = "StreamPrecommitError";
     this.gateReason = reason;

@@ -24,6 +24,10 @@ import {
   type RateLimitError,
 } from "./errors";
 import { ProxyResponses } from "./responses";
+import {
+  getRoutingErrorClassification,
+  type RoutingErrorClassification,
+} from "./routing-error-classifier";
 import type { ProxySession } from "./session";
 
 /** 覆写状态码最小值 */
@@ -115,11 +119,13 @@ export function resolveFinalClientErrorMessage({
   currentFallbackMessage,
   settings,
   override,
+  effectiveStatusCode,
 }: {
   error: unknown;
   currentFallbackMessage: string;
   settings?: Pick<SystemSettings, "passThroughUpstreamErrorMessage"> | null;
   override?: ErrorOverrideForMessageResolver;
+  effectiveStatusCode?: number;
 }): string {
   if (override?.response) {
     return currentFallbackMessage;
@@ -130,7 +136,7 @@ export function resolveFinalClientErrorMessage({
       ? stripUpstreamDetailSuffix(currentFallbackMessage)
       : currentFallbackMessage;
   const fallback = getGenericProxyErrorFallbackMessage(
-    error instanceof ProxyError ? error.statusCode : 500,
+    effectiveStatusCode ?? (error instanceof ProxyError ? error.statusCode : 500),
     error,
     strippedFallback
   );
@@ -159,6 +165,61 @@ export function resolveFinalClientErrorMessage({
   return fallback;
 }
 
+function buildRoutingErrorResponse(
+  session: ProxySession,
+  classification: RoutingErrorClassification,
+  statusCode: number,
+  message: string,
+  requestId?: string
+): Response {
+  const param = classification.clientParam ?? null;
+  let payload: Record<string, unknown>;
+  const errorType = statusCode >= 500 ? "service_unavailable_error" : "invalid_request_error";
+
+  if (session.originalFormat === "claude") {
+    payload = {
+      type: "error",
+      error: {
+        type: errorType,
+        message,
+        code: classification.clientCode,
+        ...(param ? { param } : {}),
+      },
+      ...(requestId ? { request_id: requestId } : {}),
+    };
+  } else if (session.originalFormat === "gemini" || session.originalFormat === "gemini-cli") {
+    payload = {
+      error: {
+        code: statusCode,
+        message,
+        status: statusCode >= 500 ? "UNAVAILABLE" : "INVALID_ARGUMENT",
+        details: [
+          {
+            "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+            reason: classification.clientCode,
+            ...(param ? { metadata: { param } } : {}),
+          },
+        ],
+      },
+    };
+  } else {
+    payload = {
+      error: {
+        message,
+        type: errorType,
+        param,
+        code: classification.clientCode,
+      },
+      ...(requestId ? { request_id: requestId } : {}),
+    };
+  }
+
+  return new Response(JSON.stringify(payload), {
+    status: statusCode,
+    headers: { "content-type": "application/json; charset=utf-8" },
+  });
+}
+
 /**
  * 根据限流类型计算 HTTP 状态码
  * - RPM/并发用 429 Too Many Requests（可重试的频率控制）
@@ -180,6 +241,7 @@ export class ProxyErrorHandler {
     let settingsResolved = false;
     let cachedSettings: SystemSettings | null = null;
     const databaseError = findSafeDatabaseError(error);
+    const routingClassification = getRoutingErrorClassification(error);
 
     const getSettings = async (): Promise<SystemSettings | null> => {
       if (settingsResolved) return cachedSettings;
@@ -266,6 +328,31 @@ export class ProxyErrorHandler {
       statusCode = databaseError.kind === "admission" ? 503 : 500;
     }
 
+    if (!databaseError && routingClassification?.disposition === "request_terminal") {
+      statusCode = routingClassification.clientStatusCode;
+      if (routingClassification.clientMessage) {
+        clientErrorMessage = routingClassification.clientMessage;
+      }
+    }
+
+    const buildClientResponse = (
+      responseStatusCode: number,
+      message: string,
+      details?: Record<string, unknown>,
+      requestId?: string
+    ): Response => {
+      if (routingClassification) {
+        return buildRoutingErrorResponse(
+          session,
+          routingClassification,
+          responseStatusCode,
+          message,
+          requestId
+        );
+      }
+      return ProxyResponses.buildError(responseStatusCode, message, undefined, details, requestId);
+    };
+
     // 后备方案：如果状态码仍是 500，尝试从 provider chain 中提取最后一次实际请求的状态码
     if (!databaseError && statusCode === 500) {
       const lastRequestStatusCode = ProxyErrorHandler.getLastRequestStatusCode(session);
@@ -313,13 +400,18 @@ export class ProxyErrorHandler {
     if (error instanceof Error && !databaseError) {
       const override = await getErrorOverrideAsync(error);
       if (override) {
-        // 运行时校验覆写状态码范围（400-599），防止数据库脏数据导致 Response 抛 RangeError
+        // Request-terminal rules may customize only within 4xx. This runtime guard also
+        // protects against manually corrupted rows.
         let validatedStatusCode = override.statusCode;
+        const overrideStatusCodeMax =
+          routingClassification?.disposition === "request_terminal"
+            ? 499
+            : OVERRIDE_STATUS_CODE_MAX;
         if (
           validatedStatusCode !== null &&
           (!Number.isInteger(validatedStatusCode) ||
             validatedStatusCode < OVERRIDE_STATUS_CODE_MIN ||
-            validatedStatusCode > OVERRIDE_STATUS_CODE_MAX)
+            validatedStatusCode > overrideStatusCodeMax)
         ) {
           logger.warn("ProxyErrorHandler: Invalid override status code, falling back to upstream", {
             overrideStatusCode: validatedStatusCode,
@@ -352,12 +444,12 @@ export class ProxyErrorHandler {
                 currentFallbackMessage: clientErrorMessage,
                 settings,
                 override: { response: null, statusCode: override.statusCode },
+                effectiveStatusCode: responseStatusCode,
               });
               return await finalizeErrorResponse(
-                ProxyResponses.buildError(
+                buildClientResponse(
                   responseStatusCode,
                   finalClientErrorMessage,
-                  undefined,
                   undefined,
                   safeRequestId
                 ),
@@ -371,15 +463,10 @@ export class ProxyErrorHandler {
               currentFallbackMessage: clientErrorMessage,
               settings,
               override: { response: null, statusCode: null },
+              effectiveStatusCode: statusCode,
             });
             return await finalizeErrorResponse(
-              ProxyResponses.buildError(
-                statusCode,
-                finalClientErrorMessage,
-                undefined,
-                undefined,
-                safeRequestId
-              ),
+              buildClientResponse(statusCode, finalClientErrorMessage, undefined, safeRequestId),
               finalClientErrorMessage,
               { traceFinalResponseBody: true }
             );
@@ -403,12 +490,29 @@ export class ProxyErrorHandler {
             settings,
             override: hasExplicitOverrideMessage ? override : null,
           });
+          const resolvedOverrideMessage =
+            overrideMessage === clientErrorMessage ? finalClientErrorMessage : overrideMessage;
+
+          // Semantic routing classifications own the public protocol envelope and stable
+          // error code. A legacy body override may still customize the message, but it must
+          // not turn a classified request error back into an arbitrary provider response.
+          if (routingClassification) {
+            return await finalizeErrorResponse(
+              buildClientResponse(
+                responseStatusCode,
+                String(resolvedOverrideMessage),
+                undefined,
+                safeRequestId
+              ),
+              String(resolvedOverrideMessage),
+              { traceFinalResponseBody: true }
+            );
+          }
           const responseBody = {
             ...override.response,
             error: {
               ...overrideErrorObj,
-              message:
-                overrideMessage === clientErrorMessage ? finalClientErrorMessage : overrideMessage,
+              message: resolvedOverrideMessage,
             },
           };
 
@@ -459,13 +563,13 @@ export class ProxyErrorHandler {
           currentFallbackMessage: clientErrorMessage,
           settings,
           override: { response: null, statusCode: override.statusCode },
+          effectiveStatusCode: responseStatusCode,
         });
 
         return await finalizeErrorResponse(
-          ProxyResponses.buildError(
+          buildClientResponse(
             responseStatusCode,
             finalClientErrorMessage,
-            undefined,
             undefined,
             safeRequestId
           ),
@@ -547,16 +651,11 @@ export class ProxyErrorHandler {
       currentFallbackMessage: clientErrorMessage,
       settings,
       override: null,
+      effectiveStatusCode: statusCode,
     });
 
     return await finalizeErrorResponse(
-      ProxyResponses.buildError(
-        statusCode,
-        finalClientErrorMessage,
-        undefined,
-        details,
-        safeRequestId
-      ),
+      buildClientResponse(statusCode, finalClientErrorMessage, details, safeRequestId),
       logErrorMessage
     );
   }

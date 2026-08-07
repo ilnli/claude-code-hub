@@ -58,6 +58,7 @@ const baseRule = {
   description: null,
   overrideResponse: null,
   overrideStatusCode: null,
+  routingDisposition: "request_terminal" as const,
   isEnabled: true,
   isDefault: false,
   priority: 0,
@@ -79,6 +80,7 @@ describe("error-rules actions reload the detector on mutation", () => {
       pattern: "boom",
       category: "prompt_limit",
       matchType: "contains",
+      routingDisposition: "request_terminal",
     });
 
     expect(res.ok).toBe(true);
@@ -125,6 +127,7 @@ describe("error-rules actions reload the detector on mutation", () => {
       pattern: "boom",
       category: "prompt_limit",
       matchType: "contains",
+      routingDisposition: "request_terminal",
     });
 
     // The DB write succeeded; a failed best-effort cache reload must NOT flip the

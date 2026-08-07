@@ -31,7 +31,10 @@ vi.mock("@/lib/logger", () => ({
 function createSettings(overrides: Partial<SystemSettings> = {}): Partial<SystemSettings> {
   return {
     streamGateMode: "enforce",
+    semanticErrorRoutingMode: "shadow",
     affinityIgnoreClientSessionId: true,
+    replayEnabled: null,
+    cacheEffectivenessEnabled: null,
     ...overrides,
   };
 }
@@ -45,7 +48,11 @@ async function loadModules() {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.resetModules();
-  getEnvConfigMock.mockReturnValue({ STREAM_GATE_MODE: "off" });
+  getEnvConfigMock.mockReturnValue({
+    STREAM_GATE_MODE: "off",
+    ENABLE_REQUEST_REPLAY: false,
+    ENABLE_CACHE_EFFECTIVENESS: true,
+  });
 });
 
 describe("getProxyRuntimeSettings / getCachedProxyRuntimeSettings", () => {
@@ -54,27 +61,50 @@ describe("getProxyRuntimeSettings / getCachedProxyRuntimeSettings", () => {
     expect(getCachedProxyRuntimeSettings()).toBeNull();
   });
 
-  test("getProxyRuntimeSettings 从系统设置缓存映射两字段并更新快照", async () => {
+  test("getProxyRuntimeSettings 从系统设置缓存映射运行时字段并更新快照", async () => {
     getCachedSystemSettingsMock.mockResolvedValue(
-      createSettings({ streamGateMode: "shadow", affinityIgnoreClientSessionId: false })
+      createSettings({
+        streamGateMode: "shadow",
+        semanticErrorRoutingMode: "enforce",
+        affinityIgnoreClientSessionId: false,
+      })
     );
     const { getProxyRuntimeSettings, getCachedProxyRuntimeSettings } = await loadModules();
 
     const settings = await getProxyRuntimeSettings();
-    expect(settings).toEqual({ streamGateMode: "shadow", affinityIgnoreClientSessionId: false });
+    expect(settings).toEqual({
+      streamGateMode: "shadow",
+      semanticErrorRoutingMode: "enforce",
+      affinityIgnoreClientSessionId: false,
+      replayEnabled: false,
+      cacheEffectivenessEnabled: true,
+    });
     expect(getCachedProxyRuntimeSettings()).toEqual({
       streamGateMode: "shadow",
+      semanticErrorRoutingMode: "enforce",
       affinityIgnoreClientSessionId: false,
+      replayEnabled: false,
+      cacheEffectivenessEnabled: true,
     });
   });
 
   test("系统设置读取异常且无快照时回退 env（affinity 默认开）", async () => {
     getCachedSystemSettingsMock.mockRejectedValue(new Error("db down"));
-    getEnvConfigMock.mockReturnValue({ STREAM_GATE_MODE: "shadow" });
+    getEnvConfigMock.mockReturnValue({
+      STREAM_GATE_MODE: "shadow",
+      ENABLE_REQUEST_REPLAY: false,
+      ENABLE_CACHE_EFFECTIVENESS: true,
+    });
     const { getProxyRuntimeSettings } = await loadModules();
 
     const settings = await getProxyRuntimeSettings();
-    expect(settings).toEqual({ streamGateMode: "shadow", affinityIgnoreClientSessionId: true });
+    expect(settings).toEqual({
+      streamGateMode: "shadow",
+      semanticErrorRoutingMode: "shadow",
+      affinityIgnoreClientSessionId: true,
+      replayEnabled: false,
+      cacheEffectivenessEnabled: true,
+    });
   });
 
   test("系统设置读取异常但已有快照时返回旧快照", async () => {
@@ -84,7 +114,13 @@ describe("getProxyRuntimeSettings / getCachedProxyRuntimeSettings", () => {
 
     getCachedSystemSettingsMock.mockRejectedValueOnce(new Error("db down"));
     const settings = await getProxyRuntimeSettings();
-    expect(settings).toEqual({ streamGateMode: "off", affinityIgnoreClientSessionId: true });
+    expect(settings).toEqual({
+      streamGateMode: "off",
+      semanticErrorRoutingMode: "shadow",
+      affinityIgnoreClientSessionId: true,
+      replayEnabled: false,
+      cacheEffectivenessEnabled: true,
+    });
   });
 });
 

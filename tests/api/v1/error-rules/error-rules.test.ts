@@ -42,6 +42,7 @@ function rule(overrides: Partial<ErrorRule> = {}): ErrorRule {
     description: "Prompt limit",
     overrideResponse: null,
     overrideStatusCode: null,
+    routingDisposition: "request_terminal",
     isEnabled: true,
     isDefault: false,
     priority: 0,
@@ -94,7 +95,12 @@ describe("v1 error rules endpoints", () => {
       method: "POST",
       pathname: "/api/v1/error-rules",
       headers: { Authorization: "Bearer admin-token" },
-      body: { pattern: "blocked", category: "content_filter", matchType: "exact" },
+      body: {
+        pattern: "blocked",
+        category: "content_filter",
+        matchType: "exact",
+        routingDisposition: "request_terminal",
+      },
     });
     expect(created.response.status).toBe(201);
     expect(created.response.headers.get("Location")).toBe("/api/v1/error-rules/2");
@@ -102,6 +108,7 @@ describe("v1 error rules endpoints", () => {
       pattern: "blocked",
       category: "content_filter",
       matchType: "exact",
+      routingDisposition: "request_terminal",
     });
 
     const updated = await callV1Route({

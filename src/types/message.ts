@@ -34,6 +34,8 @@ export interface ProviderChainItem {
     | "retry_failed" // 重试失败（供应商错误，已计入熔断器）
     | "system_error" // 系统/网络错误（不计入熔断器）
     | "resource_not_found" // 资源不存在（404），触发故障转移但不计入熔断器
+    | "endpoint_capability_gap" // 当前 Endpoint 不支持该请求；换 Endpoint，不计入健康
+    | "provider_capability_gap" // 当前 Provider 不支持该请求；换 Provider，不计入健康
     | "retry_with_official_instructions" // Codex instructions 自动重试（官方）
     | "retry_with_cached_instructions" // Codex instructions 智能重试（缓存）
     | "client_error_non_retryable" // 不可重试的客户端错误（Prompt 超限、内容过滤、PDF 限制、Thinking 格式）

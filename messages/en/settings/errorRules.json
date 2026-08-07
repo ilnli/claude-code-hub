@@ -32,7 +32,18 @@
   "deleteFailed": "Delete failed",
   "deleteSuccess": "Error rule deleted successfully",
   "description": "Manage client error rules that should not trigger automatic retries. When configured, errors matching these rules will be returned directly to users without retrying or counting toward provider circuit breaker thresholds.",
+  "dispositions": {
+    "endpoint_capability_gap": "Endpoint capability gap",
+    "legacy": "Legacy (unreviewed)",
+    "provider_capability_gap": "Provider capability gap",
+    "provider_failure": "Provider failure",
+    "request_terminal": "Stop request (no retry)"
+  },
   "dialog": {
+    "routingDispositionHint": "Controls retry, provider switching, and health accounting after this rule matches.",
+    "routingDispositionLabel": "Routing disposition *",
+    "routingDispositionPlaceholder": "Select routing disposition",
+    "routingDispositionRequired": "Please select a routing disposition",
     "addDescription": "Configure error message regex patterns. Matched errors will be identified as non-retryable client errors.",
     "addTitle": "Add Error Rule",
     "categoryHint": "Choose the error category for classification and statistics",
@@ -127,6 +138,7 @@
     "status": "Status"
   },
   "tester": {
+    "routingDisposition": "Routing disposition",
     "category": "Category",
     "description": "Input an error message to check if it matches configured rules and see the final response.",
     "finalResponse": "Override response to return",

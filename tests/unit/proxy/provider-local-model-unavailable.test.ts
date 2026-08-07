@@ -38,7 +38,7 @@ describe("provider-local model availability errors", () => {
     });
 
     expect(isProviderLocalModelUnavailableError(error)).toBe(true);
-    expect(await categorizeErrorAsync(error)).toBe(ErrorCategory.RESOURCE_NOT_FOUND);
+    expect(await categorizeErrorAsync(error)).toBe(ErrorCategory.PROVIDER_CAPABILITY_GAP);
     expect(mocks.detectAsync).not.toHaveBeenCalled();
   });
 
@@ -54,7 +54,7 @@ describe("provider-local model availability errors", () => {
     );
 
     expect(isProviderLocalModelUnavailableError(error)).toBe(true);
-    expect(await categorizeErrorAsync(error)).toBe(ErrorCategory.RESOURCE_NOT_FOUND);
+    expect(await categorizeErrorAsync(error)).toBe(ErrorCategory.PROVIDER_CAPABILITY_GAP);
     expect(mocks.detectAsync).not.toHaveBeenCalled();
   });
 

@@ -15,6 +15,7 @@ import safeRegex from "safe-regex";
 import { isValidErrorOverrideResponse } from "@/lib/error-override-validator";
 import { logger } from "@/lib/logger";
 import { type ErrorOverrideResponse, getActiveErrorRules } from "@/repository/error-rules";
+import type { RoutingDisposition } from "@/types/routing-error";
 
 /**
  * 错误检测结果
@@ -30,6 +31,8 @@ export interface ErrorDetectionResult {
   overrideResponse?: ErrorOverrideResponse;
   /** 覆写状态码：如果配置了则用此状态码替换原始状态码 */
   overrideStatusCode?: number;
+  /** Explicit reviewed routing authority; undefined keeps legacy precedence. */
+  routingDisposition?: RoutingDisposition;
 }
 
 /**
@@ -43,6 +46,7 @@ interface RegexPattern {
   description?: string;
   overrideResponse?: ErrorOverrideResponse;
   overrideStatusCode?: number;
+  routingDisposition?: RoutingDisposition;
 }
 
 /**
@@ -56,6 +60,7 @@ interface ContainsPattern {
   description?: string;
   overrideResponse?: ErrorOverrideResponse;
   overrideStatusCode?: number;
+  routingDisposition?: RoutingDisposition;
 }
 
 /**
@@ -69,6 +74,7 @@ interface ExactPattern {
   description?: string;
   overrideResponse?: ErrorOverrideResponse;
   overrideStatusCode?: number;
+  routingDisposition?: RoutingDisposition;
 }
 
 /**
@@ -252,6 +258,7 @@ class ErrorRuleDetector {
                   description: rule.description ?? undefined,
                   overrideResponse: validatedOverrideResponse,
                   overrideStatusCode: rule.overrideStatusCode ?? undefined,
+                  routingDisposition: rule.routingDisposition ?? undefined,
                 });
                 break;
               }
@@ -266,6 +273,7 @@ class ErrorRuleDetector {
                   description: rule.description ?? undefined,
                   overrideResponse: validatedOverrideResponse,
                   overrideStatusCode: rule.overrideStatusCode ?? undefined,
+                  routingDisposition: rule.routingDisposition ?? undefined,
                 });
                 break;
               }
@@ -290,6 +298,7 @@ class ErrorRuleDetector {
                     description: rule.description ?? undefined,
                     overrideResponse: validatedOverrideResponse,
                     overrideStatusCode: rule.overrideStatusCode ?? undefined,
+                    routingDisposition: rule.routingDisposition ?? undefined,
                   });
                   validRegexCount++;
                 } catch (error) {
@@ -403,6 +412,7 @@ class ErrorRuleDetector {
           description: pattern.description,
           overrideResponse: pattern.overrideResponse,
           overrideStatusCode: pattern.overrideStatusCode,
+          routingDisposition: pattern.routingDisposition,
         };
       }
     }
@@ -419,6 +429,7 @@ class ErrorRuleDetector {
         description: exactMatch.description,
         overrideResponse: exactMatch.overrideResponse,
         overrideStatusCode: exactMatch.overrideStatusCode,
+        routingDisposition: exactMatch.routingDisposition,
       };
     }
 
@@ -431,6 +442,7 @@ class ErrorRuleDetector {
       description,
       overrideResponse,
       overrideStatusCode,
+      routingDisposition,
     } of this.regexPatterns) {
       if (pattern.test(errorMessage)) {
         return {
@@ -442,6 +454,7 @@ class ErrorRuleDetector {
           description,
           overrideResponse,
           overrideStatusCode,
+          routingDisposition,
         };
       }
     }

@@ -82,6 +82,7 @@ async function SettingsConfigContent({ locale }: { locale: string }) {
               settings.allowNonConversationEndpointProviderFallback,
             fakeStreamingWhitelist: settings.fakeStreamingWhitelist,
             streamGateMode: settings.streamGateMode,
+            semanticErrorRoutingMode: settings.semanticErrorRoutingMode,
             affinityIgnoreClientSessionId: settings.affinityIgnoreClientSessionId,
             replayEnabled: settings.replayEnabled,
             cacheEffectivenessEnabled: settings.cacheEffectivenessEnabled,

@@ -32,7 +32,18 @@
   "deleteFailed": "刪除失敗",
   "deleteSuccess": "錯誤規則刪除成功",
   "description": "管理不需要自動重試的客戶端錯誤規則。配置後，命中規則的報錯將直接返回給用戶，不會觸發重試，也不會計入供應商熔斷。",
+  "dispositions": {
+    "endpoint_capability_gap": "端點能力缺口",
+    "legacy": "舊規則（未審查）",
+    "provider_capability_gap": "供應商能力缺口",
+    "provider_failure": "供應商故障",
+    "request_terminal": "終止請求（不重試）"
+  },
   "dialog": {
+    "routingDispositionHint": "控制規則命中後的重試、供應商切換和健康度記帳行為。",
+    "routingDispositionLabel": "路由處置 *",
+    "routingDispositionPlaceholder": "選擇路由處置",
+    "routingDispositionRequired": "請選擇路由處置",
     "addDescription": "設定錯誤訊息正則表達式模式，符合的錯誤將被識別為不可重試的客戶端錯誤。",
     "addTitle": "新增錯誤規則",
     "categoryHint": "選擇規則所屬的錯誤類別，用於分類管理和統計",
@@ -127,6 +138,7 @@
     "status": "狀態"
   },
   "tester": {
+    "routingDisposition": "路由處置",
     "category": "規則類別",
     "description": "輸入錯誤訊息，檢查是否命中已設定的規則以及最終返回的內容。",
     "finalResponse": "覆寫回應",

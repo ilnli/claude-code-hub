@@ -145,6 +145,7 @@ vi.mock("@/app/v1/_lib/proxy/errors", async (importOriginal) => {
 
 import { ErrorCategory as ProxyErrorCategory } from "@/app/v1/_lib/proxy/errors";
 import { ProxyForwarder } from "@/app/v1/_lib/proxy/forwarder";
+import { classifyBuiltInRoutingError } from "@/app/v1/_lib/proxy/routing-error-classifier";
 import { ProxySession } from "@/app/v1/_lib/proxy/session";
 import type { Provider } from "@/types/provider";
 
@@ -164,6 +165,16 @@ const PING_FRAME = sseFrame("ping", { type: "ping" });
 const ERROR_FRAME = sseFrame(null, {
   type: "error",
   error: { type: "overloaded_error", message: "x" },
+});
+const CONTEXT_LENGTH_ERROR_FRAME = sseFrame(null, {
+  type: "error",
+  error: {
+    type: "invalid_request_error",
+    code: "context_length_exceeded",
+    message: "Your input exceeds the context window of this model.",
+    param: "input",
+  },
+  sequence_number: 2,
 });
 const MESSAGE_START_FRAME = sseFrame("message_start", {
   type: "message_start",
@@ -492,6 +503,43 @@ describe("F1 stream content gate x ProxyForwarder sequential path", () => {
         .find((item) => item.id === provider1.id && item.reason === "retry_failed");
       expect(gateFailureEntry?.statusCode).toBe(502);
       expect(gateFailureEntry?.errorDetails?.provider?.upstreamBody).toContain("overloaded_error");
+    });
+
+    test("context_length_exceeded 被本地 502 承载时只请求一次且不写熔断", async () => {
+      const provider1 = createProvider({ id: 1, name: "context-limit-p1" });
+      const session = createSession();
+      session.setProvider(provider1);
+      const doForward = spyOnDoForward();
+      doForward.mockImplementationOnce(async () => createSseResponse([CONTEXT_LENGTH_ERROR_FRAME]));
+      mocks.categorizeErrorAsync.mockImplementationOnce(async (error) => {
+        expect(classifyBuiltInRoutingError(error)).toMatchObject({
+          disposition: "request_terminal",
+          clientStatusCode: 400,
+          clientCode: "context_length_exceeded",
+          syntheticStatusCode: 502,
+        });
+        return ProxyErrorCategory.NON_RETRYABLE_CLIENT_ERROR;
+      });
+
+      await expect(ProxyForwarder.send(session)).rejects.toMatchObject({
+        statusCode: 502,
+        upstreamError: {
+          origin: "stream_gate_precommit",
+          originalStatusCode: 200,
+        },
+      });
+
+      expect(doForward).toHaveBeenCalledTimes(1);
+      expect(mocks.pickRandomProviderWithExclusion).not.toHaveBeenCalled();
+      expect(mocks.recordFailure).not.toHaveBeenCalled();
+      expect(mocks.recordEndpointFailure).not.toHaveBeenCalled();
+      expect(session.getProviderChain()).toEqual([
+        expect.objectContaining({
+          id: provider1.id,
+          reason: "client_error_non_retryable",
+          statusCode: 502,
+        }),
+      ]);
     });
 
     test("中性前缀（ping/message_start）在首个内容帧提交时完整冲刷，无丢失无重复", async () => {

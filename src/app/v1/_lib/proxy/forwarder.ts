@@ -110,6 +110,7 @@ import { ProxyProviderResolver } from "./provider-selector";
 import { abortReplayOwnership, releaseReplayOwnership } from "./replay/replay-spool";
 import { isJsonResponseContentType, isMalformedJsonResponseBody } from "./response-content-type";
 import { finalizeHedgeLoserBilling, hasStreamCompletionMarker } from "./response-handler";
+import { rememberRoutingErrorClassification } from "./routing-error-classifier";
 import type { ProxySession } from "./session";
 import {
   type DeferredStreamingHedgeBindingAuthority,
@@ -252,7 +253,7 @@ type DiscoverySetupReservationBase = {
 };
 
 type DiscoveryRetrySetupReservation = DiscoverySetupReservationBase & {
-  purpose: "rectifier_retry";
+  purpose: "rectifier_retry" | "endpoint_retry";
   providerId: number;
 };
 
@@ -309,6 +310,8 @@ type StreamingHedgeAttempt = {
   session: ProxySession;
   baseUrl: string;
   endpointAudit: { endpointId: number | null; endpointUrl: string };
+  endpointIndex: number;
+  endpointCount: number;
   modelRedirect?: ProviderChainItem["modelRedirect"];
   responseController: AbortController | null;
   clearResponseTimeout: (() => void) | null;
@@ -1436,6 +1439,8 @@ export class ProxyForwarder {
     let currentProvider = session.provider;
     const failedProviderIds: number[] = []; // 记录已失败的供应商ID
     let totalProvidersAttempted = 0; // 已尝试的供应商数量（用于日志）
+    let capabilityGapSeen = false;
+    let nonCapabilityFailureSeen = false;
 
     // ========== 外层循环：供应商切换（最多 MAX_PROVIDER_SWITCHES 次）==========
     while (totalProvidersAttempted < MAX_PROVIDER_SWITCHES) {
@@ -1584,22 +1589,6 @@ export class ProxyForwarder {
             baseUrl: currentProvider.url,
           });
         }
-      }
-
-      // Truncate endpoints to maxRetryAttempts count
-      // Ensures only the N lowest-latency endpoints are used (N = maxRetryAttempts)
-      // Note: getPreferredProviderEndpoints already returns endpoints sorted by latency (ascending)
-      if (endpointCandidates.length > maxAttemptsPerProvider) {
-        const originalCount = endpointCandidates.length;
-        endpointCandidates.length = maxAttemptsPerProvider;
-
-        logger.debug("ProxyForwarder: Truncated endpoint candidates to match maxRetryAttempts", {
-          providerId: currentProvider.id,
-          providerName: currentProvider.name,
-          originalEndpointCount: originalCount,
-          truncatedTo: maxAttemptsPerProvider,
-          selectedEndpointIds: endpointCandidates.map((e) => e.endpointId),
-        });
       }
 
       const endpointCandidateKeys = new Set(
@@ -2222,6 +2211,18 @@ export class ProxyForwarder {
             throw lastError;
           }
 
+          if (
+            errorCategory === ErrorCategory.ENDPOINT_CAPABILITY_GAP ||
+            errorCategory === ErrorCategory.PROVIDER_CAPABILITY_GAP
+          ) {
+            capabilityGapSeen = true;
+          } else if (
+            errorCategory !== ErrorCategory.NON_RETRYABLE_CLIENT_ERROR &&
+            errorCategory !== ErrorCategory.LOCAL_OVERLOAD
+          ) {
+            nonCapabilityFailureSeen = true;
+          }
+
           // 2.5 Reactive rectifier：命中后对同供应商“整流 + 重试一次”
           const reactiveRectifierResult = await tryApplyReactiveRectifier({
             error: lastError,
@@ -2337,6 +2338,55 @@ export class ProxyForwarder {
             // 立即抛出错误，不重试，不切换供应商
             // 白名单错误不计入熔断器，因为是客户端输入问题，不是供应商故障
             throw lastError;
+          }
+
+          if (errorCategory === ErrorCategory.ENDPOINT_CAPABILITY_GAP) {
+            const hasNextEndpoint = currentEndpointIndex < endpointCandidates.length - 1;
+            session.addProviderToChain(currentProvider, {
+              ...endpointAudit,
+              reason: "endpoint_capability_gap",
+              circuitState: getCircuitState(currentProvider.id),
+              attemptNumber: attemptCount,
+              statusCode: lastError instanceof ProxyError ? lastError.statusCode : undefined,
+              errorMessage,
+            });
+
+            logger.warn("ProxyForwarder: Endpoint capability gap", {
+              providerId: currentProvider.id,
+              providerName: currentProvider.name,
+              endpointId: activeEndpoint.endpointId,
+              attemptNumber: attemptCount,
+              hasNextEndpoint,
+            });
+
+            if (hasNextEndpoint) {
+              currentEndpointIndex += 1;
+              maxAttemptsPerProvider = Math.max(maxAttemptsPerProvider, attemptCount + 1);
+              continue;
+            }
+
+            ProxyForwarder.markProviderFailed(session, failedProviderIds, currentProvider.id);
+            break;
+          }
+
+          if (errorCategory === ErrorCategory.PROVIDER_CAPABILITY_GAP) {
+            session.addProviderToChain(currentProvider, {
+              ...endpointAudit,
+              reason: "provider_capability_gap",
+              circuitState: getCircuitState(currentProvider.id),
+              attemptNumber: attemptCount,
+              statusCode: lastError instanceof ProxyError ? lastError.statusCode : undefined,
+              errorMessage,
+            });
+
+            logger.warn("ProxyForwarder: Provider capability gap", {
+              providerId: currentProvider.id,
+              providerName: currentProvider.name,
+              attemptNumber: attemptCount,
+            });
+
+            ProxyForwarder.markProviderFailed(session, failedProviderIds, currentProvider.id);
+            break;
           }
 
           // ⭐ 4. 系统错误处理（不计入熔断器，先重试1次当前供应商）
@@ -2785,6 +2835,9 @@ export class ProxyForwarder {
     const attemptedProviderIds = new Set(failedProviderIds);
     if (session.provider?.id != null) attemptedProviderIds.add(session.provider.id);
     await ProxyForwarder.clearSessionProviderBindings(session, attemptedProviderIds);
+    if (capabilityGapSeen && !nonCapabilityFailureSeen) {
+      throw ProxyForwarder.buildProviderCapabilityUnavailableError(lastError);
+    }
     throw ProxyForwarder.buildAllProvidersUnavailableError(lastError); // Service Unavailable
   }
 
@@ -4392,8 +4445,25 @@ export class ProxyForwarder {
     let launchingAlternative: Promise<void> | null = null;
     let lastError: Error | null = null;
     let lastErrorCategory: ErrorCategory | null = null;
+    let capabilityGapSeen = false;
+    let nonCapabilityFailureSeen = false;
     const attempts = new Set<StreamingHedgeAttempt>();
     const failedProviderIds: number[] = [];
+
+    const noteRoutingFailure = (category: ErrorCategory) => {
+      if (
+        category === ErrorCategory.ENDPOINT_CAPABILITY_GAP ||
+        category === ErrorCategory.PROVIDER_CAPABILITY_GAP
+      ) {
+        capabilityGapSeen = true;
+      } else if (
+        category !== ErrorCategory.CLIENT_ABORT &&
+        category !== ErrorCategory.NON_RETRYABLE_CLIENT_ERROR &&
+        category !== ErrorCategory.LOCAL_OVERLOAD
+      ) {
+        nonCapabilityFailureSeen = true;
+      }
+    };
 
     let resolveResult: ((result: { response?: Response; error?: Error }) => void) | null = null;
     const resultPromise = new Promise<{ response?: Response; error?: Error }>((resolve) => {
@@ -4642,7 +4712,13 @@ export class ProxyForwarder {
 
     const finishIfExhausted = async () => {
       if (!settled && noMoreProviders && attempts.size === 0) {
-        await settleFailure(ProxyForwarder.resolveHedgeTerminalError(lastError, lastErrorCategory));
+        await settleFailure(
+          ProxyForwarder.resolveHedgeTerminalError(
+            lastError,
+            lastErrorCategory,
+            capabilityGapSeen && !nonCapabilityFailureSeen
+          )
+        );
       }
     };
 
@@ -4685,6 +4761,7 @@ export class ProxyForwarder {
 
           lastError = ProxyForwarder.buildAllProvidersUnavailableError(lastError);
           lastErrorCategory = null;
+          nonCapabilityFailureSeen = true;
           noMoreProviders = true;
           abortAllAttempts(undefined, "hedge_launch_failed");
           await finishIfExhausted();
@@ -4879,6 +4956,7 @@ export class ProxyForwarder {
 
       let errorCategory = await categorizeErrorAsync(error);
       lastErrorCategory = errorCategory;
+      noteRoutingFailure(errorCategory);
       // F3a：hedge attempt 供应商侧失败且正是亲和提名者 -> 定向墓碑
       if (
         errorCategory === ErrorCategory.PROVIDER_ERROR ||
@@ -4959,6 +5037,69 @@ export class ProxyForwarder {
         abortAllAttempts(undefined, "database_pool_overload");
         await settleFailure(error);
         return;
+      }
+
+      if (
+        errorCategory === ErrorCategory.ENDPOINT_CAPABILITY_GAP &&
+        attempt.endpointIndex + 1 < attempt.endpointCount
+      ) {
+        const nextEndpointIndex = attempt.endpointIndex + 1;
+        try {
+          const nextEndpoint = await ProxyForwarder.resolveStreamingHedgeEndpoint(
+            session,
+            attempt.provider,
+            nextEndpointIndex
+          );
+          session.addProviderToChain(attempt.provider, {
+            ...attempt.endpointAudit,
+            reason: "endpoint_capability_gap",
+            attemptNumber: attempt.requestAttemptCount,
+            statusCode,
+            errorMessage,
+            circuitState: getCircuitState(attempt.provider.id),
+            modelRedirect: getAttemptModelRedirect(attempt),
+          });
+
+          const readerCancel = attempt.reader?.cancel("endpoint_capability_gap");
+          readerCancel?.catch(() => undefined);
+          try {
+            attempt.responseController?.abort(new Error("endpoint_capability_gap"));
+          } catch {
+            /* best-effort cleanup before reusing the hedge participant */
+          }
+          releaseAttemptAgent(attempt);
+
+          attempt.baseUrl = nextEndpoint.baseUrl;
+          attempt.endpointAudit = {
+            endpointId: nextEndpoint.endpointId,
+            endpointUrl: nextEndpoint.endpointUrl,
+          };
+          attempt.endpointIndex = nextEndpoint.endpointIndex ?? nextEndpointIndex;
+          attempt.endpointCount = nextEndpoint.endpointCount ?? attempt.endpointCount;
+          attempt.requestAttemptCount += 1;
+          attempt.responseController = null;
+          attempt.clearResponseTimeout = null;
+          attempt.reader = null;
+          attempt.response = null;
+          attempt.releaseAgent = null;
+          attempt.agentReleased = false;
+          attempt.firstChunk = null;
+          attempt.gateAudit = undefined;
+          attempt.firstByteAt = null;
+          armAttemptThreshold(attempt);
+          runAttempt(attempt);
+          return;
+        } catch (endpointSelectionError) {
+          logger.warn("ProxyForwarder: Failed to select next endpoint after capability gap", {
+            providerId: attempt.provider.id,
+            providerName: attempt.provider.name,
+            nextEndpointIndex,
+            error:
+              endpointSelectionError instanceof Error
+                ? endpointSelectionError.message
+                : String(endpointSelectionError),
+          });
+        }
       }
 
       const reactiveRectifierResult = await tryApplyReactiveRectifier({
@@ -5078,7 +5219,11 @@ export class ProxyForwarder {
               reason:
                 errorCategory === ErrorCategory.RESOURCE_NOT_FOUND
                   ? "resource_not_found"
-                  : "retry_failed",
+                  : errorCategory === ErrorCategory.ENDPOINT_CAPABILITY_GAP
+                    ? "endpoint_capability_gap"
+                    : errorCategory === ErrorCategory.PROVIDER_CAPABILITY_GAP
+                      ? "provider_capability_gap"
+                      : "retry_failed",
               attemptNumber: attempt.sequence,
               statusCode,
               errorMessage,
@@ -5295,12 +5440,15 @@ export class ProxyForwarder {
         endpointId: number | null;
         baseUrl: string;
         endpointUrl: string;
+        endpointIndex?: number;
+        endpointCount?: number;
       };
       try {
         endpointSelection = await ProxyForwarder.resolveStreamingHedgeEndpoint(session, provider);
       } catch (endpointError) {
         lastError = endpointError as Error;
         lastErrorCategory = null;
+        nonCapabilityFailureSeen = true;
         ProxyForwarder.markProviderFailed(session, failedProviderIds, provider.id);
         await finishIfExhausted();
         return false;
@@ -5321,6 +5469,8 @@ export class ProxyForwarder {
           endpointId: endpointSelection.endpointId,
           endpointUrl: endpointSelection.endpointUrl,
         },
+        endpointIndex: endpointSelection.endpointIndex ?? 0,
+        endpointCount: endpointSelection.endpointCount ?? 1,
         responseController: null,
         clearResponseTimeout: null,
         firstByteTimeoutMs:
@@ -5478,6 +5628,8 @@ export class ProxyForwarder {
     let noMoreCandidates = false;
     let lastError: Error | null = null;
     let lastErrorCategory: ErrorCategory | null = null;
+    let capabilityGapSeen = false;
+    let nonCapabilityFailureSeen = false;
     let totalTimer: NodeJS.Timeout | null = null;
     let roundTimer: NodeJS.Timeout | null = null;
     let stickyTimer: NodeJS.Timeout | null = null;
@@ -5502,6 +5654,20 @@ export class ProxyForwarder {
       !!session.sessionId &&
       bindingSnapshot.providerId === initialProvider.id;
     let stickyProbeActive = hasSticky;
+    const noteRoutingFailure = (category: ErrorCategory) => {
+      if (
+        category === ErrorCategory.ENDPOINT_CAPABILITY_GAP ||
+        category === ErrorCategory.PROVIDER_CAPABILITY_GAP
+      ) {
+        capabilityGapSeen = true;
+      } else if (
+        category !== ErrorCategory.CLIENT_ABORT &&
+        category !== ErrorCategory.NON_RETRYABLE_CLIENT_ERROR &&
+        category !== ErrorCategory.LOCAL_OVERLOAD
+      ) {
+        nonCapabilityFailureSeen = true;
+      }
+    };
     if (hasSticky) {
       coordinator.startStickyProbe();
       session.appendRoutingTraceEvent({
@@ -6260,6 +6426,7 @@ export class ProxyForwarder {
         retryState?: ReactiveRectifierRetryState;
         retrySetupReservation?: DiscoveryRetrySetupReservation;
         candidateSetupReservation?: DiscoveryCandidateSetupReservation;
+        endpointIndex?: number;
       }
     ): Promise<boolean> => {
       const retrySetupReservation = options?.retrySetupReservation;
@@ -6375,7 +6542,11 @@ export class ProxyForwarder {
       let endpoint: Awaited<ReturnType<typeof ProxyForwarder.resolveStreamingHedgeEndpoint>>;
       try {
         endpoint = await awaitSetupStep(
-          ProxyForwarder.resolveStreamingHedgeEndpoint(session, provider),
+          ProxyForwarder.resolveStreamingHedgeEndpoint(
+            session,
+            provider,
+            options?.endpointIndex ?? 0
+          ),
           setupReservation
         );
       } catch (error) {
@@ -6477,6 +6648,8 @@ export class ProxyForwarder {
           endpointId: endpoint.endpointId,
           endpointUrl: endpoint.endpointUrl,
         },
+        endpointIndex: endpoint.endpointIndex ?? 0,
+        endpointCount: endpoint.endpointCount ?? 1,
         modelRedirect: undefined,
         responseController: null,
         clearResponseTimeout: null,
@@ -6611,7 +6784,15 @@ export class ProxyForwarder {
               });
               throw new DiscoveryValidityLimitError();
             }
-            if (validity.error || (validity.terminal && !validity.ready))
+            if (validity.error) {
+              throw new StreamPrecommitError("gate_error", {
+                family: mapProviderTypeToFamily(provider.providerType) ?? "openai-chat",
+                providerId: provider.id,
+                providerName: provider.name,
+                frameData: validity.errorFrameData,
+              });
+            }
+            if (validity.terminal && !validity.ready)
               throw new ProxyError("Invalid upstream discovery response", 502);
             if (!validity.ready) continue;
             attempt.ready = true;
@@ -6694,6 +6875,7 @@ export class ProxyForwarder {
           if (stickyWaveForFallback) stickyWaveForFallback.slots = concurrency;
           lastError = error instanceof Error ? error : new Error(String(error));
           lastErrorCategory = await categorizeErrorAsync(lastError);
+          noteRoutingFailure(lastErrorCategory);
           const errorMessage =
             lastError instanceof ProxyError
               ? lastError.getDetailedErrorMessage()
@@ -6750,6 +6932,123 @@ export class ProxyForwarder {
               reason: "local_overload",
             });
             await settleFailure(lastError, { preserveBinding: true });
+            return;
+          }
+
+          if (
+            lastErrorCategory === ErrorCategory.ENDPOINT_CAPABILITY_GAP &&
+            attempt.endpointIndex + 1 < attempt.endpointCount
+          ) {
+            const nextEndpointIndex = attempt.endpointIndex + 1;
+            const reservationEpoch = coordinator.epochs;
+            const retrySetupReservation: DiscoveryRetrySetupReservation = {
+              purpose: "endpoint_retry",
+              placeholderAttemptId: id,
+              providerId: provider.id,
+              requestEpoch: reservationEpoch.requestEpoch,
+              roundEpoch: reservationEpoch.roundEpoch,
+              controller: new AbortController(),
+              providerSessionRefOwned:
+                attempt.providerSessionRefOwned && !attempt.providerSessionRefReleased,
+              providerSessionRefRetainOnSuccess: attempt.providerSessionRefRetainOnSuccess,
+              providerSessionRefReleased: false,
+              cancellationKind: null,
+            };
+            retrySetupReservations.set(id, retrySetupReservation);
+            coordinator.markSetupOnly(id);
+            if (retrySetupReservation.providerSessionRefOwned) {
+              attempt.providerSessionRefOwned = false;
+            }
+            attempt.pending = false;
+            session.addProviderToChain(provider, {
+              ...attempt.endpointAudit,
+              reason: "endpoint_capability_gap",
+              attemptNumber: attempt.requestAttemptCount,
+              statusCode: lastError instanceof ProxyError ? lastError.statusCode : undefined,
+              errorMessage,
+              modelRedirect: getAttemptModelRedirect(attempt),
+            });
+            cleanupAttempt(attempt, null, {
+              statusCode: lastError instanceof ProxyError ? lastError.statusCode : undefined,
+              reason: "endpoint_capability_gap",
+            });
+
+            try {
+              const endpointRetryLaunched = await launch(provider, attempt.kind, {
+                attemptSession: attempt.session,
+                requestAttemptCount: attempt.requestAttemptCount + 1,
+                retryState: attempt.reactiveRectifierRetryState,
+                retrySetupReservation,
+                endpointIndex: nextEndpointIndex,
+              });
+              if (endpointRetryLaunched || committed || settled) return;
+            } catch (retryLaunchError) {
+              if (retrySetupReservation.cancellationKind || committed || settled) return;
+              lastError =
+                retryLaunchError instanceof Error
+                  ? retryLaunchError
+                  : new Error(String(retryLaunchError));
+              lastErrorCategory = await categorizeErrorAsync(lastError);
+              noteRoutingFailure(lastErrorCategory);
+              if (lastErrorCategory === ErrorCategory.CLIENT_ABORT) {
+                coordinator.cancelRequest();
+                await settleFailure(
+                  lastError instanceof ProxyError
+                    ? lastError
+                    : new ProxyError("Request aborted by client", 499, undefined, true),
+                  { preserveBinding: true, cancellationKind: "client_abort" }
+                );
+                return;
+              }
+              if (lastErrorCategory === ErrorCategory.LOCAL_OVERLOAD) {
+                await settleFailure(lastError, { preserveBinding: true });
+                return;
+              }
+            }
+
+            if (stickyProbeActive && provider.id === initialProvider.id) {
+              stickyProbeActive = false;
+              if (stickyTimer) {
+                clearTimeout(stickyTimer);
+                stickyTimer = null;
+              }
+              coordinator.removeAttempt(id);
+              await clearCapturedStickyBinding(0);
+              coordinator.startDiscoveryAfterSticky();
+              await launchNextRound(concurrency, true);
+              return;
+            }
+
+            if (stickyTimeoutWaveReservation?.fallbackAttemptId === id) {
+              stickyTimeoutWaveReservation.slots = concurrency;
+              coordinator.removeAttempt(id);
+              if (!stickyTimeoutCooldownPromise) {
+                await launchReservedStickyTimeoutWave();
+              }
+              return;
+            }
+
+            const endpointRetryFailureAction = coordinator.markFailed(id);
+            const endpointRetryOwnsNextStep =
+              endpointRetryFailureAction.type === "commit_normal" ||
+              endpointRetryFailureAction.type === "promote_fallback" ||
+              endpointRetryFailureAction.type === "launch" ||
+              endpointRetryFailureAction.type === "terminal_failure";
+            if (endpointRetryOwnsNextStep) {
+              await executeCoordinatorAction(endpointRetryFailureAction);
+            }
+            if (!endpointRetryOwnsNextStep && !committed && !settled) {
+              await refillCurrentRoundSlots(concurrency);
+            }
+            if (coordinator.activeAttempts.length === 0 && noMoreCandidates) {
+              await settleFailure(
+                ProxyForwarder.resolveHedgeTerminalError(
+                  lastError,
+                  lastErrorCategory,
+                  capabilityGapSeen && !nonCapabilityFailureSeen
+                )
+              );
+            }
             return;
           }
 
@@ -6828,6 +7127,7 @@ export class ProxyForwarder {
                   ? retryLaunchError
                   : new Error(String(retryLaunchError));
               lastErrorCategory = await categorizeErrorAsync(lastError);
+              noteRoutingFailure(lastErrorCategory);
               if (lastErrorCategory === ErrorCategory.CLIENT_ABORT) {
                 coordinator.cancelRequest();
                 await settleFailure(
@@ -6887,7 +7187,11 @@ export class ProxyForwarder {
               }
               if (coordinator.activeAttempts.length === 0 && noMoreCandidates) {
                 await settleFailure(
-                  ProxyForwarder.resolveHedgeTerminalError(lastError, lastErrorCategory)
+                  ProxyForwarder.resolveHedgeTerminalError(
+                    lastError,
+                    lastErrorCategory,
+                    capabilityGapSeen && !nonCapabilityFailureSeen
+                  )
                 );
               }
             }
@@ -6906,7 +7210,12 @@ export class ProxyForwarder {
           if (failedStickyProbe || failedReservedStickyFallback) coordinator.removeAttempt(id);
           session.addProviderToChain(provider, {
             ...attempt.endpointAudit,
-            reason: "retry_failed",
+            reason:
+              lastErrorCategory === ErrorCategory.ENDPOINT_CAPABILITY_GAP
+                ? "endpoint_capability_gap"
+                : lastErrorCategory === ErrorCategory.PROVIDER_CAPABILITY_GAP
+                  ? "provider_capability_gap"
+                  : "retry_failed",
             attemptNumber: attempt.sequence,
             statusCode: lastError instanceof ProxyError ? lastError.statusCode : undefined,
             errorMessage,
@@ -6930,7 +7239,11 @@ export class ProxyForwarder {
             // Stop Discovery immediately so the same invalid request is not
             // fanned out or masked by a later generic fallback error.
             await settleFailure(
-              ProxyForwarder.resolveHedgeTerminalError(lastError, lastErrorCategory),
+              ProxyForwarder.resolveHedgeTerminalError(
+                lastError,
+                lastErrorCategory,
+                capabilityGapSeen && !nonCapabilityFailureSeen
+              ),
               { preserveBinding: true }
             );
             return;
@@ -6984,7 +7297,11 @@ export class ProxyForwarder {
           }
           if (coordinator.activeAttempts.length === 0 && noMoreCandidates) {
             await settleFailure(
-              ProxyForwarder.resolveHedgeTerminalError(lastError, lastErrorCategory)
+              ProxyForwarder.resolveHedgeTerminalError(
+                lastError,
+                lastErrorCategory,
+                capabilityGapSeen && !nonCapabilityFailureSeen
+              )
             );
           }
         })
@@ -7102,6 +7419,7 @@ export class ProxyForwarder {
             } catch (error) {
               if (isCandidateSetupReservationActive(reservation)) {
                 lastError = error instanceof Error ? error : new Error(String(error));
+                nonCapabilityFailureSeen = true;
                 // The setup placeholder remains in the current round so another
                 // candidate can consume the same reserved slot.
                 noMoreCandidates = false;
@@ -7259,7 +7577,13 @@ export class ProxyForwarder {
           !settled &&
           coordinator.acceptsEpoch(launchEpoch.requestEpoch, launchEpoch.roundEpoch)
         ) {
-          await settleFailure(ProxyForwarder.buildAllProvidersUnavailableError(lastError));
+          await settleFailure(
+            ProxyForwarder.resolveHedgeTerminalError(
+              lastError,
+              lastErrorCategory,
+              capabilityGapSeen && !nonCapabilityFailureSeen
+            )
+          );
           return;
         }
       } finally {
@@ -7461,9 +7785,15 @@ export class ProxyForwarder {
         return;
       }
       if (action.type === "terminal_failure") {
-        await settleFailure(ProxyForwarder.buildAllProvidersUnavailableError(lastError), {
-          cancellationKind: terminalCancellationKind,
-        });
+        const terminalError =
+          terminalCancellationKind === "request_deadline"
+            ? ProxyForwarder.buildAllProvidersUnavailableError(lastError)
+            : ProxyForwarder.resolveHedgeTerminalError(
+                lastError,
+                lastErrorCategory,
+                capabilityGapSeen && !nonCapabilityFailureSeen
+              );
+        await settleFailure(terminalError, { cancellationKind: terminalCancellationKind });
         return;
       }
     };
@@ -7631,11 +7961,14 @@ export class ProxyForwarder {
 
   private static async resolveStreamingHedgeEndpoint(
     session: ProxySession,
-    provider: Provider
+    provider: Provider,
+    endpointIndex: number = 0
   ): Promise<{
     endpointId: number | null;
     baseUrl: string;
     endpointUrl: string;
+    endpointIndex: number;
+    endpointCount: number;
   }> {
     const requestPath = session.requestUrl.pathname;
     const providerVendorId = provider.providerVendorId ?? 0;
@@ -7673,6 +8006,8 @@ export class ProxyForwarder {
         endpointId: null,
         baseUrl: provider.url,
         endpointUrl: sanitizedUrl,
+        endpointIndex: 0,
+        endpointCount: 1,
       };
     }
 
@@ -7723,13 +8058,26 @@ export class ProxyForwarder {
         endpointId: null,
         baseUrl: provider.url,
         endpointUrl: sanitizedUrl,
+        endpointIndex: 0,
+        endpointCount: 1,
       };
     }
 
+    const selectedEndpoint = endpointCandidates[endpointIndex];
+    if (!selectedEndpoint) {
+      throw new ProxyError("No available provider endpoint at requested index", 503, {
+        body: "",
+        providerId: provider.id,
+        providerName: provider.name,
+      });
+    }
+
     return {
-      endpointId: endpointCandidates[0].endpointId,
-      baseUrl: endpointCandidates[0].endpointUrl,
-      endpointUrl: sanitizeUrl(endpointCandidates[0].endpointUrl),
+      endpointId: selectedEndpoint.endpointId,
+      baseUrl: selectedEndpoint.endpointUrl,
+      endpointUrl: sanitizeUrl(selectedEndpoint.endpointUrl),
+      endpointIndex,
+      endpointCount: endpointCandidates.length,
     };
   }
 
@@ -7947,9 +8295,35 @@ export class ProxyForwarder {
     });
   }
 
+  private static buildProviderCapabilityUnavailableError(finalError?: Error | null): ProxyError {
+    const error = new ProxyError("No configured provider supports this request", 503, {
+      body: JSON.stringify({
+        error: {
+          type: "service_unavailable_error",
+          code: "provider_capability_unavailable",
+          message: "No configured provider supports this request",
+        },
+      }),
+      safeClientMessageCandidate: "No configured provider supports this request",
+      origin: "upstream_http",
+      originalStatusCode: finalError instanceof ProxyError ? finalError.statusCode : undefined,
+    });
+    rememberRoutingErrorClassification(error, {
+      disposition: "provider_capability_gap",
+      evidenceSource: "core_signature",
+      evidenceCode: "capability_exhaustion",
+      clientStatusCode: 503,
+      clientCode: "provider_capability_unavailable",
+      clientMessage: "No configured provider supports this request",
+      originalStatusCode: finalError instanceof ProxyError ? finalError.statusCode : undefined,
+    });
+    return error;
+  }
+
   private static resolveHedgeTerminalError(
     lastError: Error | null,
-    lastErrorCategory: ErrorCategory | null
+    lastErrorCategory: ErrorCategory | null,
+    capabilityOnly: boolean = false
   ): Error {
     if (
       lastError &&
@@ -7957,6 +8331,10 @@ export class ProxyForwarder {
         lastErrorCategory === ErrorCategory.NON_RETRYABLE_CLIENT_ERROR)
     ) {
       return lastError;
+    }
+
+    if (capabilityOnly) {
+      return ProxyForwarder.buildProviderCapabilityUnavailableError(lastError);
     }
 
     return ProxyForwarder.buildAllProvidersUnavailableError(lastError);

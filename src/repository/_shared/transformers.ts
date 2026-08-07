@@ -344,6 +344,12 @@ export function toSystemSettings(dbSettings: any): SystemSettings {
       dbSettings?.streamGateMode === "enforce"
         ? dbSettings.streamGateMode
         : "enforce",
+    semanticErrorRoutingMode:
+      dbSettings?.semanticErrorRoutingMode === "legacy" ||
+      dbSettings?.semanticErrorRoutingMode === "shadow" ||
+      dbSettings?.semanticErrorRoutingMode === "enforce"
+        ? dbSettings.semanticErrorRoutingMode
+        : "shadow",
     affinityIgnoreClientSessionId: dbSettings?.affinityIgnoreClientSessionId ?? true,
     replayEnabled: dbSettings?.replayEnabled ?? null,
     cacheEffectivenessEnabled: dbSettings?.cacheEffectivenessEnabled ?? null,

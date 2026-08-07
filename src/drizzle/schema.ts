@@ -954,6 +954,10 @@ export const errorRules = pgTable('error_rules', {
   overrideResponse: jsonb('override_response'),
   // 覆写状态码：null = 透传上游状态码
   overrideStatusCode: integer('override_status_code'),
+  // 路由处置：null 表示迁移前的 legacy 自定义规则，不获得覆盖 5xx 的语义权限
+  routingDisposition: varchar('routing_disposition', { length: 40 }).$type<
+    'request_terminal' | 'endpoint_capability_gap' | 'provider_capability_gap' | 'provider_failure'
+  >(),
   isEnabled: boolean('is_enabled').notNull().default(true),
   isDefault: boolean('is_default').notNull().default(false),
   priority: integer('priority').notNull().default(0),
@@ -1207,6 +1211,12 @@ export const systemSettings = pgTable('system_settings', {
   // F1 流式内容门控模式: 'off' | 'shadow' | 'enforce'（默认 enforce）
   // enforce：首个有效内容帧前缓冲，错误/空流时自动切换供应商；shadow：仅旁路统计分歧
   streamGateMode: varchar('stream_gate_mode', { length: 10 }).notNull().default('enforce'),
+
+  // 一般语义错误路由 rollout；核心请求错误不受该开关影响
+  semanticErrorRoutingMode: varchar('semantic_error_routing_mode', { length: 10 })
+    .notNull()
+    .default('shadow')
+    .$type<'legacy' | 'shadow' | 'enforce'>(),
 
   // 忽略客户端 Session ID（默认开启）
   // 开启后：可指纹化的请求强制使用最长前缀亲和做供应商粘性（跳过客户端 Session ID 绑定），

@@ -80,7 +80,7 @@ vi.mock("@/app/v1/_lib/proxy/errors", async (importOriginal) => {
 });
 
 import { ProxyForwarder } from "@/app/v1/_lib/proxy/forwarder";
-import { ProxyError } from "@/app/v1/_lib/proxy/errors";
+import { ErrorCategory, ProxyError } from "@/app/v1/_lib/proxy/errors";
 import { resolveEndpointPolicy } from "@/app/v1/_lib/proxy/endpoint-policy";
 import { ProxySession } from "@/app/v1/_lib/proxy/session";
 import { logger } from "@/lib/logger";
@@ -361,6 +361,67 @@ describe("ProxyForwarder - endpoint audit", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  test("Endpoint Capability Gap 应优先尝试同一 Provider 的下一个端点且不写健康失败", async () => {
+    const session = createSession(new URL("https://example.com/v1/responses"));
+    const provider = createProvider({
+      providerType: "openai-compatible",
+      providerVendorId: 123,
+      maxRetryAttempts: 1,
+    });
+    session.setProvider(provider);
+    mocks.getPreferredProviderEndpoints.mockResolvedValue([
+      makeEndpoint({
+        id: 11,
+        vendorId: 123,
+        providerType: provider.providerType,
+        url: "https://endpoint-one.example.com/v1",
+      }),
+      makeEndpoint({
+        id: 12,
+        vendorId: 123,
+        providerType: provider.providerType,
+        url: "https://endpoint-two.example.com/v1",
+      }),
+    ]);
+    mocks.categorizeErrorAsync.mockResolvedValueOnce(ErrorCategory.ENDPOINT_CAPABILITY_GAP);
+
+    const doForward = vi.spyOn(
+      ProxyForwarder as unknown as { doForward: (...args: unknown[]) => Promise<Response> },
+      "doForward"
+    );
+    doForward.mockRejectedValueOnce(
+      new ProxyError("Invalid URL (POST /v1/responses)", 404, {
+        body: JSON.stringify({
+          error: {
+            type: "invalid_request_error",
+            message: "Invalid URL (POST /v1/responses)",
+          },
+        }),
+        origin: "upstream_http",
+        originalStatusCode: 404,
+      })
+    );
+    doForward.mockResolvedValueOnce(
+      new Response("{}", {
+        status: 200,
+        headers: { "content-type": "application/json", "content-length": "2" },
+      })
+    );
+
+    const response = await ProxyForwarder.send(session);
+
+    expect(response.status).toBe(200);
+    expect(doForward).toHaveBeenCalledTimes(2);
+    expect(doForward.mock.calls[0]?.[3]).toMatchObject({ endpointId: 11 });
+    expect(doForward.mock.calls[1]?.[3]).toMatchObject({ endpointId: 12 });
+    expect(mocks.recordFailure).not.toHaveBeenCalled();
+    expect(mocks.recordEndpointFailure).not.toHaveBeenCalled();
+    expect(session.getProviderChain()).toEqual([
+      expect.objectContaining({ reason: "endpoint_capability_gap", endpointId: 11 }),
+      expect.objectContaining({ reason: "retry_success", endpointId: 12 }),
+    ]);
   });
 
   test("MCP 请求应保持 provider.url 语义，不触发 strict endpoint 拦截", async () => {

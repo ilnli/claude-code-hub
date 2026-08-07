@@ -18,6 +18,7 @@ import { getCachedSystemSettings } from "@/lib/config/system-settings-cache";
  */
 export interface ProxyRuntimeSettings {
   streamGateMode: "off" | "shadow" | "enforce";
+  semanticErrorRoutingMode: "legacy" | "shadow" | "enforce";
   affinityIgnoreClientSessionId: boolean;
   replayEnabled: boolean;
   cacheEffectivenessEnabled: boolean;
@@ -47,6 +48,7 @@ function envFallback(): ProxyRuntimeSettings {
     const env = getEnvConfig();
     return {
       streamGateMode: env.STREAM_GATE_MODE,
+      semanticErrorRoutingMode: "shadow",
       affinityIgnoreClientSessionId: true,
       replayEnabled: env.ENABLE_REQUEST_REPLAY,
       cacheEffectivenessEnabled: env.ENABLE_CACHE_EFFECTIVENESS,
@@ -54,6 +56,7 @@ function envFallback(): ProxyRuntimeSettings {
   } catch {
     return {
       streamGateMode: "off",
+      semanticErrorRoutingMode: "shadow",
       affinityIgnoreClientSessionId: true,
       replayEnabled: false,
       cacheEffectivenessEnabled: true,
@@ -66,6 +69,7 @@ export async function getProxyRuntimeSettings(): Promise<ProxyRuntimeSettings> {
     const settings = await getCachedSystemSettings();
     lastKnown = {
       streamGateMode: settings.streamGateMode,
+      semanticErrorRoutingMode: settings.semanticErrorRoutingMode ?? "shadow",
       affinityIgnoreClientSessionId: settings.affinityIgnoreClientSessionId,
       replayEnabled: settings.replayEnabled ?? envReplayDefault(),
       cacheEffectivenessEnabled:

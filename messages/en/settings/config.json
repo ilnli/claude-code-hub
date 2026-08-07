@@ -163,6 +163,13 @@
     },
     "affinityIgnoreClientSessionId": "Ignore Client Session ID",
     "affinityIgnoreClientSessionIdDesc": "When enabled, fingerprintable requests are forced to use longest-prefix affinity for provider stickiness (skipping client Session ID binding); non-fingerprintable requests still use session reuse. Default on.",
+    "semanticErrorRoutingMode": "Semantic Error Routing",
+    "semanticErrorRoutingModeDesc": "Controls reviewed error-rule dispositions. Legacy preserves existing behavior, shadow records differences, and enforce applies terminal and capability routing. Core request errors are always enforced.",
+    "semanticErrorRoutingModeOptions": {
+      "enforce": "Enforce reviewed rules",
+      "legacy": "Legacy behavior",
+      "shadow": "Shadow only"
+    },
     "streamGateMode": "Stream Content Gate",
     "streamGateModeDesc": "Controls the first-valid-content gate for ordinary requests: enabled mode fails over on error frames or empty streams, shadow mode only records divergence, and off mode forwards directly. Replay owners always retain the pre-content safety gate regardless of this setting. Default enabled.",
     "streamGateModeOptions": {

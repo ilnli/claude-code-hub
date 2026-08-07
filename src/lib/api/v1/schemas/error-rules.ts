@@ -17,6 +17,15 @@ export const ErrorRuleMatchTypeSchema = z
   .enum(["contains", "exact", "regex"])
   .describe("Error rule match type.");
 
+export const RoutingDispositionSchema = z
+  .enum([
+    "request_terminal",
+    "endpoint_capability_gap",
+    "provider_capability_gap",
+    "provider_failure",
+  ])
+  .describe("Routing action authorized by the reviewed rule.");
+
 export const ErrorOverrideResponseSchema = z
   .record(z.string(), z.unknown())
   .describe("Provider-specific error response override payload.");
@@ -35,6 +44,9 @@ export const ErrorRuleSchema = z.object({
     .max(599)
     .nullable()
     .describe("Optional status override."),
+  routingDisposition: RoutingDispositionSchema.nullable().describe(
+    "Reviewed routing disposition, or null for a legacy unreviewed custom rule."
+  ),
   isEnabled: z.boolean().describe("Whether the rule is enabled."),
   isDefault: z.boolean().describe("Whether this is a built-in default rule."),
   priority: z.number().int().describe("Rule priority."),
@@ -63,6 +75,7 @@ export const ErrorRuleCreateSchema = z
       .nullable()
       .optional()
       .describe("Optional status override."),
+    routingDisposition: RoutingDispositionSchema,
   })
   .strict();
 
@@ -110,6 +123,9 @@ export const ErrorRuleTestResponseSchema = z.object({
         "Matched override response."
       ),
       overrideStatusCode: z.number().int().nullable().describe("Matched override status code."),
+      routingDisposition: RoutingDispositionSchema.nullable().describe(
+        "Matched routing disposition."
+      ),
     })
     .optional()
     .describe("Matched rule summary."),

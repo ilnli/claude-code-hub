@@ -240,6 +240,7 @@ export async function getCachedSystemSettings(): Promise<SystemSettings> {
       publicStatusAggregationIntervalMinutes:
         DEFAULT_SETTINGS.publicStatusAggregationIntervalMinutes,
       streamGateMode: getFallbackStreamGateMode(),
+      semanticErrorRoutingMode: "shadow",
       affinityIgnoreClientSessionId: DEFAULT_SETTINGS.affinityIgnoreClientSessionId,
       replayEnabled: null,
       cacheEffectivenessEnabled: null,

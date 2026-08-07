@@ -170,6 +170,13 @@
     },
     "affinityIgnoreClientSessionId": "忽略用戶端 Session ID",
     "affinityIgnoreClientSessionIdDesc": "開啟後，可指紋化的請求強制使用最長前綴親和做供應商黏性（跳過用戶端 Session ID 綁定）；不可指紋化的請求仍走會話複用。預設開啟。",
+    "semanticErrorRoutingMode": "語義錯誤路由",
+    "semanticErrorRoutingModeDesc": "控制已審查錯誤規則的路由處置。舊模式保持現狀，影子模式只記錄差異，強制模式執行終止和能力缺口路由。核心請求錯誤始終強制執行。",
+    "semanticErrorRoutingModeOptions": {
+      "enforce": "強制執行已審查規則",
+      "legacy": "保持舊行為",
+      "shadow": "僅影子記錄"
+    },
     "streamGateMode": "串流內容閘控",
     "streamGateModeDesc": "控制一般請求的首個有效內容影格閘控：啟用時遇到錯誤影格或空串流會自動切換供應商重試，影子模式僅旁路統計判定分歧，關閉時直接轉發。Replay owner 無論選擇哪種模式，始終保留首內容前的安全判定。預設啟用。",
     "streamGateModeOptions": {

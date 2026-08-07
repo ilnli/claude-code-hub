@@ -16,6 +16,7 @@ export type DiscoveryValidity = {
   terminal: boolean;
   error: boolean;
   limitExceeded?: boolean;
+  errorFrameData?: string;
 };
 
 export const DISCOVERY_PREFIX_MAX_BYTES = 1024 * 1024;
@@ -125,6 +126,7 @@ export class DiscoveryValidityParser {
   private _terminal = false;
   private _error = false;
   private _limitExceeded = false;
+  private _errorFrameData: string | null = null;
   private bytesSeen = 0;
   private eventsSeen = 0;
 
@@ -253,6 +255,9 @@ export class DiscoveryValidityParser {
     this._ready ||= result.ready;
     this._terminal ||= result.terminal;
     this._error ||= result.error;
+    if (result.error && !this._errorFrameData) {
+      this._errorFrameData = data;
+    }
   }
 
   private isSseField(line: string): boolean {
@@ -285,6 +290,7 @@ export class DiscoveryValidityParser {
       terminal: this._terminal,
       error: this._error,
       ...(this._limitExceeded ? { limitExceeded: true } : {}),
+      ...(this._errorFrameData ? { errorFrameData: this._errorFrameData } : {}),
     };
   }
 }

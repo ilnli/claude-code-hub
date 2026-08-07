@@ -2143,6 +2143,216 @@ describe("ProxyForwarder - first-byte hedge scheduling", () => {
     );
   });
 
+  test("a request-terminal hedge failure cancels an already-running peer attempt", async () => {
+    vi.useFakeTimers();
+
+    try {
+      const provider1 = createProvider({ id: 1, name: "p1", firstByteTimeoutStreamingMs: 100 });
+      const provider2 = createProvider({ id: 2, name: "p2", firstByteTimeoutStreamingMs: 100 });
+      const session = createSession();
+      session.setProvider(provider1);
+      mocks.pickRandomProviderWithExclusion.mockResolvedValueOnce(provider2);
+
+      const contextError = new UpstreamProxyError("stream gate rejected upstream", 502, {
+        body: JSON.stringify({
+          type: "error",
+          error: {
+            type: "invalid_request_error",
+            code: "context_length_exceeded",
+            message: "Your input exceeds the context window of this model.",
+            param: "input",
+          },
+        }),
+        providerId: provider1.id,
+        providerName: provider1.name,
+        origin: "stream_gate_precommit",
+        originalStatusCode: 200,
+      });
+      mocks.categorizeErrorAsync.mockImplementation(async (error) =>
+        error === contextError
+          ? ProxyErrorCategory.NON_RETRYABLE_CLIENT_ERROR
+          : ProxyErrorCategory.PROVIDER_ERROR
+      );
+
+      const doForward = vi.spyOn(
+        ProxyForwarder as unknown as {
+          doForward: (...args: unknown[]) => Promise<Response>;
+        },
+        "doForward"
+      );
+      const controller1 = new AbortController();
+      const controller2 = new AbortController();
+      doForward.mockImplementationOnce(async (attemptSession) => {
+        const runtime = attemptSession as ProxySession & AttemptRuntime;
+        runtime.responseController = controller1;
+        runtime.clearResponseTimeout = vi.fn();
+        return createDelayedFailure({ delayMs: 150, error: contextError, controller: controller1 });
+      });
+      doForward.mockImplementationOnce(async (attemptSession) => {
+        const runtime = attemptSession as ProxySession & AttemptRuntime;
+        runtime.responseController = controller2;
+        runtime.clearResponseTimeout = vi.fn();
+        return createStreamingResponse({
+          label: "peer",
+          firstChunkDelayMs: 300,
+          controller: controller2,
+        });
+      });
+
+      const errorPromise = ProxyForwarder.send(session).catch((error) => error);
+      await vi.advanceTimersByTimeAsync(100);
+      expect(doForward).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(50);
+
+      expect(await errorPromise).toBe(contextError);
+      expect(controller2.signal.aborted).toBe(true);
+      expect(mocks.recordFailure).not.toHaveBeenCalled();
+      expect(mocks.recordEndpointFailure).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("hedge retries an endpoint capability gap on the same Provider before failover", async () => {
+    const provider = createProvider({
+      id: 1,
+      name: "p1",
+      providerVendorId: 10,
+      firstByteTimeoutStreamingMs: 100,
+    });
+    const session = createSession();
+    session.setProvider(provider);
+    const invalidUrl = new UpstreamProxyError("Invalid URL (POST /v1/alpha/search)", 404, {
+      body: JSON.stringify({
+        error: {
+          type: "invalid_request_error",
+          code: "",
+          message: "Invalid URL (POST /v1/alpha/search)",
+          param: "",
+        },
+      }),
+      providerId: provider.id,
+      providerName: provider.name,
+    });
+    mocks.categorizeErrorAsync.mockImplementation(async (error) =>
+      error === invalidUrl
+        ? ProxyErrorCategory.ENDPOINT_CAPABILITY_GAP
+        : ProxyErrorCategory.PROVIDER_ERROR
+    );
+
+    const endpointResolver = vi.spyOn(
+      ProxyForwarder as unknown as {
+        resolveStreamingHedgeEndpoint: (...args: unknown[]) => Promise<{
+          endpointId: number | null;
+          baseUrl: string;
+          endpointUrl: string;
+          endpointIndex: number;
+          endpointCount: number;
+        }>;
+      },
+      "resolveStreamingHedgeEndpoint"
+    );
+    endpointResolver
+      .mockResolvedValueOnce({
+        endpointId: 101,
+        baseUrl: "https://endpoint-1.example.com",
+        endpointUrl: "https://endpoint-1.example.com",
+        endpointIndex: 0,
+        endpointCount: 2,
+      })
+      .mockResolvedValueOnce({
+        endpointId: 102,
+        baseUrl: "https://endpoint-2.example.com",
+        endpointUrl: "https://endpoint-2.example.com",
+        endpointIndex: 1,
+        endpointCount: 2,
+      });
+    const doForward = vi.spyOn(
+      ProxyForwarder as unknown as {
+        doForward: (...args: unknown[]) => Promise<Response>;
+      },
+      "doForward"
+    );
+    doForward.mockRejectedValueOnce(invalidUrl).mockResolvedValueOnce(
+      new Response('data: {"type":"content_block_delta","delta":{"text":"ok"}}\n\n', {
+        headers: { "content-type": "text/event-stream" },
+      })
+    );
+
+    const response = await ProxyForwarder.send(session);
+
+    expect(await response.text()).toContain('"ok"');
+    expect(endpointResolver).toHaveBeenCalledTimes(2);
+    expect(endpointResolver).toHaveBeenNthCalledWith(2, session, provider, 1);
+    expect(doForward).toHaveBeenCalledTimes(2);
+    expect(doForward.mock.calls[0]?.[2]).toBe("https://endpoint-1.example.com");
+    expect(doForward.mock.calls[1]?.[2]).toBe("https://endpoint-2.example.com");
+    expect(mocks.pickRandomProviderWithExclusion).not.toHaveBeenCalled();
+    expect(mocks.recordFailure).not.toHaveBeenCalled();
+    expect(mocks.recordEndpointFailure).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    { name: "only capability gaps", mixedFailure: false, expectedCapabilityCode: true },
+    {
+      name: "a Provider failure and a capability gap",
+      mixedFailure: true,
+      expectedCapabilityCode: false,
+    },
+  ])(
+    "hedge terminal aggregation handles $name",
+    async ({ mixedFailure, expectedCapabilityCode }) => {
+      const provider1 = createProvider({ id: 1, name: "p1", firstByteTimeoutStreamingMs: 100 });
+      const provider2 = createProvider({ id: 2, name: "p2", firstByteTimeoutStreamingMs: 100 });
+      const session = createSession();
+      session.setProvider(provider1);
+      mocks.pickRandomProviderWithExclusion
+        .mockResolvedValueOnce(provider2)
+        .mockResolvedValueOnce(null);
+
+      const firstError = new UpstreamProxyError(
+        mixedFailure ? "Provider returned 502" : "model capability unavailable",
+        mixedFailure ? 502 : 404,
+        { providerId: provider1.id, providerName: provider1.name }
+      );
+      const secondError = new UpstreamProxyError("model capability unavailable", 404, {
+        providerId: provider2.id,
+        providerName: provider2.name,
+      });
+      mocks.categorizeErrorAsync.mockImplementation(async (error) =>
+        mixedFailure && error === firstError
+          ? ProxyErrorCategory.PROVIDER_ERROR
+          : ProxyErrorCategory.PROVIDER_CAPABILITY_GAP
+      );
+      vi.spyOn(
+        ProxyForwarder as unknown as {
+          doForward: (...args: unknown[]) => Promise<Response>;
+        },
+        "doForward"
+      ).mockImplementation(async (attemptSession) => {
+        throw (attemptSession as ProxySession).provider?.id === provider1.id
+          ? firstError
+          : secondError;
+      });
+
+      const error = await ProxyForwarder.send(session).catch(
+        (caught) => caught as UpstreamProxyError
+      );
+
+      expect(error).toBeInstanceOf(UpstreamProxyError);
+      expect(error.statusCode).toBe(503);
+      expect(error.upstreamError?.body?.includes("provider_capability_unavailable") ?? false).toBe(
+        expectedCapabilityCode
+      );
+      expect(mocks.recordEndpointFailure).not.toHaveBeenCalled();
+      if (mixedFailure) {
+        expect(mocks.recordFailure).toHaveBeenCalledWith(provider1.id, firstError);
+      } else {
+        expect(mocks.recordFailure).not.toHaveBeenCalled();
+      }
+    }
+  );
+
   test("local DB admission overload should stop hedge without circuit mutation or failover", async () => {
     const provider = createProvider({
       id: 1,
@@ -4118,6 +4328,283 @@ describe("ProxyForwarder - first-byte hedge scheduling", () => {
     expect(mocks.recordFailure).not.toHaveBeenCalled();
     expect(mocks.releaseSessionDiscoveryLease).toHaveBeenCalledTimes(1);
   });
+
+  test("Discovery cancels peer attempts as soon as one proves a request-terminal error", async () => {
+    vi.useFakeTimers();
+
+    try {
+      const provider = createProvider({ id: 1, name: "request-error", priority: 1 });
+      const peer = createProvider({ id: 2, name: "peer", priority: 1 });
+      const session = createSession();
+      session.authState = {
+        success: true,
+        user: null,
+        key: { id: 40 },
+        apiKey: null,
+      } as typeof session.authState;
+      session.setProvider(provider);
+      mocks.getCachedSystemSettings.mockResolvedValue({
+        discoveryEnabled: true,
+        discoveryConcurrency: 2,
+        maxDiscoveryRounds: 1,
+        discoverySlaMs: 100,
+        stickySlaMs: 100,
+        racingTotalTimeoutMs: 500,
+      });
+      mocks.pickDiscoveryProviders.mockResolvedValueOnce([peer]);
+
+      const contextError = new UpstreamProxyError("stream gate rejected upstream", 502, {
+        body: JSON.stringify({
+          type: "error",
+          error: {
+            type: "invalid_request_error",
+            code: "context_length_exceeded",
+            message: "Your input exceeds the context window of this model.",
+            param: "input",
+          },
+        }),
+        providerId: provider.id,
+        providerName: provider.name,
+        origin: "stream_gate_precommit",
+        originalStatusCode: 200,
+      });
+      mocks.categorizeErrorAsync.mockImplementation(async (error) =>
+        error === contextError
+          ? ProxyErrorCategory.NON_RETRYABLE_CLIENT_ERROR
+          : ProxyErrorCategory.PROVIDER_ERROR
+      );
+
+      let peerSignal: AbortSignal | undefined;
+      const doForward = vi.spyOn(
+        ProxyForwarder as unknown as {
+          doForward: (...args: unknown[]) => Promise<Response>;
+        },
+        "doForward"
+      );
+      doForward.mockImplementation(
+        async (attemptSession, _provider, _baseUrl, _audit, _count, _stream, signal) => {
+          const providerId = (attemptSession as ProxySession).provider?.id;
+          if (providerId === provider.id) {
+            return await new Promise<Response>((_resolve, reject) => {
+              const timer = setTimeout(() => reject(contextError), 20);
+              (signal as AbortSignal | undefined)?.addEventListener(
+                "abort",
+                () => {
+                  clearTimeout(timer);
+                  reject((signal as AbortSignal).reason);
+                },
+                { once: true }
+              );
+            });
+          }
+          peerSignal = signal as AbortSignal | undefined;
+          return await new Promise<Response>((_resolve, reject) => {
+            peerSignal?.addEventListener("abort", () => reject(peerSignal?.reason), { once: true });
+          });
+        }
+      );
+
+      const errorPromise = ProxyForwarder.send(session).catch((error) => error);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(doForward).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(20);
+
+      expect(await errorPromise).toBe(contextError);
+      expect(peerSignal?.aborted).toBe(true);
+      expect(mocks.recordFailure).not.toHaveBeenCalled();
+      expect(mocks.recordEndpointFailure).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("Discovery retries an endpoint capability gap on the same Provider", async () => {
+    const provider = createProvider({
+      id: 1,
+      name: "p1",
+      priority: 1,
+      providerVendorId: 10,
+    });
+    const session = createSession();
+    session.authState = {
+      success: true,
+      user: null,
+      key: { id: 41 },
+      apiKey: null,
+    } as typeof session.authState;
+    session.setProvider(provider);
+    mocks.getCachedSystemSettings.mockResolvedValue({
+      discoveryEnabled: true,
+      discoveryConcurrency: 2,
+      maxDiscoveryRounds: 1,
+      discoverySlaMs: 100,
+      stickySlaMs: 100,
+      racingTotalTimeoutMs: 500,
+    });
+    mocks.pickDiscoveryProviders.mockResolvedValue([]);
+
+    const invalidUrl = new UpstreamProxyError("Invalid URL (POST /v1/alpha/search)", 404, {
+      body: JSON.stringify({
+        error: {
+          type: "invalid_request_error",
+          code: "",
+          message: "Invalid URL (POST /v1/alpha/search)",
+          param: "",
+        },
+      }),
+      providerId: provider.id,
+      providerName: provider.name,
+    });
+    mocks.categorizeErrorAsync.mockImplementation(async (error) =>
+      error === invalidUrl
+        ? ProxyErrorCategory.ENDPOINT_CAPABILITY_GAP
+        : ProxyErrorCategory.PROVIDER_ERROR
+    );
+    const endpointResolver = vi.spyOn(
+      ProxyForwarder as unknown as {
+        resolveStreamingHedgeEndpoint: (...args: unknown[]) => Promise<{
+          endpointId: number | null;
+          baseUrl: string;
+          endpointUrl: string;
+          endpointIndex: number;
+          endpointCount: number;
+        }>;
+      },
+      "resolveStreamingHedgeEndpoint"
+    );
+    endpointResolver
+      .mockResolvedValueOnce({
+        endpointId: 201,
+        baseUrl: "https://endpoint-1.example.com",
+        endpointUrl: "https://endpoint-1.example.com",
+        endpointIndex: 0,
+        endpointCount: 2,
+      })
+      .mockResolvedValueOnce({
+        endpointId: 202,
+        baseUrl: "https://endpoint-2.example.com",
+        endpointUrl: "https://endpoint-2.example.com",
+        endpointIndex: 1,
+        endpointCount: 2,
+      });
+    const doForward = vi.spyOn(
+      ProxyForwarder as unknown as {
+        doForward: (...args: unknown[]) => Promise<Response>;
+      },
+      "doForward"
+    );
+    doForward.mockRejectedValueOnce(invalidUrl).mockResolvedValueOnce(
+      new Response('data: {"type":"content_block_delta","delta":{"text":"ok"}}\n\n', {
+        headers: { "content-type": "text/event-stream" },
+      })
+    );
+
+    const response = await ProxyForwarder.send(session);
+
+    expect(await response.text()).toContain('"ok"');
+    expect(endpointResolver).toHaveBeenCalledTimes(2);
+    expect(endpointResolver).toHaveBeenNthCalledWith(2, session, provider, 1);
+    expect(doForward).toHaveBeenCalledTimes(2);
+    expect(doForward.mock.calls[0]?.[2]).toBe("https://endpoint-1.example.com");
+    expect(doForward.mock.calls[1]?.[2]).toBe("https://endpoint-2.example.com");
+    expect(mocks.recordFailure).not.toHaveBeenCalled();
+    expect(mocks.recordEndpointFailure).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    { name: "only capability gaps", mixedFailure: false, expectedCapabilityCode: true },
+    {
+      name: "a Provider failure and a capability gap",
+      mixedFailure: true,
+      expectedCapabilityCode: false,
+    },
+  ])(
+    "Discovery terminal aggregation handles $name",
+    async ({ mixedFailure, expectedCapabilityCode }) => {
+      vi.useFakeTimers();
+
+      try {
+        const provider = createProvider({ id: 1, name: "p1", priority: 1 });
+        const peer = createProvider({ id: 2, name: "p2", priority: 1 });
+        const session = createSession();
+        session.authState = {
+          success: true,
+          user: null,
+          key: { id: 42 },
+          apiKey: null,
+        } as typeof session.authState;
+        session.setProvider(provider);
+        mocks.getCachedSystemSettings.mockResolvedValue({
+          discoveryEnabled: true,
+          discoveryConcurrency: 2,
+          maxDiscoveryRounds: 1,
+          discoverySlaMs: 100,
+          stickySlaMs: 100,
+          racingTotalTimeoutMs: 500,
+        });
+        mocks.pickDiscoveryProviders.mockResolvedValueOnce([peer]).mockResolvedValue([]);
+
+        const firstError = new UpstreamProxyError(
+          mixedFailure ? "Provider returned 502" : "model capability unavailable",
+          mixedFailure ? 502 : 404,
+          { providerId: provider.id, providerName: provider.name }
+        );
+        const secondError = new UpstreamProxyError("model capability unavailable", 404, {
+          providerId: peer.id,
+          providerName: peer.name,
+        });
+        mocks.categorizeErrorAsync.mockImplementation(async (error) =>
+          mixedFailure && error === firstError
+            ? ProxyErrorCategory.PROVIDER_ERROR
+            : ProxyErrorCategory.PROVIDER_CAPABILITY_GAP
+        );
+        vi.spyOn(
+          ProxyForwarder as unknown as {
+            doForward: (...args: unknown[]) => Promise<Response>;
+          },
+          "doForward"
+        ).mockImplementation(
+          async (attemptSession, _provider, _baseUrl, _audit, _count, _stream, signal) => {
+            const error =
+              (attemptSession as ProxySession).provider?.id === provider.id
+                ? firstError
+                : secondError;
+            return await new Promise<Response>((_resolve, reject) => {
+              const timer = setTimeout(() => reject(error), error === firstError ? 10 : 20);
+              (signal as AbortSignal | undefined)?.addEventListener(
+                "abort",
+                () => {
+                  clearTimeout(timer);
+                  reject((signal as AbortSignal).reason);
+                },
+                { once: true }
+              );
+            });
+          }
+        );
+
+        const errorPromise = ProxyForwarder.send(session).catch(
+          (caught) => caught as UpstreamProxyError
+        );
+        await vi.runAllTimersAsync();
+        const error = await errorPromise;
+
+        expect(error).toBeInstanceOf(UpstreamProxyError);
+        expect(error.statusCode).toBe(503);
+        expect(
+          error.upstreamError?.body?.includes("provider_capability_unavailable") ?? false
+        ).toBe(expectedCapabilityCode);
+        expect(mocks.recordEndpointFailure).not.toHaveBeenCalled();
+        if (mixedFailure) {
+          expect(mocks.recordFailure).toHaveBeenCalledWith(provider.id, firstError);
+        } else {
+          expect(mocks.recordFailure).not.toHaveBeenCalled();
+        }
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+  );
 
   test("Discovery clears terminal binding state before releasing its lease", async () => {
     const provider = createProvider({ id: 1 });

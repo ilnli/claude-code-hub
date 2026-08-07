@@ -1183,6 +1183,9 @@ export const UpdateSystemSettingsSchema = z
     streamGateMode: z
       .enum(["off", "shadow", "enforce"], { message: "不支持的流式门控模式" })
       .optional(),
+    semanticErrorRoutingMode: z
+      .enum(["legacy", "shadow", "enforce"], { message: "不支持的语义错误路由模式" })
+      .optional(),
     // 忽略客户端 Session ID（可选）
     affinityIgnoreClientSessionId: z.boolean().optional(),
     // F2 Replay 响应缓存与复用（可选；null = 跟随环境变量）

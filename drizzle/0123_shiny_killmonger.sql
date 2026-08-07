@@ -1,0 +1,2 @@
+ALTER TABLE "error_rules" ADD COLUMN "routing_disposition" varchar(40);--> statement-breakpoint
+ALTER TABLE "system_settings" ADD COLUMN "semantic_error_routing_mode" varchar(10) DEFAULT 'shadow' NOT NULL;

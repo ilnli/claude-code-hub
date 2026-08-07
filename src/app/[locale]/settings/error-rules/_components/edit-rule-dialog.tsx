@@ -24,8 +24,10 @@ import {
 import { updateErrorRuleAction } from "@/lib/api-client/v1/actions/error-rules";
 import { cn } from "@/lib/utils";
 import type { ErrorOverrideResponse, ErrorRule } from "@/repository/error-rules";
+import type { RoutingDisposition } from "@/types/routing-error";
 import { OverrideSection } from "./override-section";
 import { RegexTester } from "./regex-tester";
+import { RoutingDispositionSelect } from "./routing-disposition-select";
 
 interface EditRuleDialogProps {
   rule: ErrorRule;
@@ -40,6 +42,7 @@ export function EditRuleDialog({ rule, open, onOpenChange }: EditRuleDialogProps
   const [pattern, setPattern] = useState("");
   const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");
+  const [routingDisposition, setRoutingDisposition] = useState<RoutingDisposition | "">("");
   const [enableOverride, setEnableOverride] = useState(false);
   const [overrideResponse, setOverrideResponse] = useState("");
   const [overrideStatusCode, setOverrideStatusCode] = useState<string>("");
@@ -50,6 +53,7 @@ export function EditRuleDialog({ rule, open, onOpenChange }: EditRuleDialogProps
       setPattern(rule.pattern);
       setCategory(rule.category || "");
       setDescription(rule.description || "");
+      setRoutingDisposition(rule.routingDisposition ?? "");
       // Enable override if rule has override response or status code
       const hasOverride = !!rule.overrideResponse || !!rule.overrideStatusCode;
       setEnableOverride(hasOverride);
@@ -70,6 +74,11 @@ export function EditRuleDialog({ rule, open, onOpenChange }: EditRuleDialogProps
 
     if (!category.trim()) {
       toast.error(t("errorRules.dialog.categoryRequired"));
+      return;
+    }
+
+    if (!routingDisposition) {
+      toast.error(t("errorRules.dialog.routingDispositionRequired"));
       return;
     }
 
@@ -100,7 +109,8 @@ export function EditRuleDialog({ rule, open, onOpenChange }: EditRuleDialogProps
       // Parse override status code
       if (overrideStatusCode.trim()) {
         const code = parseInt(overrideStatusCode.trim(), 10);
-        if (Number.isNaN(code) || code < 400 || code > 599) {
+        const maxStatusCode = routingDisposition === "request_terminal" ? 499 : 599;
+        if (Number.isNaN(code) || code < 400 || code > maxStatusCode) {
           toast.error(t("errorRules.dialog.invalidStatusCode"));
           return;
         }
@@ -124,6 +134,7 @@ export function EditRuleDialog({ rule, open, onOpenChange }: EditRuleDialogProps
         description: description.trim() || undefined,
         overrideResponse: parsedOverrideResponse,
         overrideStatusCode: parsedStatusCode,
+        routingDisposition,
       });
 
       if (result.ok) {
@@ -182,6 +193,12 @@ export function EditRuleDialog({ rule, open, onOpenChange }: EditRuleDialogProps
                 </p>
               )}
             </div>
+
+            <RoutingDispositionSelect
+              id="edit-routing-disposition"
+              value={routingDisposition}
+              onValueChange={setRoutingDisposition}
+            />
 
             <div className="space-y-2">
               <Label

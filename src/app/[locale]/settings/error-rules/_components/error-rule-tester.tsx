@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { testErrorRuleAction } from "@/lib/api-client/v1/actions/error-rules";
 import { cn } from "@/lib/utils";
 import type { ErrorOverrideResponse } from "@/repository/error-rules";
+import type { RoutingDisposition } from "@/types/routing-error";
 
 interface TestResult {
   matched: boolean;
@@ -19,6 +20,7 @@ interface TestResult {
     matchType: "regex" | "contains" | "exact";
     overrideResponse: ErrorOverrideResponse | null;
     overrideStatusCode: number | null;
+    routingDisposition: RoutingDisposition | null;
   };
   finalResponse: ErrorOverrideResponse | null;
   finalStatusCode: number | null;
@@ -132,6 +134,16 @@ export function ErrorRuleTester() {
                       className="bg-muted/50 text-foreground border-border text-[10px]"
                     >
                       {result.rule.category}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-xs text-muted-foreground">
+                      {t("errorRules.tester.routingDisposition")}
+                    </span>
+                    <Badge variant="outline" className="border-border text-[10px]">
+                      {result.rule.routingDisposition
+                        ? t(`errorRules.dispositions.${result.rule.routingDisposition}`)
+                        : t("errorRules.dispositions.legacy")}
                     </Badge>
                   </div>
                   <div className="flex items-center justify-between gap-4">

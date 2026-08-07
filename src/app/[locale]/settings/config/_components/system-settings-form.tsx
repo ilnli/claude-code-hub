@@ -57,6 +57,7 @@ import type {
   BillingModelSource,
   CodexPriorityBillingSource,
   FakeStreamingWhitelistEntry,
+  SemanticErrorRoutingMode,
   StreamGateSettingMode,
   SystemSettings,
 } from "@/types/system-config";
@@ -98,6 +99,7 @@ interface SystemSettingsFormProps {
     | "allowNonConversationEndpointProviderFallback"
     | "fakeStreamingWhitelist"
     | "streamGateMode"
+    | "semanticErrorRoutingMode"
     | "affinityIgnoreClientSessionId"
     | "replayEnabled"
     | "cacheEffectivenessEnabled"
@@ -214,6 +216,8 @@ export function SystemSettingsForm({
   const [streamGateMode, setStreamGateMode] = useState<StreamGateSettingMode>(
     initialSettings.streamGateMode
   );
+  const [semanticErrorRoutingMode, setSemanticErrorRoutingMode] =
+    useState<SemanticErrorRoutingMode>(initialSettings.semanticErrorRoutingMode);
   const [affinityIgnoreClientSessionId, setAffinityIgnoreClientSessionId] = useState(
     initialSettings.affinityIgnoreClientSessionId
   );
@@ -407,6 +411,7 @@ export function SystemSettingsForm({
         allowNonConversationEndpointProviderFallback,
         fakeStreamingWhitelist: sanitizedFakeStreamingWhitelist,
         streamGateMode,
+        semanticErrorRoutingMode,
         affinityIgnoreClientSessionId,
         replayEnabled,
         cacheEffectivenessEnabled,
@@ -473,6 +478,7 @@ export function SystemSettingsForm({
           }))
         );
         setStreamGateMode(result.data.streamGateMode);
+        setSemanticErrorRoutingMode(result.data.semanticErrorRoutingMode);
         setAffinityIgnoreClientSessionId(result.data.affinityIgnoreClientSessionId);
         setReplayEnabled(result.data.replayEnabled ?? null);
         setCacheEffectivenessEnabled(result.data.cacheEffectivenessEnabled ?? null);
@@ -1147,6 +1153,45 @@ export function SystemSettingsForm({
                 <SelectItem value="off">{t("streamGateModeOptions.off")}</SelectItem>
                 <SelectItem value="shadow">{t("streamGateModeOptions.shadow")}</SelectItem>
                 <SelectItem value="enforce">{t("streamGateModeOptions.enforce")}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Semantic Error Routing Rollout */}
+        <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors space-y-3">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-amber-500/10 text-amber-400 shrink-0">
+              <Route className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-foreground">{t("semanticErrorRoutingMode")}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {t("semanticErrorRoutingModeDesc")}
+              </p>
+            </div>
+          </div>
+          <div className="pl-11">
+            <Select
+              value={semanticErrorRoutingMode}
+              onValueChange={(value) =>
+                setSemanticErrorRoutingMode(value as SemanticErrorRoutingMode)
+              }
+              disabled={isPending}
+            >
+              <SelectTrigger id="semantic-error-routing-mode" className={selectTriggerClassName}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="legacy">
+                  {t("semanticErrorRoutingModeOptions.legacy")}
+                </SelectItem>
+                <SelectItem value="shadow">
+                  {t("semanticErrorRoutingModeOptions.shadow")}
+                </SelectItem>
+                <SelectItem value="enforce">
+                  {t("semanticErrorRoutingModeOptions.enforce")}
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>

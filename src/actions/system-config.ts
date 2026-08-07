@@ -27,6 +27,7 @@ import type {
   CodexPriorityBillingSource,
   FakeStreamingWhitelistEntry,
   ResponseFixerConfig,
+  SemanticErrorRoutingMode,
   StreamGateSettingMode,
   SystemSettings,
 } from "@/types/system-config";
@@ -106,6 +107,7 @@ export async function saveSystemSettings(formData: {
   allowNonConversationEndpointProviderFallback?: boolean;
   fakeStreamingWhitelist?: FakeStreamingWhitelistEntry[];
   streamGateMode?: StreamGateSettingMode;
+  semanticErrorRoutingMode?: SemanticErrorRoutingMode;
   affinityIgnoreClientSessionId?: boolean;
   replayEnabled?: boolean | null;
   cacheEffectivenessEnabled?: boolean | null;
@@ -198,6 +200,7 @@ export async function saveSystemSettings(formData: {
         validated.allowNonConversationEndpointProviderFallback,
       fakeStreamingWhitelist: validated.fakeStreamingWhitelist,
       streamGateMode: validated.streamGateMode,
+      semanticErrorRoutingMode: validated.semanticErrorRoutingMode,
       affinityIgnoreClientSessionId: validated.affinityIgnoreClientSessionId,
       replayEnabled: validated.replayEnabled,
       cacheEffectivenessEnabled: validated.cacheEffectivenessEnabled,

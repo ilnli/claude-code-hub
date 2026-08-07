@@ -88,7 +88,7 @@ vi.mock("@/components/ui/select", () => ({
   // Drivable native <select> so tests can set the category and submit successfully.
   Select: ({ value, onValueChange }: any) => (
     <select
-      data-testid="category-select"
+      data-testid="rule-select"
       value={value ?? ""}
       onChange={(e) => onValueChange?.(e.target.value)}
     >
@@ -101,6 +101,10 @@ vi.mock("@/components/ui/select", () => ({
         "parameter_error",
         "invalid_request",
         "cache_limit",
+        "request_terminal",
+        "endpoint_capability_gap",
+        "provider_capability_gap",
+        "provider_failure",
       ].map((c) => (
         <option key={c} value={c}>
           {c}
@@ -134,6 +138,7 @@ const rule: ErrorRule = {
   description: "test rule",
   overrideResponse: null,
   overrideStatusCode: null,
+  routingDisposition: "request_terminal",
   isEnabled: true,
   isDefault: false,
   priority: 0,
@@ -263,12 +268,11 @@ describe("error rules list refresh after mutation", () => {
         "boom",
         "input"
       );
-      setControlledValue(
-        container.querySelector('[data-testid="category-select"]') as HTMLSelectElement,
-        window.HTMLSelectElement,
-        "prompt_limit",
-        "change"
-      );
+      const selects = container.querySelectorAll(
+        '[data-testid="rule-select"]'
+      ) as NodeListOf<HTMLSelectElement>;
+      setControlledValue(selects[0], window.HTMLSelectElement, "request_terminal", "change");
+      setControlledValue(selects[1], window.HTMLSelectElement, "prompt_limit", "change");
     });
 
     const form = container.querySelector("form") as HTMLFormElement;

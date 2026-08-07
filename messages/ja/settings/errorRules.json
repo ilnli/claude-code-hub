@@ -32,7 +32,18 @@
   "deleteFailed": "削除に失敗しました",
   "deleteSuccess": "エラールールが正常に削除されました",
   "description": "自動再試行を行わないクライアントエラールールを管理します。設定後、ルールに一致するエラーは再試行せずユーザーに直接返され、プロバイダーのサーキットブレーカーにもカウントされません。",
+  "dispositions": {
+    "endpoint_capability_gap": "エンドポイント機能不足",
+    "legacy": "旧ルール（未レビュー）",
+    "provider_capability_gap": "プロバイダー機能不足",
+    "provider_failure": "プロバイダー障害",
+    "request_terminal": "リクエスト停止（再試行なし）"
+  },
   "dialog": {
+    "routingDispositionHint": "ルール一致後の再試行、プロバイダー切替、ヘルス集計を制御します。",
+    "routingDispositionLabel": "ルーティング処置 *",
+    "routingDispositionPlaceholder": "ルーティング処置を選択",
+    "routingDispositionRequired": "ルーティング処置を選択してください",
     "addDescription": "エラーメッセージの正規表現パターンを設定します。マッチしたエラーはリトライ不可能なクライアントエラーとして識別されます。",
     "addTitle": "エラールールを追加",
     "categoryHint": "分類管理と統計のためのエラーカテゴリを選択",
@@ -127,6 +138,7 @@
     "status": "ステータス"
   },
   "tester": {
+    "routingDisposition": "ルーティング処置",
     "category": "カテゴリ",
     "description": "エラーメッセージを入力して、設定済みルールに一致するかと最終的な返却内容を確認します。",
     "finalResponse": "オーバーライドレスポンス",

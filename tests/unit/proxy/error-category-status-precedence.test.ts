@@ -34,6 +34,7 @@ vi.mock("@/repository/error-rules", () => ({
 }));
 
 import { ErrorCategory, ProxyError, categorizeErrorAsync } from "@/app/v1/_lib/proxy/errors";
+import { StreamPrecommitError } from "@/app/v1/_lib/proxy/stream-gate/stream-content-gate";
 
 describe("categorizeErrorAsync - upstream HTTP status precedence", () => {
   it("should treat real upstream 503 messages with fake-200-like prefixes as PROVIDER_ERROR", async () => {
@@ -95,6 +96,53 @@ describe("categorizeErrorAsync - upstream HTTP status precedence", () => {
 
   it("should keep native transport errors as SYSTEM_ERROR", async () => {
     expect(await categorizeErrorAsync(new Error("fetch failed"))).toBe(ErrorCategory.SYSTEM_ERROR);
+  });
+
+  it("should stop retries for context_length_exceeded carried by a stream-gate 502", async () => {
+    const error = new StreamPrecommitError("gate_error", {
+      family: "anthropic",
+      providerId: 1,
+      providerName: "test-provider",
+      frameData: JSON.stringify({
+        type: "error",
+        error: {
+          type: "invalid_request_error",
+          code: "context_length_exceeded",
+          message: "Your input exceeds the context window of this model.",
+          param: "input",
+        },
+      }),
+    });
+
+    expect(await categorizeErrorAsync(error)).toBe(ErrorCategory.NON_RETRYABLE_CLIENT_ERROR);
+  });
+
+  it("should keep an unproven generic invalid request as a provider failure", async () => {
+    const error = new ProxyError("Invalid request", 502, {
+      body: JSON.stringify({
+        error: { type: "invalid_request_error", code: "", message: "Invalid request" },
+      }),
+      origin: "upstream_http",
+      originalStatusCode: 502,
+    });
+
+    expect(await categorizeErrorAsync(error)).toBe(ErrorCategory.PROVIDER_ERROR);
+  });
+
+  it("should retry another endpoint for the Invalid URL capability signature", async () => {
+    const error = new ProxyError("Invalid URL (POST /v1/alpha/search)", 404, {
+      body: JSON.stringify({
+        error: {
+          type: "invalid_request_error",
+          code: "",
+          message: "Invalid URL (POST /v1/alpha/search)",
+        },
+      }),
+      origin: "upstream_http",
+      originalStatusCode: 404,
+    });
+
+    expect(await categorizeErrorAsync(error)).toBe(ErrorCategory.ENDPOINT_CAPABILITY_GAP);
   });
 
   it("should keep fake-200 fallback 502 validation errors non-retryable", async () => {

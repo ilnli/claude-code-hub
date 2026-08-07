@@ -6,6 +6,7 @@ import { errorRules } from "@/drizzle/schema";
 import { emitErrorRulesUpdated } from "@/lib/emit-event";
 import { validateErrorOverrideResponse } from "@/lib/error-override-validator";
 import { logger } from "@/lib/logger";
+import { isRoutingDisposition, type RoutingDisposition } from "@/types/routing-error";
 
 /**
  * Claude API 错误格式
@@ -67,6 +68,8 @@ export interface ErrorRule {
   overrideResponse: ErrorOverrideResponse | null;
   /** 覆写状态码：null 表示透传上游状态码 */
   overrideStatusCode: number | null;
+  /** null 表示迁移前尚未审查的 legacy 自定义规则。 */
+  routingDisposition: RoutingDisposition | null;
   isEnabled: boolean;
   isDefault: boolean;
   priority: number;
@@ -100,6 +103,13 @@ function sanitizeOverrideResponse(raw: unknown, context: string): ErrorOverrideR
   return raw as ErrorOverrideResponse;
 }
 
+function sanitizeRoutingDisposition(raw: unknown, context: string): RoutingDisposition | null {
+  if (raw === null || raw === undefined) return null;
+  if (isRoutingDisposition(raw)) return raw;
+  logger.warn(`[ErrorRulesRepository] Invalid routingDisposition in ${context}`);
+  return null;
+}
+
 /**
  * 获取所有启用的错误规则（用于缓存加载和运行时检测）
  */
@@ -120,6 +130,10 @@ export async function getActiveErrorRules(): Promise<ErrorRule[]> {
       `getActiveErrorRules id=${r.id}`
     ),
     overrideStatusCode: r.overrideStatusCode,
+    routingDisposition: sanitizeRoutingDisposition(
+      r.routingDisposition,
+      `getActiveErrorRules id=${r.id}`
+    ),
     isEnabled: r.isEnabled,
     isDefault: r.isDefault,
     priority: r.priority,
@@ -151,6 +165,10 @@ export async function getErrorRuleById(id: number): Promise<ErrorRule | null> {
       `getErrorRuleById id=${result.id}`
     ),
     overrideStatusCode: result.overrideStatusCode,
+    routingDisposition: sanitizeRoutingDisposition(
+      result.routingDisposition,
+      `getErrorRuleById id=${result.id}`
+    ),
     isEnabled: result.isEnabled,
     isDefault: result.isDefault,
     priority: result.priority,
@@ -175,6 +193,10 @@ export async function getAllErrorRules(): Promise<ErrorRule[]> {
     description: r.description,
     overrideResponse: sanitizeOverrideResponse(r.overrideResponse, `getAllErrorRules id=${r.id}`),
     overrideStatusCode: r.overrideStatusCode,
+    routingDisposition: sanitizeRoutingDisposition(
+      r.routingDisposition,
+      `getAllErrorRules id=${r.id}`
+    ),
     isEnabled: r.isEnabled,
     isDefault: r.isDefault,
     priority: r.priority,
@@ -193,6 +215,7 @@ export async function createErrorRule(data: {
   description?: string;
   overrideResponse?: ErrorOverrideResponse | null;
   overrideStatusCode?: number | null;
+  routingDisposition: RoutingDisposition;
   priority?: number;
 }): Promise<ErrorRule> {
   const [result] = await db
@@ -204,6 +227,7 @@ export async function createErrorRule(data: {
       description: data.description,
       overrideResponse: data.overrideResponse,
       overrideStatusCode: data.overrideStatusCode ?? null,
+      routingDisposition: data.routingDisposition,
       priority: data.priority ?? 0,
     })
     .returning();
@@ -219,6 +243,10 @@ export async function createErrorRule(data: {
       `createErrorRule id=${result.id}`
     ),
     overrideStatusCode: result.overrideStatusCode,
+    routingDisposition: sanitizeRoutingDisposition(
+      result.routingDisposition,
+      `createErrorRule id=${result.id}`
+    ),
     isEnabled: result.isEnabled,
     isDefault: result.isDefault,
     priority: result.priority,
@@ -239,6 +267,7 @@ export async function updateErrorRule(
     description: string;
     overrideResponse: ErrorOverrideResponse | null;
     overrideStatusCode: number | null;
+    routingDisposition: RoutingDisposition;
     isEnabled: boolean;
     /** 是否为默认规则（编辑默认规则时会自动设为 false） */
     isDefault: boolean;
@@ -269,6 +298,10 @@ export async function updateErrorRule(
       `updateErrorRule id=${result.id}`
     ),
     overrideStatusCode: result.overrideStatusCode,
+    routingDisposition: sanitizeRoutingDisposition(
+      result.routingDisposition,
+      `updateErrorRule id=${result.id}`
+    ),
     isEnabled: result.isEnabled,
     isDefault: result.isDefault,
     priority: result.priority,
@@ -289,7 +322,7 @@ export async function deleteErrorRule(id: number): Promise<boolean> {
 /**
  * 默认错误规则定义
  */
-const DEFAULT_ERROR_RULES = [
+const DEFAULT_ERROR_RULES_BASE = [
   {
     pattern: "Missing or invalid 'alt' query parameter. Expected 'alt=sse'",
     category: "parameter_error",
@@ -773,22 +806,6 @@ const DEFAULT_ERROR_RULES = [
     },
   },
   {
-    pattern: "非法请求|illegal request|invalid request",
-    category: "invalid_request",
-    description: "Invalid request format",
-    matchType: "regex" as const,
-    isDefault: true,
-    isEnabled: true,
-    priority: 50,
-    overrideResponse: {
-      type: "error",
-      error: {
-        type: "invalid_request",
-        message: "请求格式非法，请检查请求结构是否符合 API 规范",
-      },
-    },
-  },
-  {
     pattern: "(cache_control.*(limit|maximum).*blocks|(maximum|limit).*blocks.*cache_control)",
     category: "cache_limit",
     description: "Cache control limit exceeded",
@@ -875,7 +892,19 @@ const DEFAULT_ERROR_RULES = [
       },
     },
   },
-];
+] as const;
+
+const PROVIDER_CAPABILITY_RULE_PATTERNS = new Set<string>([
+  "Missing or invalid 'alt' query parameter. Expected 'alt=sse'",
+  "pricing plan does not include Long Context",
+]);
+
+const DEFAULT_ERROR_RULES = DEFAULT_ERROR_RULES_BASE.map((rule) => ({
+  ...rule,
+  routingDisposition: PROVIDER_CAPABILITY_RULE_PATTERNS.has(rule.pattern)
+    ? ("provider_capability_gap" as const)
+    : ("request_terminal" as const),
+}));
 
 /**
  * 同步默认错误规则（推荐使用）
@@ -903,7 +932,7 @@ export async function syncDefaultErrorRules(): Promise<{
   await db.transaction(async (tx) => {
     // 获取所有默认规则的 patterns
     const defaultPatterns = DEFAULT_ERROR_RULES.map((r) => r.pattern);
-    const defaultPatternSet = new Set(defaultPatterns);
+    const defaultPatternSet = new Set<string>(defaultPatterns);
 
     // 一次查询获取数据库中所有默认规则（isDefault=true）
     const allDefaultRulesInDb = await tx.query.errorRules.findMany({
@@ -959,6 +988,7 @@ export async function syncDefaultErrorRules(): Promise<{
               ("overrideStatusCode" in rule
                 ? (rule as { overrideStatusCode?: number | null }).overrideStatusCode
                 : null) ?? null,
+            routingDisposition: rule.routingDisposition,
             isEnabled: rule.isEnabled,
             isDefault: true,
             priority: rule.priority,

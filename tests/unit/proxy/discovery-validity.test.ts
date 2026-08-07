@@ -39,7 +39,7 @@ describe("discovery validity", () => {
   it("keeps wrapped Gemini errors terminal", () => {
     expect(
       classifyDiscoveryChunk('{"response":{"error":{"message":"upstream failed"}}}', "gemini")
-    ).toEqual({ ready: false, terminal: true, error: true });
+    ).toMatchObject({ ready: false, terminal: true, error: true });
   });
 
   it("keeps stateless readiness when content and DONE share a chunk", () => {
@@ -61,8 +61,30 @@ describe("discovery validity", () => {
   });
   it("rejects errors even when a later chunk contains content", () => {
     const parser = new DiscoveryValidityParser("openai-responses");
-    expect(parser.push('{"type":"response.failed","error":{"message":"no"}}').error).toBe(true);
+    expect(parser.push('{"type":"response.failed","error":{"message":"no"}}')).toMatchObject({
+      error: true,
+      errorFrameData: '{"type":"response.failed","error":{"message":"no"}}',
+    });
     expect(parser.push('{"type":"response.output_text.delta","delta":"late"}').ready).toBe(false);
+  });
+
+  it("retains the structured request error frame for semantic routing", () => {
+    const parser = new DiscoveryValidityParser("anthropic");
+    const payload = JSON.stringify({
+      type: "error",
+      error: {
+        type: "invalid_request_error",
+        code: "context_length_exceeded",
+        message: "Your input exceeds the context window of this model.",
+      },
+    });
+
+    expect(parser.push(`data: ${payload}\n\n`)).toMatchObject({
+      ready: false,
+      terminal: true,
+      error: true,
+      errorFrameData: payload,
+    });
   });
 
   it.each([
@@ -86,7 +108,7 @@ describe("discovery validity", () => {
         '{"type":"response.output_text.delta","delta":"must not win","failed":true}',
         "openai-responses"
       )
-    ).toEqual({ ready: false, terminal: true, error: true });
+    ).toMatchObject({ ready: false, terminal: true, error: true });
   });
 
   it("does not promote empty tool or content events", () => {
@@ -153,7 +175,7 @@ describe("discovery validity", () => {
     ).toMatchObject({ ready: false, error: false });
     expect(
       parser.push('data: {"type":"response.failed","error":{"message":"upstream failed"}}\n\n')
-    ).toEqual({ ready: false, terminal: true, error: true });
+    ).toMatchObject({ ready: false, terminal: true, error: true });
   });
 
   it("accepts only an explicit non-empty Responses tool payload", () => {

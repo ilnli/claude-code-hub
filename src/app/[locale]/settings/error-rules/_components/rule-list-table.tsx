@@ -142,6 +142,11 @@ export function RuleListTable({ rules }: RuleListTableProps) {
                         {rule.category}
                       </Badge>
                     )}
+                    <Badge variant="outline" className="text-[10px] border-border">
+                      {rule.routingDisposition
+                        ? t(`errorRules.dispositions.${rule.routingDisposition}`)
+                        : t("errorRules.dispositions.legacy")}
+                    </Badge>
                   </div>
                   {rule.description && (
                     <p className="text-xs text-muted-foreground mt-1 line-clamp-1">

@@ -9,11 +9,18 @@
 import { isDbPoolAdmissionError } from "@/drizzle/admitted-client";
 import { getEnvConfig } from "@/lib/config/env.schema";
 import { type ErrorDetectionResult, errorRuleDetector } from "@/lib/error-rule-detector";
+import { logger } from "@/lib/logger";
+import { getCachedProxyRuntimeSettings } from "@/lib/system-settings/proxy-runtime";
 import { redactJsonString } from "@/lib/utils/message-redaction";
 import { sanitizeErrorTextForDetail } from "@/lib/utils/upstream-error-detection";
 import type { ErrorOverrideResponse } from "@/repository/error-rules";
 import type { ProviderChainItem } from "@/types/message";
 import { RESERVED_INTERNAL_HEADERS } from "../responses-ws/internal-secret";
+import {
+  classifyBuiltInRoutingError,
+  classifyReviewedRuleRoutingError,
+  rememberRoutingErrorClassification,
+} from "./routing-error-classifier";
 import type { ProxySession } from "./session";
 
 /** Marker message for the synthetic terminal error emitted when every provider fails. */
@@ -71,6 +78,11 @@ export class ProxyError extends Error {
        * 仅供标准客户端错误响应在系统开关允许时使用，不进入详细日志/规则匹配。
        */
       safeClientMessageCandidate?: string;
+
+      /** Error origin used to distinguish a real upstream status from a local carrier status. */
+      origin?: "upstream_http" | "synthetic_fake_200" | "stream_gate_precommit";
+      /** Real upstream HTTP status before CCH synthesized a carrier error status. */
+      originalStatusCode?: number;
     },
     isLocalAbort: boolean = false
   ) {
@@ -131,6 +143,8 @@ export class ProxyError extends Error {
       providerId: provider.id,
       providerName: provider.name,
       requestId,
+      origin: "upstream_http",
+      originalStatusCode: response.status,
     });
   }
 
@@ -560,6 +574,8 @@ export enum ErrorCategory {
   NON_RETRYABLE_CLIENT_ERROR, // 客户端输入错误（Prompt 超限、内容过滤、PDF 限制、Thinking 格式、参数缺失/额外参数、非法请求）→ 不计入熔断器 + 不重试 + 直接返回
   RESOURCE_NOT_FOUND, // 上游 404 错误 → 不计入熔断器 + 直接切换供应商
   LOCAL_OVERLOAD, // 本地数据库等 admission 过载 → 不计入任何熔断器 + 不重试/切换供应商
+  ENDPOINT_CAPABILITY_GAP, // 当前 Endpoint 不支持该合法请求 → 换 Endpoint，再换 Provider，不计健康
+  PROVIDER_CAPABILITY_GAP, // 当前 Provider 不支持该合法请求 → 换 Provider，不计健康
 }
 
 /**
@@ -990,32 +1006,42 @@ export function isEmptyResponseError(error: unknown): error is EmptyResponseErro
  * @returns 错误分类（CLIENT_ABORT、LOCAL_OVERLOAD、NON_RETRYABLE_CLIENT_ERROR、PROVIDER_ERROR 或 SYSTEM_ERROR）
  */
 export async function categorizeErrorAsync(error: Error): Promise<ErrorCategory> {
-  // 优先级 1: 真实上游 HTTP 5xx 始终表示供应商故障
-  // 必须先于基于 message/cause 的中断与传输错误启发式，避免上游正文误导分类。
-  // FAKE_200_* 的 5xx 是 CCH 根据 HTTP 200 响应体合成的，不能作为权威传输状态。
-  if (
-    error instanceof ProxyError &&
-    error.upstreamError?.isSyntheticFake200 !== true &&
-    error.statusCode >= 500 &&
-    error.statusCode < 600
-  ) {
-    return ErrorCategory.PROVIDER_ERROR;
+  // Core semantic evidence is independent of transport status, database availability,
+  // and rollout mode. This prevents a synthetic or contradictory 5xx from turning a
+  // request-owned failure into provider retries and circuit writes.
+  const builtInClassification = classifyBuiltInRoutingError(error);
+  if (builtInClassification?.disposition === "request_terminal") {
+    return ErrorCategory.NON_RETRYABLE_CLIENT_ERROR;
+  }
+  if (builtInClassification?.disposition === "endpoint_capability_gap") {
+    return ErrorCategory.ENDPOINT_CAPABILITY_GAP;
+  }
+  if (builtInClassification?.disposition === "provider_capability_gap") {
+    return ErrorCategory.PROVIDER_CAPABILITY_GAP;
   }
 
-  // 优先级 2: 客户端中断检测 - 使用统一的精确检测函数
-  if (isClientAbortError(error)) {
+  const isRealUpstreamServerError =
+    error instanceof ProxyError &&
+    error.upstreamError?.isSyntheticFake200 !== true &&
+    error.upstreamError?.origin !== "synthetic_fake_200" &&
+    error.upstreamError?.origin !== "stream_gate_precommit" &&
+    error.statusCode >= 500 &&
+    error.statusCode < 600;
+
+  // Source-aware local outcomes always outrank administrator-authored text rules.
+  if (!isRealUpstreamServerError && isClientAbortError(error)) {
     return ErrorCategory.CLIENT_ABORT; // 客户端主动中断
   }
 
-  // 优先级 3: 本地 DB admission 过载。Drizzle 会把底层错误包在 cause 中，
+  // 本地 DB admission 过载。Drizzle 会把底层错误包在 cause 中，
   // 必须在网络/规则分类前识别，避免重试上游或惩罚 Provider/endpoint circuit。
   if (isDbPoolAdmissionError(error)) {
     return ErrorCategory.LOCAL_OVERLOAD;
   }
 
-  // 优先级 4: Native transport errors — must not be matched by error rules
+  // Native transport errors must not be matched by error rules.
   // These are always SYSTEM_ERROR regardless of message content
-  if (isTransportError(error)) {
+  if (!isRealUpstreamServerError && isTransportError(error)) {
     return ErrorCategory.SYSTEM_ERROR;
   }
 
@@ -1023,7 +1049,7 @@ export async function categorizeErrorAsync(error: Error): Promise<ErrorCategory>
   // gap. The request may still succeed on another Provider, so classify this exact
   // 404 before broad client-input rules match the generic model_not_found wording.
   if (isProviderLocalModelUnavailableError(error)) {
-    return ErrorCategory.RESOURCE_NOT_FOUND;
+    return ErrorCategory.PROVIDER_CAPABILITY_GAP;
   }
 
   // Some upstream relays report their own storage-capacity protection as HTTP 400.
@@ -1033,9 +1059,42 @@ export async function categorizeErrorAsync(error: Error): Promise<ErrorCategory>
     return ErrorCategory.PROVIDER_ERROR;
   }
 
-  // 优先级 5: 不可重试的客户端输入错误检测（白名单模式）
-  // 使用异步版本确保错误规则已加载
-  if (await isNonRetryableClientErrorAsync(error)) {
+  const detectionResult = await detectErrorRuleOnceAsync(error);
+  const reviewedClassification = classifyReviewedRuleRoutingError(error, detectionResult);
+  const routingMode = getCachedProxyRuntimeSettings()?.semanticErrorRoutingMode ?? "shadow";
+
+  if (reviewedClassification && routingMode === "enforce") {
+    rememberRoutingErrorClassification(error, reviewedClassification);
+    switch (reviewedClassification.disposition) {
+      case "request_terminal":
+        return ErrorCategory.NON_RETRYABLE_CLIENT_ERROR;
+      case "endpoint_capability_gap":
+        return ErrorCategory.ENDPOINT_CAPABILITY_GAP;
+      case "provider_capability_gap":
+        return ErrorCategory.PROVIDER_CAPABILITY_GAP;
+      case "provider_failure":
+        return ErrorCategory.PROVIDER_ERROR;
+    }
+  }
+
+  if (reviewedClassification && routingMode === "shadow") {
+    logger.info("[RoutingErrorClassifier] Shadow classification difference candidate", {
+      disposition: reviewedClassification.disposition,
+      evidenceSource: reviewedClassification.evidenceSource,
+      matchedRuleId: reviewedClassification.matchedRuleId,
+      originalStatusCode: reviewedClassification.originalStatusCode,
+      syntheticStatusCode: reviewedClassification.syntheticStatusCode,
+    });
+  }
+
+  // Unproven real upstream 5xx remains a provider failure. Reviewed rules can
+  // override this only in enforce mode; legacy custom rules never gain that authority.
+  if (isRealUpstreamServerError) {
+    return ErrorCategory.PROVIDER_ERROR;
+  }
+
+  // Legacy behavior for non-5xx matches remains unchanged in legacy and shadow modes.
+  if (detectionResult.matched) {
     return ErrorCategory.NON_RETRYABLE_CLIENT_ERROR; // 客户端输入错误
   }
 

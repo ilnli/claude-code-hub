@@ -5,7 +5,15 @@
   "section": {
     "title": "错误规则列表"
   },
+  "dispositions": {
+    "endpoint_capability_gap": "端点能力缺口",
+    "legacy": "旧规则（未审查）",
+    "provider_capability_gap": "供应商能力缺口",
+    "provider_failure": "供应商故障",
+    "request_terminal": "终止请求（不重试）"
+  },
   "tester": {
+    "routingDisposition": "路由处置",
     "title": "错误规则测试",
     "description": "输入错误消息，检查是否命中已配置的规则以及最终返回给用户的内容。",
     "inputLabel": "测试错误消息",
@@ -46,6 +54,10 @@
   "emptyState": "暂无错误规则，点击右上角\"添加错误规则\"开始配置。",
   "confirmDelete": "确定要删除错误规则\"{pattern}\"吗？",
   "dialog": {
+    "routingDispositionHint": "控制规则命中后的重试、供应商切换和健康度记账行为。",
+    "routingDispositionLabel": "路由处置 *",
+    "routingDispositionPlaceholder": "选择路由处置",
+    "routingDispositionRequired": "请选择路由处置",
     "addTitle": "添加错误规则",
     "addDescription": "配置错误消息正则模式，匹配的错误将被识别为不可重试的客户端错误。",
     "editTitle": "编辑错误规则",

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import { ProxyErrorHandler } from "@/app/v1/_lib/proxy/error-handler";
 import { ProxyError, RateLimitError } from "@/app/v1/_lib/proxy/errors";
 import { ProxySession } from "@/app/v1/_lib/proxy/session";
+import { StreamPrecommitError } from "@/app/v1/_lib/proxy/stream-gate/stream-content-gate";
 import type { ErrorDetectionResult } from "@/lib/error-rule-detector";
 import type { Provider } from "@/types/provider";
 
@@ -215,5 +216,89 @@ describe("ProxyErrorHandler.handle terminal status", () => {
     expect(response.headers.get("X-RateLimit-Remaining")).toBe("8");
     expect(response.headers.get("X-RateLimit-Reset")).toBe("1776864600");
     expect(response.headers.get("Retry-After")).toBe("0");
+  });
+
+  test.each([
+    { format: "claude" as const, endpoint: "/v1/messages" },
+    { format: "openai" as const, endpoint: "/v1/chat/completions" },
+    { format: "response" as const, endpoint: "/v1/responses" },
+    { format: "gemini" as const, endpoint: "/v1beta/models/test:streamGenerateContent" },
+  ])("returns a stable context error envelope for $format", async ({ format }) => {
+    const session = await createSession();
+    session.setOriginalFormat(format);
+    const error = new StreamPrecommitError("gate_error", {
+      family: format === "claude" ? "anthropic" : format === "gemini" ? "gemini" : "openai-chat",
+      providerId: 7,
+      providerName: "provider-a",
+      frameData: JSON.stringify({
+        type: "error",
+        error: {
+          type: "invalid_request_error",
+          code: "context_length_exceeded",
+          message: "Your input exceeds the context window of this model.",
+          param: "input",
+        },
+      }),
+    });
+
+    const response = await ProxyErrorHandler.handle(session, error);
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    if (format === "gemini") {
+      expect(body).toMatchObject({
+        error: {
+          code: 400,
+          status: "INVALID_ARGUMENT",
+          details: [{ reason: "context_length_exceeded", metadata: { param: "input" } }],
+        },
+      });
+    } else {
+      expect(body.error).toMatchObject({
+        type: "invalid_request_error",
+        code: "context_length_exceeded",
+        param: "input",
+      });
+      if (format === "claude") expect(body.type).toBe("error");
+    }
+  });
+
+  test("rejects a 5xx body/status override for a core request error", async () => {
+    mocks.detectAsync.mockResolvedValue({
+      matched: true,
+      overrideStatusCode: 502,
+      overrideResponse: {
+        error: {
+          type: "server_error",
+          code: "masked_provider_failure",
+          message: "custom context guidance",
+        },
+      },
+    });
+    const session = await createSession();
+    session.setOriginalFormat("openai");
+    const error = new ProxyError("Provider returned 502", 502, {
+      body: JSON.stringify({
+        error: {
+          type: "invalid_request_error",
+          code: "context_length_exceeded",
+          message: "Your input exceeds the context window of this model.",
+          param: "input",
+        },
+      }),
+      origin: "upstream_http",
+      originalStatusCode: 502,
+    });
+
+    const response = await ProxyErrorHandler.handle(session, error);
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toMatchObject({
+      type: "invalid_request_error",
+      code: "context_length_exceeded",
+      message: "custom context guidance",
+      param: "input",
+    });
   });
 });

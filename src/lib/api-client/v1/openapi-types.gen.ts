@@ -17656,6 +17656,11 @@ export interface operations {
                          * @enum {string}
                          */
                         streamGateMode: "off" | "shadow" | "enforce";
+                        /**
+                         * @description Rollout mode for reviewed semantic error rules. Core request errors are always enforced.
+                         * @enum {string}
+                         */
+                        semanticErrorRoutingMode: "legacy" | "shadow" | "enforce";
                         /** @description Whether fingerprintable requests force longest-prefix affinity for provider stickiness, skipping client session id binding. */
                         affinityIgnoreClientSessionId: boolean;
                         /** @description Request replay (response caching and upstream connection reuse) override. Null follows the ENABLE_REQUEST_REPLAY environment variable. */
@@ -17946,6 +17951,11 @@ export interface operations {
                      * @enum {string}
                      */
                     streamGateMode?: "off" | "shadow" | "enforce";
+                    /**
+                     * @description Rollout mode for reviewed semantic error rules. Core request errors are always enforced.
+                     * @enum {string}
+                     */
+                    semanticErrorRoutingMode?: "legacy" | "shadow" | "enforce";
                     /** @description Whether fingerprintable requests force longest-prefix affinity for provider stickiness, skipping client session id binding. */
                     affinityIgnoreClientSessionId?: boolean;
                     /** @description Request replay (response caching and upstream connection reuse) override. Null follows the ENABLE_REQUEST_REPLAY environment variable. */
@@ -18113,6 +18123,11 @@ export interface operations {
                          * @enum {string}
                          */
                         streamGateMode: "off" | "shadow" | "enforce";
+                        /**
+                         * @description Rollout mode for reviewed semantic error rules. Core request errors are always enforced.
+                         * @enum {string}
+                         */
+                        semanticErrorRoutingMode: "legacy" | "shadow" | "enforce";
                         /** @description Whether fingerprintable requests force longest-prefix affinity for provider stickiness, skipping client session id binding. */
                         affinityIgnoreClientSessionId: boolean;
                         /** @description Request replay (response caching and upstream connection reuse) override. Null follows the ENABLE_REQUEST_REPLAY environment variable. */
@@ -19735,6 +19750,11 @@ export interface operations {
                             } | null;
                             /** @description Optional status override. */
                             overrideStatusCode: number | null;
+                            /**
+                             * @description Reviewed routing disposition, or null for a legacy unreviewed custom rule.
+                             * @enum {string|null}
+                             */
+                            routingDisposition: "request_terminal" | "endpoint_capability_gap" | "provider_capability_gap" | "provider_failure" | null;
                             /** @description Whether the rule is enabled. */
                             isEnabled: boolean;
                             /** @description Whether this is a built-in default rule. */
@@ -19938,6 +19958,11 @@ export interface operations {
                     } | null;
                     /** @description Optional status override. */
                     overrideStatusCode?: number | null;
+                    /**
+                     * @description Routing action authorized by the reviewed rule.
+                     * @enum {string}
+                     */
+                    routingDisposition: "request_terminal" | "endpoint_capability_gap" | "provider_capability_gap" | "provider_failure";
                 };
             };
         };
@@ -19968,6 +19993,11 @@ export interface operations {
                         } | null;
                         /** @description Optional status override. */
                         overrideStatusCode: number | null;
+                        /**
+                         * @description Reviewed routing disposition, or null for a legacy unreviewed custom rule.
+                         * @enum {string|null}
+                         */
+                        routingDisposition: "request_terminal" | "endpoint_capability_gap" | "provider_capability_gap" | "provider_failure" | null;
                         /** @description Whether the rule is enabled. */
                         isEnabled: boolean;
                         /** @description Whether this is a built-in default rule. */
@@ -20539,6 +20569,11 @@ export interface operations {
                             } | null;
                             /** @description Matched override status code. */
                             overrideStatusCode: number | null;
+                            /**
+                             * @description Matched routing disposition.
+                             * @enum {string|null}
+                             */
+                            routingDisposition: "request_terminal" | "endpoint_capability_gap" | "provider_capability_gap" | "provider_failure" | null;
                         };
                         /** @description Final response override. */
                         finalResponse: {
@@ -20909,6 +20944,11 @@ export interface operations {
                     } | null;
                     /** @description Optional status override. */
                     overrideStatusCode?: number | null;
+                    /**
+                     * @description Routing action authorized by the reviewed rule.
+                     * @enum {string}
+                     */
+                    routingDisposition?: "request_terminal" | "endpoint_capability_gap" | "provider_capability_gap" | "provider_failure";
                     /** @description Whether the rule is enabled. */
                     isEnabled?: boolean;
                     /** @description Rule priority. */
@@ -20943,6 +20983,11 @@ export interface operations {
                         } | null;
                         /** @description Optional status override. */
                         overrideStatusCode: number | null;
+                        /**
+                         * @description Reviewed routing disposition, or null for a legacy unreviewed custom rule.
+                         * @enum {string|null}
+                         */
+                        routingDisposition: "request_terminal" | "endpoint_capability_gap" | "provider_capability_gap" | "provider_failure" | null;
                         /** @description Whether the rule is enabled. */
                         isEnabled: boolean;
                         /** @description Whether this is a built-in default rule. */

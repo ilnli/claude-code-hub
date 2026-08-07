@@ -8,6 +8,7 @@ import { validateErrorOverrideResponse } from "@/lib/error-override-validator";
 import { errorRuleDetector } from "@/lib/error-rule-detector";
 import { logger } from "@/lib/logger";
 import * as repo from "@/repository/error-rules";
+import { isRoutingDisposition, type RoutingDisposition } from "@/types/routing-error";
 import type { ActionResult } from "./types";
 
 /** 覆写状态码最小值 */
@@ -21,17 +22,21 @@ const OVERRIDE_STATUS_CODE_MAX = 599;
  * @param statusCode - 要验证的状态码
  * @returns 错误消息（如果验证失败）或 null（验证通过）
  */
-function validateOverrideStatusCodeRange(statusCode: number | null | undefined): string | null {
+function validateOverrideStatusCodeRange(
+  statusCode: number | null | undefined,
+  routingDisposition?: RoutingDisposition | null
+): string | null {
   if (statusCode === null || statusCode === undefined) {
     return null;
   }
 
+  const maxStatusCode = routingDisposition === "request_terminal" ? 499 : OVERRIDE_STATUS_CODE_MAX;
   if (
     !Number.isInteger(statusCode) ||
     statusCode < OVERRIDE_STATUS_CODE_MIN ||
-    statusCode > OVERRIDE_STATUS_CODE_MAX
+    statusCode > maxStatusCode
   ) {
-    return `覆写状态码必须是 ${OVERRIDE_STATUS_CODE_MIN}-${OVERRIDE_STATUS_CODE_MAX} 范围内的整数`;
+    return `覆写状态码必须是 ${OVERRIDE_STATUS_CODE_MIN}-${maxStatusCode} 范围内的整数`;
   }
 
   return null;
@@ -74,6 +79,7 @@ export async function createErrorRuleAction(data: {
   overrideResponse?: repo.ErrorOverrideResponse | null;
   /** 覆写状态码：null 表示透传上游状态码 */
   overrideStatusCode?: number | null;
+  routingDisposition: RoutingDisposition;
 }): Promise<ActionResult<repo.ErrorRule>> {
   try {
     const session = await getSession();
@@ -97,6 +103,10 @@ export async function createErrorRuleAction(data: {
         ok: false,
         error: "错误类别不能为空",
       };
+    }
+
+    if (!isRoutingDisposition(data.routingDisposition)) {
+      return { ok: false, error: "无效的路由处置" };
     }
 
     // 验证类别
@@ -159,7 +169,10 @@ export async function createErrorRuleAction(data: {
     }
 
     // 验证覆写状态码范围
-    const statusCodeError = validateOverrideStatusCodeRange(data.overrideStatusCode);
+    const statusCodeError = validateOverrideStatusCodeRange(
+      data.overrideStatusCode,
+      data.routingDisposition
+    );
     if (statusCodeError) {
       return {
         ok: false,
@@ -174,6 +187,7 @@ export async function createErrorRuleAction(data: {
       description: data.description,
       overrideResponse: data.overrideResponse ?? null,
       overrideStatusCode: data.overrideStatusCode ?? null,
+      routingDisposition: data.routingDisposition,
     });
 
     // 刷新缓存（事件广播，支持多 worker 同步）
@@ -222,6 +236,7 @@ export async function updateErrorRuleAction(
     overrideResponse: repo.ErrorOverrideResponse | null;
     /** 覆写状态码：null 表示透传上游状态码 */
     overrideStatusCode: number | null;
+    routingDisposition: RoutingDisposition;
     isEnabled: boolean;
     priority: number;
   }>
@@ -247,6 +262,10 @@ export async function updateErrorRuleAction(
     // 计算最终的 pattern 和 matchType
     const finalPattern = updates.pattern ?? currentRule.pattern;
     const finalMatchType = updates.matchType ?? currentRule.matchType;
+    const finalRoutingDisposition = updates.routingDisposition ?? currentRule.routingDisposition;
+    if (!finalRoutingDisposition || !isRoutingDisposition(finalRoutingDisposition)) {
+      return { ok: false, error: "编辑旧规则前必须选择路由处置" };
+    }
 
     // ReDoS (Regular Expression Denial of Service) 风险检测
     // 当最终结果是 regex 类型时，需要检查 pattern 安全性
@@ -284,7 +303,10 @@ export async function updateErrorRuleAction(
     }
 
     // 验证覆写状态码范围
-    const statusCodeError = validateOverrideStatusCodeRange(updates.overrideStatusCode);
+    const statusCodeError = validateOverrideStatusCodeRange(
+      updates.overrideStatusCode,
+      finalRoutingDisposition
+    );
     if (statusCodeError) {
       return {
         ok: false,
@@ -484,6 +506,7 @@ export async function testErrorRuleAction(input: { message: string }): Promise<
       matchType: "regex" | "contains" | "exact";
       overrideResponse: repo.ErrorOverrideResponse | null;
       overrideStatusCode: number | null;
+      routingDisposition: RoutingDisposition | null;
     };
     /** 最终返回给用户的响应体（经过运行时验证处理） */
     finalResponse: repo.ErrorOverrideResponse | null;
@@ -565,7 +588,10 @@ export async function testErrorRuleAction(input: { message: string }): Promise<
       }
 
       // 4. 验证状态码范围（与 error-handler.ts 运行时逻辑一致）
-      const statusCodeError = validateOverrideStatusCodeRange(detection.overrideStatusCode);
+      const statusCodeError = validateOverrideStatusCodeRange(
+        detection.overrideStatusCode,
+        detection.routingDisposition
+      );
       if (
         !statusCodeError &&
         detection.overrideStatusCode !== undefined &&
@@ -574,7 +600,7 @@ export async function testErrorRuleAction(input: { message: string }): Promise<
         finalStatusCode = detection.overrideStatusCode;
       } else if (statusCodeError) {
         warnings.push(
-          `覆写状态码 ${detection.overrideStatusCode} 非整数或超出有效范围（${OVERRIDE_STATUS_CODE_MIN}-${OVERRIDE_STATUS_CODE_MAX}），运行时将使用上游状态码`
+          `覆写状态码 ${detection.overrideStatusCode} 与路由处置不兼容，运行时将使用默认状态码`
         );
       }
     }
@@ -590,6 +616,7 @@ export async function testErrorRuleAction(input: { message: string }): Promise<
               matchType,
               overrideResponse: detection.overrideResponse ?? null,
               overrideStatusCode: detection.overrideStatusCode ?? null,
+              routingDisposition: detection.routingDisposition ?? null,
             }
           : undefined,
         finalResponse,

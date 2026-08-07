@@ -204,6 +204,7 @@ function createFallbackSettings(): SystemSettings {
     ipExtractionConfig: null,
     ipGeoLookupEnabled: true,
     streamGateMode: "enforce",
+    semanticErrorRoutingMode: "shadow",
     affinityIgnoreClientSessionId: true,
     replayEnabled: null,
     cacheEffectivenessEnabled: null,
@@ -285,6 +286,12 @@ const RECENT_COLUMN_LADDER: ReadonlyArray<{
   // 本层更新失败（仍有列缺失）时记录的告警
   updateWarn: string;
 }> = [
+  {
+    key: "semanticErrorRoutingMode",
+    column: systemSettings.semanticErrorRoutingMode,
+    selectWarn: "system_settings 缺少 semanticErrorRoutingMode，继续回退并使用 shadow 默认值。",
+    updateWarn: "system_settings 缺少 semanticErrorRoutingMode，跳过该字段后继续降级更新。",
+  },
   {
     key: "providerWeightAdjustmentIntervalMinutes",
     column: systemSettings.providerWeightAdjustmentIntervalMinutes,
@@ -922,6 +929,9 @@ export async function updateSystemSettings(
     // F1 流式内容门控模式（如果提供）
     if (payload.streamGateMode !== undefined) {
       updates.streamGateMode = payload.streamGateMode;
+    }
+    if (payload.semanticErrorRoutingMode !== undefined) {
+      updates.semanticErrorRoutingMode = payload.semanticErrorRoutingMode;
     }
 
     // 忽略客户端 Session ID 开关（如果提供）
