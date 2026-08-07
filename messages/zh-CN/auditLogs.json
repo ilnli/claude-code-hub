@@ -18,7 +18,8 @@
     "key": "密钥",
     "notification": "通知",
     "sensitive_word": "敏感词",
-    "model_price": "模型价格"
+    "model_price": "模型价格",
+    "recharge": "充值"
   },
   "columns": {
     "time": "时间",
@@ -98,6 +99,12 @@
       "sync_litellm": "同步云端价格表",
       "upsert": "更新模型价格",
       "delete": "删除模型价格"
+    },
+    "recharge": {
+      "order": { "create": "创建充值订单", "cancel": "取消充值订单", "expire": "充值订单过期", "confirm": "手动确认充值", "admin_cancel": "管理员取消充值订单", "close": "关闭充值订单", "retry": "重试充值结算" },
+      "config": { "update": "更新充值支付设置" },
+      "callback": { "accept": "接受充值支付回调", "reject": "拒绝充值支付回调" },
+      "settlement": { "complete": "完成充值结算", "failed": "充值结算失败" }
     }
   },
   "detail": {

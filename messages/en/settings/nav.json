@@ -11,6 +11,7 @@
   "notifications": "Notifications",
   "auditLogs": "Audit Logs",
   "prices": "Pricing",
+  "payment": "Payment",
   "providers": "Providers",
   "requestFilters": "Requests",
   "sensitiveWords": "Filters"

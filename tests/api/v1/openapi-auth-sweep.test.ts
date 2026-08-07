@@ -157,9 +157,15 @@ describe("v1 OpenAPI live auth sweep", () => {
       }
     }
 
-    // Only health and public status are intentionally public. Any new public
-    // endpoint must be added here explicitly so the security boundary is
-    // reviewed.
-    expect(publicOps.sort()).toEqual(["GET /api/v1/health", "GET /api/v1/public/status"].sort());
+    // Only health, public status, and the Alipay callback are intentionally
+    // public. Any new public endpoint must be added here explicitly so the
+    // security boundary is reviewed.
+    expect(publicOps.sort()).toEqual(
+      [
+        "GET /api/v1/health",
+        "GET /api/v1/public/status",
+        "POST /api/v1/recharge/alipay/notify",
+      ].sort()
+    );
   });
 });

@@ -1,0 +1,24 @@
+{
+  "title": "Recharge",
+  "key": "Recharge increases the total limit for key {name}",
+  "return": "Back",
+  "unavailable": { "title": "Recharge unavailable", "disabled": "Alipay recharge is not enabled.", "keyLimit": "This key needs a positive total limit before it can be recharged." },
+  "form": { "title": "Create recharge order", "amount": "Credit to add (USD)", "range": "Allowed range: {min} - {max} USD", "credit": "Credit added", "payable": "Alipay payment", "submit": "Generate payment QR code" },
+  "payment": { "title": "Scan with Alipay", "credit": "Credit added", "payable": "Amount due", "expires": "QR code expires in {minutes}:{seconds}", "cancel": "Cancel order" },
+  "processing": { "title": "Payment confirmed, applying credit", "description": "The order status refreshes every 10 seconds." },
+  "history": { "title": "Recharge history", "empty": "No recharge orders for this key" },
+  "status": { "pending": "Pending payment", "processing": "Paid / processing", "cancelled": "Cancelled", "completed": "Completed", "manual_closed": "Manually closed / refunded" },
+  "errors": { "load": "Failed to load recharge information", "create": "Failed to create payment order", "cancel": "Failed to cancel order" },
+  "messages": { "cancelled": "Order cancelled" },
+  "admin": {
+    "config": {
+      "title": "Alipay payment settings", "description": "Configure Alipay F2F, payment fees, and recharge limits.", "sectionTitle": "Alipay Face-to-Face", "sectionDescription": "Each save creates a version. Existing orders continue to verify callbacks with their original version.", "enabled": "Allow new recharge orders", "enabledDescription": "Disabling only blocks new orders. Existing callbacks and settlement continue.", "appId": "App ID", "productName": "Product name", "privateKey": "Application private key", "alipayPublicKey": "Alipay public key", "notifyDomain": "Notification domain override", "feeRate": "Payment fee rate (%)", "minCredit": "Minimum credit (USD)", "maxCredit": "Maximum credit (USD)", "configured": "Configured", "secretPlaceholder": "Leave blank to keep the current key", "activeVersion": "Active configuration version #{id}, created {time}", "save": "Save new version", "saved": "Payment settings saved", "loadFailed": "Failed to load payment settings", "saveFailed": "Failed to save payment settings"
+    },
+    "orders": {
+      "title": "Recharge orders", "description": "Review Alipay payment and credit settlement status.", "manualCount": "Needs attention: {count}", "refresh": "Refresh", "search": "Search order, transaction, user, or key", "allStatuses": "All statuses", "manualOnly": "Needs attention only", "orderNo": "Order", "owner": "User / key", "amount": "Credit / paid", "status": "Status", "createdAt": "Created", "empty": "No matching orders", "loadFailed": "Failed to load recharge orders"
+    },
+    "detail": {
+      "title": "Recharge order details", "manualTitle": "This order requires manual handling", "credit": "Credit", "paidAmount": "Alipay amount", "feeRate": "Fee rate", "user": "User", "key": "Key", "tradeNo": "Alipay transaction", "createdAt": "Created", "paidAt": "Paid", "completedAt": "Completed", "retryCount": "Automatic retries", "reason": "Handling reason", "confirm": "Confirm payment", "cancel": "Cancel order", "retry": "Retry settlement", "close": "Close / refunded", "reasonLabel": "Reason", "submit": "Confirm", "back": "Back", "done": "Order updated", "loadFailed": "Failed to load order details", "actionFailed": "Order action failed", "actions": { "confirm": "Confirm payment", "cancel": "Cancel order", "close": "Close / refunded" }
+    }
+  }
+}

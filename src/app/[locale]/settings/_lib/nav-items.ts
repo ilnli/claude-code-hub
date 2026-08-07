@@ -4,6 +4,7 @@ export type SettingsNavIconName =
   | "settings"
   | "activity"
   | "dollar-sign"
+  | "credit-card"
   | "server"
   | "shield-alert"
   | "alert-triangle"
@@ -40,6 +41,12 @@ export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
     iconName: "activity",
   },
   { href: "/settings/prices", labelKey: "nav.prices", label: "Prices", iconName: "dollar-sign" },
+  {
+    href: "/settings/payment",
+    labelKey: "nav.payment",
+    label: "Payment",
+    iconName: "credit-card",
+  },
   {
     href: "/settings/providers",
     labelKey: "nav.providers",

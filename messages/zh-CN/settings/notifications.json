@@ -156,6 +156,11 @@
     "description": "权重调整规则发生故障时每个故障阶段发送一次，并在恢复后再次通知",
     "enable": "启用权重调整通知"
   },
+  "rechargeSettlementAlert": {
+    "title": "充值结算告警",
+    "description": "订单三次自动结算重试均失败并需要人工处理时发送一次通知",
+    "enable": "启用充值结算告警"
+  },
   "form": {
     "save": "保存设置",
     "saving": "保存中...",

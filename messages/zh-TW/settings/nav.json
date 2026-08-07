@@ -11,6 +11,7 @@
   "notifications": "訊息推送",
   "auditLogs": "稽核日誌",
   "prices": "價格表",
+  "payment": "付款設定",
   "providers": "供應商",
   "requestFilters": "請求過濾",
   "sensitiveWords": "敏感詞"

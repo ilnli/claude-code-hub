@@ -572,17 +572,25 @@ export async function register() {
         "@/lib/user-statistics-reset/reset-queue"
       );
       startUserStatisticsResetQueue();
+      const { startRechargeSettlementScheduler } = await import("@/lib/recharge/scheduler");
+      startRechargeSettlementScheduler();
       (
         globalThis as typeof globalThis & {
           __CCH_STOP_BACKGROUND_QUEUES__?: () => Promise<void>;
         }
       ).__CCH_STOP_BACKGROUND_QUEUES__ = async () => {
-        const [{ stopCleanupQueue }, { stopNotificationQueue }, { stopUserStatisticsResetQueue }] =
-          await Promise.all([
-            import("@/lib/log-cleanup/cleanup-queue"),
-            import("@/lib/notification/notification-queue"),
-            import("@/lib/user-statistics-reset/reset-queue"),
-          ]);
+        const [
+          { stopCleanupQueue },
+          { stopNotificationQueue },
+          { stopUserStatisticsResetQueue },
+          { stopRechargeSettlementScheduler },
+        ] = await Promise.all([
+          import("@/lib/log-cleanup/cleanup-queue"),
+          import("@/lib/notification/notification-queue"),
+          import("@/lib/user-statistics-reset/reset-queue"),
+          import("@/lib/recharge/scheduler"),
+        ]);
+        stopRechargeSettlementScheduler();
         const results = await Promise.allSettled([
           stopCleanupQueue(),
           stopNotificationQueue(),

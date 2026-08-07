@@ -3,6 +3,7 @@
     "title": "我的使用量",
     "welcome": "歡迎，{name}",
     "documentation": "使用說明",
+    "recharge": "主動儲值",
     "logout": "登出",
     "keyLabel": "金鑰",
     "userLabel": "使用者",

@@ -13,6 +13,7 @@ import notifications from "./notifications.json";
 import providerChain from "./provider-chain.json";
 import providers from "./providers.json";
 import quota from "./quota.json";
+import recharge from "./recharge.json";
 import settings from "./settings";
 import ui from "./ui.json";
 import usage from "./usage.json";
@@ -33,6 +34,7 @@ export default {
   "provider-chain": providerChain,
   providers,
   quota,
+  recharge,
   myUsage,
   settings,
   ui,

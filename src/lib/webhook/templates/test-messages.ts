@@ -131,5 +131,26 @@ export function buildTestMessage(type: NotificationJobType, timezone?: string): 
         message: "Example failure",
         generatedAt: new Date().toISOString(),
       });
+    case "recharge-settlement-alert":
+      return {
+        header: {
+          title: "Recharge settlement requires manual handling",
+          level: "error",
+        },
+        sections: [
+          {
+            content: [
+              {
+                type: "fields",
+                items: [
+                  { label: "Order", value: "RC20260807000000000000000000" },
+                  { label: "Pending manual handling", value: "1" },
+                ],
+              },
+            ],
+          },
+        ],
+        timestamp: new Date(),
+      };
   }
 }

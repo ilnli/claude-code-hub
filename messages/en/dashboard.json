@@ -1010,6 +1010,8 @@
     "auditLogs": "Audit logs",
     "documentation": "Docs",
     "systemSettings": "Settings",
+    "recharge": "Recharge",
+    "rechargeOrders": "Recharge orders",
     "feedback": "Feedback",
     "login": "Login",
     "logout": "Logout"

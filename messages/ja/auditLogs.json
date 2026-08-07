@@ -18,7 +18,8 @@
     "key": "キー",
     "notification": "通知",
     "sensitive_word": "機密ワード",
-    "model_price": "モデル価格"
+    "model_price": "モデル価格",
+    "recharge": "チャージ"
   },
   "columns": {
     "time": "日時",
@@ -98,6 +99,12 @@
       "sync_litellm": "クラウド価格表の同期",
       "upsert": "モデル価格更新",
       "delete": "モデル価格削除"
+    },
+    "recharge": {
+      "order": { "create": "チャージ注文作成", "cancel": "チャージ注文キャンセル", "expire": "チャージ注文期限切れ", "confirm": "チャージ手動確認", "admin_cancel": "チャージ注文を管理者がキャンセル", "close": "チャージ注文終了", "retry": "チャージ決済を再試行" },
+      "config": { "update": "チャージ支払い設定更新" },
+      "callback": { "accept": "チャージ決済コールバック受付", "reject": "チャージ決済コールバック拒否" },
+      "settlement": { "complete": "チャージ決済完了", "failed": "チャージ決済失敗" }
     }
   },
   "detail": {

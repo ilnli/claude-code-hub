@@ -2,6 +2,7 @@
   "config": "配置",
   "statusPage": "状态页",
   "prices": "价格表",
+  "payment": "支付设置",
   "providers": "供应商",
   "sensitiveWords": "敏感词",
   "requestFilters": "请求过滤",

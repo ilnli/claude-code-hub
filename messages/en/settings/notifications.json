@@ -64,6 +64,11 @@
     "description": "Send one alert per weight adjustment fault episode and another when the rule recovers",
     "enable": "Enable weight adjustment alerts"
   },
+  "rechargeSettlementAlert": {
+    "title": "Recharge settlement alert",
+    "description": "Send one alert when all three automatic settlement retries fail and manual handling is required",
+    "enable": "Enable recharge settlement alerts"
+  },
   "dailyLeaderboard": {
     "description": "Send daily scheduled user consumption Top N leaderboard",
     "enable": "Enable Daily Leaderboard",

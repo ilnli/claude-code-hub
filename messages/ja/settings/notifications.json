@@ -64,6 +64,11 @@
     "description": "ウェイト調整ルールの障害エピソードごとに一度通知し、復旧時にも通知します",
     "enable": "ウェイト調整通知を有効化"
   },
+  "rechargeSettlementAlert": {
+    "title": "チャージ決済アラート",
+    "description": "3 回の自動再試行がすべて失敗し、手動対応が必要になったときに一度通知します",
+    "enable": "チャージ決済アラートを有効化"
+  },
   "dailyLeaderboard": {
     "description": "毎日定時でユーザー消費トップNランキングを送信",
     "enable": "日次ランキングを有効にする",

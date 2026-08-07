@@ -1011,6 +1011,8 @@
     "auditLogs": "Журнал аудита",
     "documentation": "Доки",
     "systemSettings": "Настройки",
+    "recharge": "Пополнение",
+    "rechargeOrders": "Заказы пополнения",
     "feedback": "Обратная связь",
     "login": "Вход",
     "logout": "Выход"

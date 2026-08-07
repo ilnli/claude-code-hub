@@ -8,6 +8,7 @@ import {
   Settings2,
   ShieldAlert,
   TrendingUp,
+  WalletCards,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { ComponentProps, ReactNode } from "react";
@@ -48,7 +49,8 @@ interface TypeConfig {
     | typeof DollarSign
     | typeof Database
     | typeof ShieldAlert
-    | typeof Scale;
+    | typeof Scale
+    | typeof WalletCards;
 }
 
 function getTypeConfig(type: NotificationType): TypeConfig {
@@ -94,6 +96,13 @@ function getTypeConfig(type: NotificationType): TypeConfig {
         iconBgColor: "bg-cyan-500/10",
         borderColor: "border-cyan-500/20 hover:border-cyan-500/30",
         IconComponent: Scale,
+      };
+    case "recharge_settlement_alert":
+      return {
+        iconColor: "text-red-400",
+        iconBgColor: "bg-red-500/10",
+        borderColor: "border-red-500/20 hover:border-red-500/30",
+        IconComponent: WalletCards,
       };
   }
 }
@@ -216,7 +225,8 @@ export function NotificationTypeCard({
     | "costAlertEnabled"
     | "cacheHitRateAlertEnabled"
     | "modelMismatchAlertEnabled"
-    | "weightAdjustmentAlertEnabled";
+    | "weightAdjustmentAlertEnabled"
+    | "rechargeSettlementAlertEnabled";
 
   type TypeMeta = {
     title: string;
@@ -275,6 +285,14 @@ export function NotificationTypeCard({
           enabled: settings.weightAdjustmentAlertEnabled,
           enabledKey: "weightAdjustmentAlertEnabled" as const,
           enableLabel: t("notifications.weightAdjustmentAlert.enable"),
+        };
+      case "recharge_settlement_alert":
+        return {
+          title: t("notifications.rechargeSettlementAlert.title"),
+          description: t("notifications.rechargeSettlementAlert.description"),
+          enabled: settings.rechargeSettlementAlertEnabled,
+          enabledKey: "rechargeSettlementAlertEnabled" as const,
+          enableLabel: t("notifications.rechargeSettlementAlert.enable"),
         };
     }
   }, [settings, t, type]);

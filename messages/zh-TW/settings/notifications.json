@@ -64,6 +64,11 @@
     "description": "權重調整規則發生故障時每個故障階段傳送一次，並在恢復後再次通知",
     "enable": "啟用權重調整通知"
   },
+  "rechargeSettlementAlert": {
+    "title": "儲值結算告警",
+    "description": "訂單三次自動結算重試均失敗並需要人工處理時傳送一次通知",
+    "enable": "啟用儲值結算告警"
+  },
   "dailyLeaderboard": {
     "description": "每天定時發送使用者消費 Top N 排行榜",
     "enable": "啟用每日排行榜",

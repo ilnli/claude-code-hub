@@ -12,6 +12,7 @@ export const AuditCategorySchema = z
     "notification",
     "sensitive_word",
     "model_price",
+    "recharge",
   ])
   .describe("Audit log action category.");
 

@@ -18,7 +18,8 @@
     "key": "Keys",
     "notification": "Notifications",
     "sensitive_word": "Sensitive words",
-    "model_price": "Model prices"
+    "model_price": "Model prices",
+    "recharge": "Recharge"
   },
   "columns": {
     "time": "Time",
@@ -98,6 +99,12 @@
       "sync_litellm": "Sync cloud price table",
       "upsert": "Upsert model price",
       "delete": "Delete model price"
+    },
+    "recharge": {
+      "order": { "create": "Create recharge order", "cancel": "Cancel recharge order", "expire": "Expire recharge order", "confirm": "Manually confirm recharge", "admin_cancel": "Admin cancel recharge order", "close": "Close recharge order", "retry": "Retry recharge settlement" },
+      "config": { "update": "Update recharge payment settings" },
+      "callback": { "accept": "Accept recharge payment callback", "reject": "Reject recharge payment callback" },
+      "settlement": { "complete": "Complete recharge settlement", "failed": "Recharge settlement failed" }
     }
   },
   "detail": {

@@ -81,6 +81,8 @@ const NotificationTypeSchema = z.enum([
   "cost_alert",
   "cache_hit_rate_alert",
   "model_mismatch_alert",
+  "weight_adjustment_alert",
+  "recharge_settlement_alert",
 ]);
 
 export type NotificationType = z.infer<typeof NotificationTypeSchema>;
@@ -251,6 +253,10 @@ function toJobType(type: NotificationType): NotificationJobType {
       return "cache-hit-rate-alert";
     case "model_mismatch_alert":
       return "model-mismatch-alert";
+    case "weight_adjustment_alert":
+      return "weight-adjustment-alert";
+    case "recharge_settlement_alert":
+      return "recharge-settlement-alert";
   }
 }
 
@@ -348,6 +354,23 @@ function buildTestData(type: NotificationType): unknown {
         generatedAt: now.toISOString(),
       };
     }
+    case "weight_adjustment_alert":
+      return {
+        event: "fault",
+        ruleId: 1,
+        ruleName: "Example rule",
+        runId: 1,
+        faultKind: "run_failed",
+        message: "Example failure",
+        generatedAt: new Date().toISOString(),
+      };
+    case "recharge_settlement_alert":
+      return {
+        orderNo: "RC20260807000000000000000000",
+        creditUsd: "100.00",
+        pendingManualHandlingCount: 1,
+        lastError: "Example settlement failure",
+      };
   }
 }
 

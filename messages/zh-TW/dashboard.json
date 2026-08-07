@@ -1008,6 +1008,8 @@
     "auditLogs": "稽核日誌",
     "documentation": "文件",
     "systemSettings": "系統設定",
+    "recharge": "主動儲值",
+    "rechargeOrders": "儲值訂單",
     "feedback": "意見回饋",
     "login": "登入",
     "logout": "登出"

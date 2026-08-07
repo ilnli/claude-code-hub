@@ -24,6 +24,7 @@ export const WEBHOOK_NOTIFICATION_TYPES = [
   "cache_hit_rate_alert",
   "model_mismatch_alert",
   "weight_adjustment_alert",
+  "recharge_settlement_alert",
 ] as const satisfies readonly WebhookNotificationType[];
 
 export const TEMPLATE_PLACEHOLDERS = {
@@ -102,6 +103,16 @@ export const TEMPLATE_PLACEHOLDERS = {
     { key: "{{fault_kind}}", label: "故障类型", description: "故障分类" },
     { key: "{{message}}", label: "详情", description: "故障详情" },
     { key: "{{generated_at}}", label: "生成时间", description: "ISO 8601 格式" },
+  ],
+  recharge_settlement_alert: [
+    { key: "{{order_no}}", label: "订单号", description: "本地充值订单号" },
+    { key: "{{credit_usd}}", label: "充值额度", description: "应增加的 USD 额度" },
+    {
+      key: "{{pending_manual_handling_count}}",
+      label: "待人工处理数量",
+      description: "当前等待人工处理的订单总数",
+    },
+    { key: "{{last_error}}", label: "最后错误", description: "最后一次结算错误" },
   ],
 } as const satisfies Record<string, readonly TemplatePlaceholder[]>;
 
@@ -211,6 +222,24 @@ export function buildTemplateVariables(params: {
     values["{{fault_kind}}"] = alert?.faultKind ?? "";
     values["{{message}}"] = alert?.message ?? "";
     values["{{generated_at}}"] = alert?.generatedAt ?? "";
+  }
+
+  if (notificationType === "recharge_settlement_alert") {
+    const alert = data as
+      | {
+          orderNo?: string;
+          creditUsd?: string;
+          pendingManualHandlingCount?: number;
+          lastError?: string | null;
+        }
+      | undefined;
+    values["{{order_no}}"] = alert?.orderNo ?? "";
+    values["{{credit_usd}}"] = alert?.creditUsd ?? "";
+    values["{{pending_manual_handling_count}}"] =
+      alert?.pendingManualHandlingCount !== undefined
+        ? String(alert.pendingManualHandlingCount)
+        : "";
+    values["{{last_error}}"] = alert?.lastError ?? "";
   }
 
   return values;

@@ -3,6 +3,7 @@
     "title": "My Usage",
     "welcome": "Welcome, {name}",
     "documentation": "Usage Docs",
+    "recharge": "Recharge",
     "logout": "Logout",
     "keyLabel": "Key",
     "userLabel": "User",

@@ -7,7 +7,8 @@ export type AuditCategory =
   | "key"
   | "notification"
   | "sensitive_word"
-  | "model_price";
+  | "model_price"
+  | "recharge";
 
 export interface AuditLogInput {
   actionCategory: AuditCategory;

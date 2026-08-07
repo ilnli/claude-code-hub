@@ -1008,6 +1008,8 @@
     "auditLogs": "監査ログ",
     "documentation": "ドキュ",
     "systemSettings": "設定",
+    "recharge": "チャージ",
+    "rechargeOrders": "チャージ注文",
     "feedback": "フィードバック",
     "login": "ログイン",
     "logout": "ログアウト"

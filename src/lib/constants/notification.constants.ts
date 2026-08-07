@@ -8,6 +8,7 @@ export const NOTIFICATION_JOB_TYPES = [
   "daily-leaderboard",
   "model-mismatch-alert",
   "weight-adjustment-alert",
+  "recharge-settlement-alert",
 ] as const;
 
 export type NotificationJobType = (typeof NOTIFICATION_JOB_TYPES)[number];

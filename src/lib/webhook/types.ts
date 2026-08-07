@@ -194,7 +194,8 @@ export type WebhookNotificationType =
   | "cost_alert"
   | "cache_hit_rate_alert"
   | "model_mismatch_alert"
-  | "weight_adjustment_alert";
+  | "weight_adjustment_alert"
+  | "recharge_settlement_alert";
 
 export interface WebhookTargetConfig {
   id?: number;

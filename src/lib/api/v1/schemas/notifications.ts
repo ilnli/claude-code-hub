@@ -10,6 +10,7 @@ export const NotificationTypeSchema = z
     "cache_hit_rate_alert",
     "model_mismatch_alert",
     "weight_adjustment_alert",
+    "recharge_settlement_alert",
   ])
   .describe("Notification job type.");
 
@@ -87,6 +88,9 @@ export const NotificationSettingsSchema = z
     weightAdjustmentAlertEnabled: z
       .boolean()
       .describe("Whether provider weight adjustment fault and recovery alerts are enabled."),
+    rechargeSettlementAlertEnabled: z
+      .boolean()
+      .describe("Whether exhausted recharge settlement retries trigger alerts."),
     createdAt: IsoDateTimeStringSchema.nullable().describe("Creation time."),
     updatedAt: IsoDateTimeStringSchema.nullable().describe("Last update time."),
   })

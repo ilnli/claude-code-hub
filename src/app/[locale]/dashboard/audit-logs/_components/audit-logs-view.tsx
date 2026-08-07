@@ -39,6 +39,7 @@ const CATEGORIES: AuditCategory[] = [
   "notification",
   "sensitive_word",
   "model_price",
+  "recharge",
 ];
 
 type StatusFilter = "all" | "success" | "failure";

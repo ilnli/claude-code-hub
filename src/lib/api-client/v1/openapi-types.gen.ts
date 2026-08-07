@@ -1496,6 +1496,254 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/recharge/availability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get recharge availability
+         * @description Get recharge availability
+         */
+        get: operations["getRechargeAvailability"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/recharge/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List current key recharge orders
+         * @description List current key recharge orders
+         */
+        get: operations["getRechargeOrders"];
+        put?: never;
+        /**
+         * Create recharge order
+         * @description Create recharge order
+         */
+        post: operations["postRechargeOrders"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/recharge/orders/{orderId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get current key recharge order
+         * @description Get current key recharge order
+         */
+        get: operations["getRechargeOrdersByOrderid"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/recharge/orders/{orderId}:cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel pending recharge order
+         * @description Cancel pending recharge order
+         */
+        post: operations["postRechargeOrdersByOrderidCancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/recharge/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Alipay recharge configuration
+         * @description Get Alipay recharge configuration
+         */
+        get: operations["getRechargeConfig"];
+        /**
+         * Create a new Alipay recharge configuration version
+         * @description Create a new Alipay recharge configuration version
+         */
+        put: operations["putRechargeConfig"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/recharge/admin/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List recharge orders
+         * @description List recharge orders
+         */
+        get: operations["getRechargeAdminOrders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/recharge/admin/orders/{orderId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get recharge order
+         * @description Get recharge order
+         */
+        get: operations["getRechargeAdminOrdersByOrderid"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/recharge/admin/orders/{orderId}:confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * confirm recharge order
+         * @description confirm recharge order
+         */
+        post: operations["postRechargeAdminOrdersByOrderidConfirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/recharge/admin/orders/{orderId}:cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * cancel recharge order
+         * @description cancel recharge order
+         */
+        post: operations["postRechargeAdminOrdersByOrderidCancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/recharge/admin/orders/{orderId}:close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * close recharge order
+         * @description close recharge order
+         */
+        post: operations["postRechargeAdminOrdersByOrderidClose"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/recharge/admin/orders/{orderId}:retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry recharge settlement
+         * @description Retry recharge settlement
+         */
+        post: operations["postRechargeAdminOrdersByOrderidRetry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/recharge/alipay/notify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Alipay asynchronous notification
+         * @description Accepts and verifies Alipay asynchronous payment notifications.
+         */
+        post: operations["postRechargeAlipayNotify"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/provider-groups": {
         parameters: {
             query?: never;
@@ -16579,6 +16827,8 @@ export interface operations {
                         modelMismatchAlertEnabled: boolean;
                         /** @description Whether provider weight adjustment fault and recovery alerts are enabled. */
                         weightAdjustmentAlertEnabled: boolean;
+                        /** @description Whether exhausted recharge settlement retries trigger alerts. */
+                        rechargeSettlementAlertEnabled: boolean;
                         /**
                          * Format: date-time
                          * @description Creation time.
@@ -16770,6 +17020,8 @@ export interface operations {
                     modelMismatchAlertEnabled?: boolean;
                     /** @description Whether provider weight adjustment fault and recovery alerts are enabled. */
                     weightAdjustmentAlertEnabled?: boolean;
+                    /** @description Whether exhausted recharge settlement retries trigger alerts. */
+                    rechargeSettlementAlertEnabled?: boolean;
                 };
             };
         };
@@ -16835,6 +17087,8 @@ export interface operations {
                         modelMismatchAlertEnabled: boolean;
                         /** @description Whether provider weight adjustment fault and recovery alerts are enabled. */
                         weightAdjustmentAlertEnabled: boolean;
+                        /** @description Whether exhausted recharge settlement retries trigger alerts. */
+                        rechargeSettlementAlertEnabled: boolean;
                         /**
                          * Format: date-time
                          * @description Creation time.
@@ -16983,7 +17237,7 @@ export interface operations {
                      * @description Notification job type.
                      * @enum {string}
                      */
-                    type: "circuit_breaker" | "daily_leaderboard" | "cost_alert" | "cache_hit_rate_alert" | "model_mismatch_alert" | "weight_adjustment_alert";
+                    type: "circuit_breaker" | "daily_leaderboard" | "cost_alert" | "cache_hit_rate_alert" | "model_mismatch_alert" | "weight_adjustment_alert" | "recharge_settlement_alert";
                 };
             };
         };
@@ -17121,7 +17375,7 @@ export interface operations {
             header?: never;
             path: {
                 /** @description Notification job type. */
-                type: "circuit_breaker" | "daily_leaderboard" | "cost_alert" | "cache_hit_rate_alert" | "model_mismatch_alert" | "weight_adjustment_alert";
+                type: "circuit_breaker" | "daily_leaderboard" | "cost_alert" | "cache_hit_rate_alert" | "model_mismatch_alert" | "weight_adjustment_alert" | "recharge_settlement_alert";
             };
             cookie?: never;
         };
@@ -17142,7 +17396,7 @@ export interface operations {
                              * @description Notification job type.
                              * @enum {string}
                              */
-                            notificationType: "circuit_breaker" | "daily_leaderboard" | "cost_alert" | "cache_hit_rate_alert" | "model_mismatch_alert" | "weight_adjustment_alert";
+                            notificationType: "circuit_breaker" | "daily_leaderboard" | "cost_alert" | "cache_hit_rate_alert" | "model_mismatch_alert" | "weight_adjustment_alert" | "recharge_settlement_alert";
                             /** @description Webhook target id. */
                             targetId: number;
                             /** @description Whether this binding is enabled. */
@@ -17344,7 +17598,7 @@ export interface operations {
             };
             path: {
                 /** @description Notification job type. */
-                type: "circuit_breaker" | "daily_leaderboard" | "cost_alert" | "cache_hit_rate_alert" | "model_mismatch_alert" | "weight_adjustment_alert";
+                type: "circuit_breaker" | "daily_leaderboard" | "cost_alert" | "cache_hit_rate_alert" | "model_mismatch_alert" | "weight_adjustment_alert" | "recharge_settlement_alert";
             };
             cookie?: never;
         };
@@ -23134,6 +23388,3410 @@ export interface operations {
             };
         };
     };
+    getRechargeAvailability: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        enabled: boolean;
+                        eligible: boolean;
+                        /** @enum {string|null} */
+                        ineligibleReason: "payment_disabled" | "key_limit_required" | null;
+                        feeRatePercent: string;
+                        /** @description Decimal amount with at most two fractional digits. */
+                        minCreditUsd: string;
+                        /** @description Decimal amount with at most two fractional digits. */
+                        maxCreditUsd: string;
+                        keyLimitTotalUsd: string | null;
+                    };
+                };
+            };
+            /** @description Invalid request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Access denied. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Order state conflict. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Recharge request rejected. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    getRechargeOrders: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            id: number;
+                            orderNo: string;
+                            keyId: number;
+                            userId: number;
+                            keyName: string;
+                            userName: string;
+                            /** @enum {string} */
+                            status: "pending" | "processing" | "cancelled" | "completed" | "manual_closed";
+                            /** @description Decimal amount with at most two fractional digits. */
+                            creditUsd: string;
+                            /** @description Decimal amount with at most two fractional digits. */
+                            paidAmountCny: string;
+                            feeRatePercent: string;
+                            productName: string;
+                            qrCode: string | null;
+                            alipayTradeNo: string | null;
+                            retryCount: number;
+                            needsManualHandling: boolean;
+                            lastSettlementError: string | null;
+                            cancellationReason: string | null;
+                            manualReason: string | null;
+                            /**
+                             * Format: date-time
+                             * @description ISO 8601 date-time string.
+                             */
+                            expiresAt: string;
+                            /**
+                             * Format: date-time
+                             * @description ISO 8601 date-time string.
+                             */
+                            paidAt: string | null;
+                            /**
+                             * Format: date-time
+                             * @description ISO 8601 date-time string.
+                             */
+                            completedAt: string | null;
+                            /**
+                             * Format: date-time
+                             * @description ISO 8601 date-time string.
+                             */
+                            cancelledAt: string | null;
+                            /**
+                             * Format: date-time
+                             * @description ISO 8601 date-time string.
+                             */
+                            closedAt: string | null;
+                            /**
+                             * Format: date-time
+                             * @description ISO 8601 date-time string.
+                             */
+                            createdAt: string;
+                            /**
+                             * Format: date-time
+                             * @description ISO 8601 date-time string.
+                             */
+                            updatedAt: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Invalid request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Access denied. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Order state conflict. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Recharge request rejected. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    postRechargeOrders: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required only when authenticating with the auth-token cookie on mutation requests. */
+                "X-CCH-CSRF"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Decimal amount with at most two fractional digits. */
+                    creditUsd: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: number;
+                        orderNo: string;
+                        keyId: number;
+                        userId: number;
+                        keyName: string;
+                        userName: string;
+                        /** @enum {string} */
+                        status: "pending" | "processing" | "cancelled" | "completed" | "manual_closed";
+                        /** @description Decimal amount with at most two fractional digits. */
+                        creditUsd: string;
+                        /** @description Decimal amount with at most two fractional digits. */
+                        paidAmountCny: string;
+                        feeRatePercent: string;
+                        productName: string;
+                        qrCode: string | null;
+                        alipayTradeNo: string | null;
+                        retryCount: number;
+                        needsManualHandling: boolean;
+                        lastSettlementError: string | null;
+                        cancellationReason: string | null;
+                        manualReason: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        expiresAt: string;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        paidAt: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        completedAt: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        cancelledAt: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        closedAt: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        createdAt: string;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        updatedAt: string;
+                    };
+                };
+            };
+            /** @description Invalid request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Access denied. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Order state conflict. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Recharge request rejected. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    getRechargeOrdersByOrderid: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orderId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: number;
+                        orderNo: string;
+                        keyId: number;
+                        userId: number;
+                        keyName: string;
+                        userName: string;
+                        /** @enum {string} */
+                        status: "pending" | "processing" | "cancelled" | "completed" | "manual_closed";
+                        /** @description Decimal amount with at most two fractional digits. */
+                        creditUsd: string;
+                        /** @description Decimal amount with at most two fractional digits. */
+                        paidAmountCny: string;
+                        feeRatePercent: string;
+                        productName: string;
+                        qrCode: string | null;
+                        alipayTradeNo: string | null;
+                        retryCount: number;
+                        needsManualHandling: boolean;
+                        lastSettlementError: string | null;
+                        cancellationReason: string | null;
+                        manualReason: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        expiresAt: string;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        paidAt: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        completedAt: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        cancelledAt: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        closedAt: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        createdAt: string;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        updatedAt: string;
+                    };
+                };
+            };
+            /** @description Invalid request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Access denied. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Order state conflict. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Recharge request rejected. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    postRechargeOrdersByOrderidCancel: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required only when authenticating with the auth-token cookie on mutation requests. */
+                "X-CCH-CSRF"?: string;
+            };
+            path: {
+                orderId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: number;
+                        orderNo: string;
+                        keyId: number;
+                        userId: number;
+                        keyName: string;
+                        userName: string;
+                        /** @enum {string} */
+                        status: "pending" | "processing" | "cancelled" | "completed" | "manual_closed";
+                        /** @description Decimal amount with at most two fractional digits. */
+                        creditUsd: string;
+                        /** @description Decimal amount with at most two fractional digits. */
+                        paidAmountCny: string;
+                        feeRatePercent: string;
+                        productName: string;
+                        qrCode: string | null;
+                        alipayTradeNo: string | null;
+                        retryCount: number;
+                        needsManualHandling: boolean;
+                        lastSettlementError: string | null;
+                        cancellationReason: string | null;
+                        manualReason: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        expiresAt: string;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        paidAt: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        completedAt: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        cancelledAt: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        closedAt: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        createdAt: string;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        updatedAt: string;
+                    };
+                };
+            };
+            /** @description Invalid request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Access denied. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Order state conflict. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Recharge request rejected. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    getRechargeConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: number | null;
+                        enabled: boolean;
+                        appId: string;
+                        privateKeyConfigured: boolean;
+                        alipayPublicKeyConfigured: boolean;
+                        productName: string;
+                        notifyDomain: string | null;
+                        feeRatePercent: string;
+                        /** @description Decimal amount with at most two fractional digits. */
+                        minCreditUsd: string;
+                        /** @description Decimal amount with at most two fractional digits. */
+                        maxCreditUsd: string;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        createdAt: string | null;
+                    };
+                };
+            };
+            /** @description Invalid request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Access denied. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Order state conflict. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Recharge request rejected. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    putRechargeConfig: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required only when authenticating with the auth-token cookie on mutation requests. */
+                "X-CCH-CSRF"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    enabled?: boolean;
+                    appId?: string;
+                    privateKey?: string;
+                    alipayPublicKey?: string;
+                    productName?: string;
+                    /** Format: uri */
+                    notifyDomain?: string | null;
+                    /** @description Percentage from 0 inclusive to 100 exclusive. */
+                    feeRatePercent?: string;
+                    /** @description Decimal amount with at most two fractional digits. */
+                    minCreditUsd?: string;
+                    /** @description Decimal amount with at most two fractional digits. */
+                    maxCreditUsd?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: number | null;
+                        enabled: boolean;
+                        appId: string;
+                        privateKeyConfigured: boolean;
+                        alipayPublicKeyConfigured: boolean;
+                        productName: string;
+                        notifyDomain: string | null;
+                        feeRatePercent: string;
+                        /** @description Decimal amount with at most two fractional digits. */
+                        minCreditUsd: string;
+                        /** @description Decimal amount with at most two fractional digits. */
+                        maxCreditUsd: string;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        createdAt: string | null;
+                    };
+                };
+            };
+            /** @description Invalid request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Access denied. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Order state conflict. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Recharge request rejected. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    getRechargeAdminOrders: {
+        parameters: {
+            query?: {
+                status?: "pending" | "processing" | "cancelled" | "completed" | "manual_closed";
+                needsManualHandling?: "true" | "false";
+                search?: string;
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            id: number;
+                            orderNo: string;
+                            keyId: number;
+                            userId: number;
+                            keyName: string;
+                            userName: string;
+                            /** @enum {string} */
+                            status: "pending" | "processing" | "cancelled" | "completed" | "manual_closed";
+                            /** @description Decimal amount with at most two fractional digits. */
+                            creditUsd: string;
+                            /** @description Decimal amount with at most two fractional digits. */
+                            paidAmountCny: string;
+                            feeRatePercent: string;
+                            productName: string;
+                            qrCode: string | null;
+                            alipayTradeNo: string | null;
+                            retryCount: number;
+                            needsManualHandling: boolean;
+                            lastSettlementError: string | null;
+                            cancellationReason: string | null;
+                            manualReason: string | null;
+                            /**
+                             * Format: date-time
+                             * @description ISO 8601 date-time string.
+                             */
+                            expiresAt: string;
+                            /**
+                             * Format: date-time
+                             * @description ISO 8601 date-time string.
+                             */
+                            paidAt: string | null;
+                            /**
+                             * Format: date-time
+                             * @description ISO 8601 date-time string.
+                             */
+                            completedAt: string | null;
+                            /**
+                             * Format: date-time
+                             * @description ISO 8601 date-time string.
+                             */
+                            cancelledAt: string | null;
+                            /**
+                             * Format: date-time
+                             * @description ISO 8601 date-time string.
+                             */
+                            closedAt: string | null;
+                            /**
+                             * Format: date-time
+                             * @description ISO 8601 date-time string.
+                             */
+                            createdAt: string;
+                            /**
+                             * Format: date-time
+                             * @description ISO 8601 date-time string.
+                             */
+                            updatedAt: string;
+                        }[];
+                        total: number;
+                        needsManualHandlingCount: number;
+                    };
+                };
+            };
+            /** @description Invalid request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Access denied. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Order state conflict. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Recharge request rejected. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    getRechargeAdminOrdersByOrderid: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orderId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: number;
+                        orderNo: string;
+                        keyId: number;
+                        userId: number;
+                        keyName: string;
+                        userName: string;
+                        /** @enum {string} */
+                        status: "pending" | "processing" | "cancelled" | "completed" | "manual_closed";
+                        /** @description Decimal amount with at most two fractional digits. */
+                        creditUsd: string;
+                        /** @description Decimal amount with at most two fractional digits. */
+                        paidAmountCny: string;
+                        feeRatePercent: string;
+                        productName: string;
+                        qrCode: string | null;
+                        alipayTradeNo: string | null;
+                        retryCount: number;
+                        needsManualHandling: boolean;
+                        lastSettlementError: string | null;
+                        cancellationReason: string | null;
+                        manualReason: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        expiresAt: string;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        paidAt: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        completedAt: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        cancelledAt: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        closedAt: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        createdAt: string;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        updatedAt: string;
+                    };
+                };
+            };
+            /** @description Invalid request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Access denied. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Order state conflict. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Recharge request rejected. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    postRechargeAdminOrdersByOrderidConfirm: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required only when authenticating with the auth-token cookie on mutation requests. */
+                "X-CCH-CSRF"?: string;
+            };
+            path: {
+                orderId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: number;
+                        orderNo: string;
+                        keyId: number;
+                        userId: number;
+                        keyName: string;
+                        userName: string;
+                        /** @enum {string} */
+                        status: "pending" | "processing" | "cancelled" | "completed" | "manual_closed";
+                        /** @description Decimal amount with at most two fractional digits. */
+                        creditUsd: string;
+                        /** @description Decimal amount with at most two fractional digits. */
+                        paidAmountCny: string;
+                        feeRatePercent: string;
+                        productName: string;
+                        qrCode: string | null;
+                        alipayTradeNo: string | null;
+                        retryCount: number;
+                        needsManualHandling: boolean;
+                        lastSettlementError: string | null;
+                        cancellationReason: string | null;
+                        manualReason: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        expiresAt: string;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        paidAt: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        completedAt: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        cancelledAt: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        closedAt: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        createdAt: string;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        updatedAt: string;
+                    };
+                };
+            };
+            /** @description Invalid request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Access denied. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Order state conflict. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Recharge request rejected. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    postRechargeAdminOrdersByOrderidCancel: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required only when authenticating with the auth-token cookie on mutation requests. */
+                "X-CCH-CSRF"?: string;
+            };
+            path: {
+                orderId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: number;
+                        orderNo: string;
+                        keyId: number;
+                        userId: number;
+                        keyName: string;
+                        userName: string;
+                        /** @enum {string} */
+                        status: "pending" | "processing" | "cancelled" | "completed" | "manual_closed";
+                        /** @description Decimal amount with at most two fractional digits. */
+                        creditUsd: string;
+                        /** @description Decimal amount with at most two fractional digits. */
+                        paidAmountCny: string;
+                        feeRatePercent: string;
+                        productName: string;
+                        qrCode: string | null;
+                        alipayTradeNo: string | null;
+                        retryCount: number;
+                        needsManualHandling: boolean;
+                        lastSettlementError: string | null;
+                        cancellationReason: string | null;
+                        manualReason: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        expiresAt: string;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        paidAt: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        completedAt: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        cancelledAt: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        closedAt: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        createdAt: string;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        updatedAt: string;
+                    };
+                };
+            };
+            /** @description Invalid request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Access denied. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Order state conflict. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Recharge request rejected. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    postRechargeAdminOrdersByOrderidClose: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required only when authenticating with the auth-token cookie on mutation requests. */
+                "X-CCH-CSRF"?: string;
+            };
+            path: {
+                orderId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: number;
+                        orderNo: string;
+                        keyId: number;
+                        userId: number;
+                        keyName: string;
+                        userName: string;
+                        /** @enum {string} */
+                        status: "pending" | "processing" | "cancelled" | "completed" | "manual_closed";
+                        /** @description Decimal amount with at most two fractional digits. */
+                        creditUsd: string;
+                        /** @description Decimal amount with at most two fractional digits. */
+                        paidAmountCny: string;
+                        feeRatePercent: string;
+                        productName: string;
+                        qrCode: string | null;
+                        alipayTradeNo: string | null;
+                        retryCount: number;
+                        needsManualHandling: boolean;
+                        lastSettlementError: string | null;
+                        cancellationReason: string | null;
+                        manualReason: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        expiresAt: string;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        paidAt: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        completedAt: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        cancelledAt: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        closedAt: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        createdAt: string;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        updatedAt: string;
+                    };
+                };
+            };
+            /** @description Invalid request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Access denied. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Order state conflict. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Recharge request rejected. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    postRechargeAdminOrdersByOrderidRetry: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required only when authenticating with the auth-token cookie on mutation requests. */
+                "X-CCH-CSRF"?: string;
+            };
+            path: {
+                orderId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: number;
+                        orderNo: string;
+                        keyId: number;
+                        userId: number;
+                        keyName: string;
+                        userName: string;
+                        /** @enum {string} */
+                        status: "pending" | "processing" | "cancelled" | "completed" | "manual_closed";
+                        /** @description Decimal amount with at most two fractional digits. */
+                        creditUsd: string;
+                        /** @description Decimal amount with at most two fractional digits. */
+                        paidAmountCny: string;
+                        feeRatePercent: string;
+                        productName: string;
+                        qrCode: string | null;
+                        alipayTradeNo: string | null;
+                        retryCount: number;
+                        needsManualHandling: boolean;
+                        lastSettlementError: string | null;
+                        cancellationReason: string | null;
+                        manualReason: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        expiresAt: string;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        paidAt: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        completedAt: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        cancelledAt: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        closedAt: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        createdAt: string;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        updatedAt: string;
+                    };
+                };
+            };
+            /** @description Invalid request. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Access denied. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Order state conflict. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Recharge request rejected. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    postRechargeAlipayNotify: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required only when authenticating with the auth-token cookie on mutation requests. */
+                "X-CCH-CSRF"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Notification accepted. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description Notification rejected. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+        };
+    };
     getProviderGroups: {
         parameters: {
             query?: never;
@@ -24725,7 +28383,7 @@ export interface operations {
                 /** @description Page size. */
                 limit?: number;
                 /** @description Optional action category filter. */
-                category?: "auth" | "user" | "provider" | "provider_group" | "system_settings" | "key" | "notification" | "sensitive_word" | "model_price";
+                category?: "auth" | "user" | "provider" | "provider_group" | "system_settings" | "key" | "notification" | "sensitive_word" | "model_price" | "recharge";
                 /** @description Optional success filter. */
                 success?: "true" | "false";
                 /** @description Optional inclusive start time. */
@@ -24754,7 +28412,7 @@ export interface operations {
                              * @description Action category.
                              * @enum {string}
                              */
-                            actionCategory: "auth" | "user" | "provider" | "provider_group" | "system_settings" | "key" | "notification" | "sensitive_word" | "model_price";
+                            actionCategory: "auth" | "user" | "provider" | "provider_group" | "system_settings" | "key" | "notification" | "sensitive_word" | "model_price" | "recharge";
                             /** @description Action type. */
                             actionType: string;
                             /** @description Target resource type. */
@@ -24976,7 +28634,7 @@ export interface operations {
                          * @description Action category.
                          * @enum {string}
                          */
-                        actionCategory: "auth" | "user" | "provider" | "provider_group" | "system_settings" | "key" | "notification" | "sensitive_word" | "model_price";
+                        actionCategory: "auth" | "user" | "provider" | "provider_group" | "system_settings" | "key" | "notification" | "sensitive_word" | "model_price" | "recharge";
                         /** @description Action type. */
                         actionType: string;
                         /** @description Target resource type. */

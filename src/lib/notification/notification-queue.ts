@@ -64,6 +64,8 @@ function toWebhookNotificationType(type: NotificationJobType): WebhookNotificati
       return "model_mismatch_alert";
     case "weight-adjustment-alert":
       return "weight_adjustment_alert";
+    case "recharge-settlement-alert":
+      return "recharge_settlement_alert";
   }
 }
 

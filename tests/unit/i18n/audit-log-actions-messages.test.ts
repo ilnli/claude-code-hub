@@ -64,6 +64,15 @@ function collectEmittedAuditActionTypes(): string[] {
     )) {
       actions.add(match[1]);
     }
+    // Some API handlers route audit writes through a local helper so request
+    // context is applied consistently. Keep those literal action names in
+    // the same coverage set as direct repository writes.
+    for (const match of content.matchAll(/\baudit\(\s*c,\s*(?:auth|null),\s*"([^"]+)"/g)) {
+      actions.add(match[1]);
+    }
+    for (const match of content.matchAll(/\brunAdminOrderAction\(\s*c,\s*"([^"]+)"/g)) {
+      actions.add(match[1]);
+    }
   }
 
   return [...actions].sort();

@@ -24,12 +24,14 @@ export async function DashboardHeader({ session, locale }: DashboardHeaderProps)
     { href: "/dashboard", label: t("dashboard") },
     { href: "/dashboard/logs", label: t("usageLogs") },
     { href: "/dashboard/leaderboard", label: t("leaderboard") },
+    { href: "/recharge", label: t("recharge") },
     { href: "/dashboard/availability", label: t("availability"), adminOnly: true },
     { href: "/dashboard/providers", label: t("providers"), adminOnly: true },
     ...(isAdmin
       ? [{ href: "/dashboard/quotas", label: t("quotasManagement") }]
       : [{ href: "/dashboard/my-quota", label: t("myQuota") }]),
     { href: "/dashboard/users", label: t("userManagement") },
+    { href: "/dashboard/recharge-orders", label: t("rechargeOrders"), adminOnly: true },
     documentationItem,
     { href: "/settings", label: t("systemSettings"), adminOnly: true },
   ];

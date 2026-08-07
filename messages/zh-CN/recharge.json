@@ -1,0 +1,106 @@
+{
+  "title": "主动充值",
+  "key": "充值将增加密钥 {name} 的总额度",
+  "return": "返回",
+  "unavailable": {
+    "title": "当前无法充值",
+    "disabled": "管理员尚未启用支付宝充值。",
+    "keyLimit": "当前密钥未配置正数总额度，不能发起充值。"
+  },
+  "form": {
+    "title": "创建充值订单",
+    "amount": "增加额度（USD）",
+    "range": "允许范围：{min} - {max} USD",
+    "credit": "到账额度",
+    "payable": "支付宝实付",
+    "submit": "生成支付二维码"
+  },
+  "payment": {
+    "title": "支付宝扫码支付",
+    "credit": "到账额度",
+    "payable": "实付金额",
+    "expires": "二维码剩余 {minutes}:{seconds}",
+    "cancel": "取消订单"
+  },
+  "processing": {
+    "title": "支付已确认，正在增加额度",
+    "description": "订单状态将每 10 秒自动更新。"
+  },
+  "history": { "title": "充值记录", "empty": "当前密钥暂无充值记录" },
+  "status": {
+    "pending": "待支付",
+    "processing": "已支付/处理中",
+    "cancelled": "已取消",
+    "completed": "已完成",
+    "manual_closed": "人工关闭/已退款"
+  },
+  "errors": { "load": "加载充值信息失败", "create": "创建支付订单失败", "cancel": "取消订单失败" },
+  "messages": { "cancelled": "订单已取消" },
+  "admin": {
+    "config": {
+      "title": "支付宝支付设置",
+      "description": "配置支付宝当面付、手续费和用户可充值范围。",
+      "sectionTitle": "支付宝当面付",
+      "sectionDescription": "每次保存会创建新版本，历史订单继续使用创建时的版本验签。",
+      "enabled": "允许创建充值订单",
+      "enabledDescription": "关闭后只阻止新订单，已有订单仍可回调和结算。",
+      "appId": "App ID",
+      "productName": "商品名称",
+      "privateKey": "应用私钥",
+      "alipayPublicKey": "支付宝公钥",
+      "notifyDomain": "通知域名覆盖",
+      "feeRate": "支付手续费率（%）",
+      "minCredit": "最小到账额度（USD）",
+      "maxCredit": "最大到账额度（USD）",
+      "configured": "已配置",
+      "secretPlaceholder": "留空以保留当前密钥",
+      "activeVersion": "当前配置版本 #{id}，创建于 {time}",
+      "save": "保存新版本",
+      "saved": "支付设置已保存",
+      "loadFailed": "加载支付设置失败",
+      "saveFailed": "保存支付设置失败"
+    },
+    "orders": {
+      "title": "充值订单",
+      "description": "查看支付宝付款和额度结算状态。",
+      "manualCount": "待人工处理 {count}",
+      "refresh": "刷新",
+      "search": "搜索订单号、交易号、用户或密钥",
+      "allStatuses": "全部状态",
+      "manualOnly": "仅待人工处理",
+      "orderNo": "订单号",
+      "owner": "用户 / 密钥",
+      "amount": "额度 / 实付",
+      "status": "状态",
+      "createdAt": "创建时间",
+      "empty": "没有符合条件的订单",
+      "loadFailed": "加载充值订单失败"
+    },
+    "detail": {
+      "title": "充值订单详情",
+      "manualTitle": "该订单需要人工处理",
+      "credit": "到账额度",
+      "paidAmount": "支付宝实付",
+      "feeRate": "手续费率",
+      "user": "用户",
+      "key": "密钥",
+      "tradeNo": "支付宝交易号",
+      "createdAt": "创建时间",
+      "paidAt": "付款时间",
+      "completedAt": "完成时间",
+      "retryCount": "自动重试次数",
+      "reason": "处理原因",
+      "confirm": "手动确认支付",
+      "cancel": "取消订单",
+      "retry": "重试结算",
+      "close": "人工关闭/已退款",
+      "reasonLabel": "操作原因",
+      "submit": "确认操作",
+      "back": "返回",
+      "done": "订单已更新",
+      "loadFailed": "加载订单详情失败",
+      "actionFailed": "订单操作失败",
+      "actions": { "confirm": "手动确认支付", "cancel": "取消订单", "close": "人工关闭/已退款" }
+    }
+  }
+}

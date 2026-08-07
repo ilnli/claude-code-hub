@@ -22,6 +22,7 @@ const AUDIT_CATEGORY_VALUES = [
   "notification",
   "sensitive_word",
   "model_price",
+  "recharge",
 ] as const satisfies readonly AuditCategory[];
 
 // If a new variant is added to `AuditCategory` without also being appended

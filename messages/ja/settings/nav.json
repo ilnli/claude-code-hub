@@ -11,6 +11,7 @@
   "notifications": "通知",
   "auditLogs": "監査ログ",
   "prices": "価格表",
+  "payment": "支払い設定",
   "providers": "供給元",
   "requestFilters": "リクエスト",
   "sensitiveWords": "フィルター"

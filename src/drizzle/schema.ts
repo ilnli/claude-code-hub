@@ -12,6 +12,7 @@ import {
   index,
   uniqueIndex,
   pgEnum,
+  check,
 } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 import type { SpecialSetting } from '@/types/special-settings';
@@ -41,6 +42,14 @@ export const notificationTypeEnum = pgEnum('notification_type', [
   'cache_hit_rate_alert',
   'model_mismatch_alert',
   'weight_adjustment_alert',
+  'recharge_settlement_alert',
+]);
+export const rechargeOrderStatusEnum = pgEnum('recharge_order_status', [
+  'pending',
+  'processing',
+  'cancelled',
+  'completed',
+  'manual_closed',
 ]);
 
 // Users table
@@ -1282,6 +1291,11 @@ export const notificationSettings = pgTable('notification_settings', {
     .notNull()
     .default(false),
 
+  // 充值结算连续三次自动重试失败告警
+  rechargeSettlementAlertEnabled: boolean('recharge_settlement_alert_enabled')
+    .notNull()
+    .default(false),
+
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });
@@ -1351,6 +1365,108 @@ export const notificationTargetBindings = pgTable(
       table.isEnabled
     ),
     bindingsTargetIdx: index('idx_notification_bindings_target').on(table.targetId, table.isEnabled),
+  })
+);
+
+// Versioned Alipay F2F configuration. Historical versions are retained for callback verification.
+export const paymentConfigVersions = pgTable(
+  'payment_config_versions',
+  {
+    id: serial('id').primaryKey(),
+    isActive: boolean('is_active').notNull().default(true),
+    enabled: boolean('enabled').notNull().default(false),
+    appId: varchar('app_id', { length: 64 }).notNull(),
+    privateKey: text('private_key').notNull(),
+    alipayPublicKey: text('alipay_public_key').notNull(),
+    productName: varchar('product_name', { length: 256 }).notNull(),
+    notifyDomain: varchar('notify_domain', { length: 512 }),
+    feeRatePercent: numeric('fee_rate_percent', { precision: 6, scale: 4 })
+      .notNull()
+      .default('0'),
+    minCreditUsd: numeric('min_credit_usd', { precision: 10, scale: 2 })
+      .notNull()
+      .default('1'),
+    maxCreditUsd: numeric('max_credit_usd', { precision: 10, scale: 2 })
+      .notNull()
+      .default('1000'),
+    createdByUserId: integer('created_by_user_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    paymentConfigActiveUnique: uniqueIndex('uniq_payment_config_active')
+      .on(table.isActive)
+      .where(sql`${table.isActive} = true`),
+    paymentConfigFeeRateCheck: check(
+      'payment_config_fee_rate_check',
+      sql`${table.feeRatePercent} >= 0 AND ${table.feeRatePercent} < 100`
+    ),
+    paymentConfigCreditRangeCheck: check(
+      'payment_config_credit_range_check',
+      sql`${table.minCreditUsd} > 0 AND ${table.maxCreditUsd} >= ${table.minCreditUsd}`
+    ),
+  })
+);
+
+// Recharge orders add credit to existing total usage limits; they are not wallet transactions.
+export const rechargeOrders = pgTable(
+  'recharge_orders',
+  {
+    id: serial('id').primaryKey(),
+    orderNo: varchar('order_no', { length: 64 }).notNull(),
+    configVersionId: integer('config_version_id')
+      .notNull()
+      .references(() => paymentConfigVersions.id, { onDelete: 'restrict' }),
+    keyId: integer('key_id').notNull(),
+    userId: integer('user_id').notNull(),
+    keyName: varchar('key_name').notNull(),
+    userName: varchar('user_name').notNull(),
+    status: rechargeOrderStatusEnum('status').notNull().default('pending'),
+    creditUsd: numeric('credit_usd', { precision: 10, scale: 2 }).notNull(),
+    paidAmountCny: numeric('paid_amount_cny', { precision: 10, scale: 2 }).notNull(),
+    feeRatePercent: numeric('fee_rate_percent', { precision: 6, scale: 4 }).notNull(),
+    productName: varchar('product_name', { length: 256 }).notNull(),
+    qrCode: text('qr_code'),
+    alipayTradeNo: varchar('alipay_trade_no', { length: 128 }),
+    keyCreditAppliedUsd: numeric('key_credit_applied_usd', { precision: 10, scale: 2 })
+      .notNull()
+      .default('0'),
+    userCreditAppliedUsd: numeric('user_credit_applied_usd', { precision: 10, scale: 2 })
+      .notNull()
+      .default('0'),
+    retryCount: integer('retry_count').notNull().default(0),
+    nextRetryAt: timestamp('next_retry_at', { withTimezone: true }),
+    lastSettlementError: text('last_settlement_error'),
+    cancellationReason: varchar('cancellation_reason', { length: 64 }),
+    manualReason: text('manual_reason'),
+    manualOperatorUserId: integer('manual_operator_user_id'),
+    alertSentAt: timestamp('alert_sent_at', { withTimezone: true }),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    paidAt: timestamp('paid_at', { withTimezone: true }),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+    closedAt: timestamp('closed_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    rechargeOrderNoUnique: uniqueIndex('uniq_recharge_orders_order_no').on(table.orderNo),
+    rechargeAlipayTradeNoUnique: uniqueIndex('uniq_recharge_orders_alipay_trade_no')
+      .on(table.alipayTradeNo)
+      .where(sql`${table.alipayTradeNo} IS NOT NULL`),
+    rechargeOnePendingPerKey: uniqueIndex('uniq_recharge_orders_pending_key')
+      .on(table.keyId)
+      .where(sql`${table.status} = 'pending'`),
+    rechargeOrdersKeyCreatedIdx: index('idx_recharge_orders_key_created').on(
+      table.keyId,
+      table.createdAt
+    ),
+    rechargeOrdersStatusCreatedIdx: index('idx_recharge_orders_status_created').on(
+      table.status,
+      table.createdAt
+    ),
+    rechargeOrdersRetryIdx: index('idx_recharge_orders_retry')
+      .on(table.nextRetryAt)
+      .where(sql`${table.status} = 'processing' AND ${table.nextRetryAt} IS NOT NULL`),
   })
 );
 

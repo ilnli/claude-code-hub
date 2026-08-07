@@ -72,6 +72,13 @@ export const DEFAULT_TEMPLATES = {
     message: "{{message}}",
     generatedAt: "{{generated_at}}",
   },
+  recharge_settlement_alert: {
+    title: "{{title}}",
+    orderNo: "{{order_no}}",
+    creditUsd: "{{credit_usd}}",
+    pendingManualHandlingCount: "{{pending_manual_handling_count}}",
+    lastError: "{{last_error}}",
+  },
 } as const;
 
 export const DEFAULT_TEMPLATE_BY_NOTIFICATION_TYPE: Record<
@@ -84,4 +91,5 @@ export const DEFAULT_TEMPLATE_BY_NOTIFICATION_TYPE: Record<
   cache_hit_rate_alert: DEFAULT_TEMPLATES.cache_hit_rate_alert,
   model_mismatch_alert: DEFAULT_TEMPLATES.model_mismatch_alert,
   weight_adjustment_alert: DEFAULT_TEMPLATES.weight_adjustment_alert,
+  recharge_settlement_alert: DEFAULT_TEMPLATES.recharge_settlement_alert,
 };
