@@ -1,10 +1,15 @@
 import { generateKeyPairSync } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   buildAlipaySignContent,
+  createAlipayPrecreatePayment,
   signAlipayParameters,
   verifyAlipaySignature,
 } from "@/lib/recharge/alipay";
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 function testKeyPair() {
   return generateKeyPairSync("rsa", {
@@ -50,5 +55,47 @@ describe("Alipay RSA2 signing", () => {
     const params = { out_trade_no: "RC002", trade_status: "TRADE_SUCCESS" };
     const sign = signAlipayParameters(params, rawPrivate);
     expect(verifyAlipaySignature({ ...params, sign }, rawPublic)).toBe(true);
+  });
+
+  it("uses the v2board-compatible GET query for precreate", async () => {
+    const pair = testKeyPair();
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          alipay_trade_precreate_response: {
+            code: "10000",
+            msg: "Success",
+            qr_code: "https://qr.example.test/RC003",
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await createAlipayPrecreatePayment({
+      appId: "20240001",
+      privateKey: pair.privateKey,
+      alipayPublicKey: pair.publicKey,
+      notifyUrl: "https://app.example.test/api/v1/recharge/alipay/notify",
+      orderNo: "RC003",
+      subject: "SKHUB",
+      totalAmount: "10.04",
+    });
+
+    expect(result.qrCode).toBe("https://qr.example.test/RC003");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [request, options] = fetchMock.mock.calls[0] as [URL, RequestInit];
+    expect(request).toBeInstanceOf(URL);
+    expect(request.origin + request.pathname).toBe("https://openapi.alipay.com/gateway.do");
+    expect(options.method).toBe("GET");
+    expect(options.body).toBeUndefined();
+
+    const params = Object.fromEntries(request.searchParams.entries());
+    expect(params._input_charset).toBe("UTF-8");
+    expect(params.biz_content).toBe(
+      JSON.stringify({ subject: "SKHUB", out_trade_no: "RC003", total_amount: "10.04" })
+    );
+    expect(verifyAlipaySignature(params, pair.publicKey)).toBe(true);
   });
 });

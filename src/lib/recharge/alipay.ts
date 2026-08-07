@@ -62,6 +62,7 @@ export async function createAlipayPrecreatePayment(
     app_id: input.appId,
     method: "alipay.trade.precreate",
     charset: "UTF-8",
+    _input_charset: "UTF-8",
     sign_type: "RSA2",
     timestamp,
     version: "1.0",
@@ -74,10 +75,10 @@ export async function createAlipayPrecreatePayment(
   };
   params.sign = signAlipayParameters(params, input.privateKey);
 
-  const response = await fetch(ALIPAY_GATEWAY, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
-    body: new URLSearchParams(params),
+  const gatewayUrl = new URL(ALIPAY_GATEWAY);
+  gatewayUrl.search = new URLSearchParams(params).toString();
+  const response = await fetch(gatewayUrl, {
+    method: "GET",
     signal: AbortSignal.timeout(15_000),
   });
   if (!response.ok) {
