@@ -116,6 +116,13 @@ export function RechargeOrderDetail({ orderId }: { orderId: number }) {
         </Alert>
       ) : null}
 
+      {order.lastSettlementError && !order.needsManualHandling ? (
+        <Alert variant="destructive">
+          <AlertTitle>{t("lastError")}</AlertTitle>
+          <AlertDescription>{order.lastSettlementError}</AlertDescription>
+        </Alert>
+      ) : null}
+
       <div className="grid gap-x-8 gap-y-5 border-y py-6 sm:grid-cols-2 lg:grid-cols-3">
         <Field label={t("credit")} value={`$${order.creditUsd}`} />
         <Field label={t("paidAmount")} value={`¥${order.paidAmountCny}`} />

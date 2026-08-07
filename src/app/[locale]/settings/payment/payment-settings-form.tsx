@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Section } from "@/components/section";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -47,11 +48,13 @@ export function PaymentSettingsForm() {
   const [form, setForm] = useState<PaymentFormState>(EMPTY_FORM);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [replaceKeys, setReplaceKeys] = useState(true);
 
   useEffect(() => {
     void getRechargePaymentConfig()
       .then((value) => {
         setConfig(value);
+        setReplaceKeys(!(value.privateKeyConfigured && value.alipayPublicKeyConfigured));
         setForm({
           enabled: value.enabled,
           appId: value.appId,
@@ -73,13 +76,18 @@ export function PaymentSettingsForm() {
   };
 
   const handleSave = async () => {
+    const privateKey = form.privateKey.trim();
+    const alipayPublicKey = form.alipayPublicKey.trim();
+    if (replaceKeys && (!privateKey || !alipayPublicKey)) {
+      toast.error(t("keysRequired"));
+      return;
+    }
     setSaving(true);
     try {
       const next = await updateRechargePaymentConfig({
         enabled: form.enabled,
         appId: form.appId,
-        ...(form.privateKey ? { privateKey: form.privateKey } : {}),
-        ...(form.alipayPublicKey ? { alipayPublicKey: form.alipayPublicKey } : {}),
+        ...(replaceKeys ? { privateKey, alipayPublicKey } : {}),
         productName: form.productName,
         notifyDomain: form.notifyDomain || null,
         feeRatePercent: form.feeRatePercent,
@@ -88,6 +96,7 @@ export function PaymentSettingsForm() {
       });
       setConfig(next);
       setForm((current) => ({ ...current, privateKey: "", alipayPublicKey: "" }));
+      setReplaceKeys(!(next.privateKeyConfigured && next.alipayPublicKeyConfigured));
       toast.success(t("saved"));
     } catch {
       toast.error(t("saveFailed"));
@@ -133,29 +142,64 @@ export function PaymentSettingsForm() {
           <Field
             label={t("privateKey")}
             htmlFor="privateKey"
-            status={config?.privateKeyConfigured ? t("configured") : undefined}
+            status={
+              replaceKeys && form.privateKey
+                ? t("replacementPending")
+                : config?.privateKeyConfigured
+                  ? t("configured")
+                  : undefined
+            }
           >
             <Textarea
               id="privateKey"
               rows={5}
               value={form.privateKey}
-              placeholder={config?.privateKeyConfigured ? t("secretPlaceholder") : undefined}
+              required={replaceKeys}
+              disabled={!replaceKeys}
+              placeholder={!replaceKeys ? t("secretPlaceholder") : undefined}
               onChange={(e) => update("privateKey", e.target.value)}
             />
           </Field>
           <Field
             label={t("alipayPublicKey")}
             htmlFor="alipayPublicKey"
-            status={config?.alipayPublicKeyConfigured ? t("configured") : undefined}
+            status={
+              replaceKeys && form.alipayPublicKey
+                ? t("replacementPending")
+                : config?.alipayPublicKeyConfigured
+                  ? t("configured")
+                  : undefined
+            }
           >
             <Textarea
               id="alipayPublicKey"
               rows={5}
               value={form.alipayPublicKey}
-              placeholder={config?.alipayPublicKeyConfigured ? t("secretPlaceholder") : undefined}
+              required={replaceKeys}
+              disabled={!replaceKeys}
+              placeholder={!replaceKeys ? t("secretPlaceholder") : undefined}
               onChange={(e) => update("alipayPublicKey", e.target.value)}
             />
           </Field>
+          {config?.privateKeyConfigured && config.alipayPublicKeyConfigured ? (
+            <div className="flex items-center gap-2 md:col-span-2">
+              <Checkbox
+                id="replacePaymentKeys"
+                checked={replaceKeys}
+                onCheckedChange={(checked) => {
+                  setReplaceKeys(checked === true);
+                  if (checked !== true) {
+                    setForm((current) => ({
+                      ...current,
+                      privateKey: "",
+                      alipayPublicKey: "",
+                    }));
+                  }
+                }}
+              />
+              <Label htmlFor="replacePaymentKeys">{t("replaceKeys")}</Label>
+            </div>
+          ) : null}
           <Field label={t("notifyDomain")} htmlFor="notifyDomain">
             <Input
               id="notifyDomain"

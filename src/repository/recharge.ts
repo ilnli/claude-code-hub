@@ -5,12 +5,19 @@ import Decimal from "decimal.js-light";
 import { and, asc, count, desc, eq, ilike, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "@/drizzle/db";
 import { keys, paymentConfigVersions, rechargeOrders, users } from "@/drizzle/schema";
+import { logger } from "@/lib/logger";
 import { createAlipayPrecreatePayment, verifyAlipaySignature } from "@/lib/recharge/alipay";
 import {
   calculateAlipayAmount,
   isAmountWithinRange,
   normalizeCreditAmount,
 } from "@/lib/recharge/money";
+import { buildAlipayNotifyUrl } from "@/lib/recharge/notify-url";
+import {
+  type RechargePaymentConfigDraft,
+  resolveRechargePaymentConfig,
+  validateRechargePaymentConfig,
+} from "@/lib/recharge/payment-config";
 import { getRechargeRetryDelayMs } from "@/lib/recharge/retry";
 import { invalidateCachedKey, invalidateCachedUser } from "@/lib/security/api-key-auth-cache";
 import { createAuditLogAsync } from "@/repository/audit-log";
@@ -38,17 +45,7 @@ export class RechargeError extends Error {
   }
 }
 
-export interface RechargePaymentConfigInput {
-  enabled?: boolean;
-  appId?: string;
-  privateKey?: string;
-  alipayPublicKey?: string;
-  productName?: string;
-  notifyDomain?: string | null;
-  feeRatePercent?: string;
-  minCreditUsd?: string;
-  maxCreditUsd?: string;
-}
+export type RechargePaymentConfigInput = RechargePaymentConfigDraft;
 
 export interface RechargeAdminOrderFilters {
   status?: RechargeOrderStatus;
@@ -56,18 +53,6 @@ export interface RechargeAdminOrderFilters {
   search?: string;
   page?: number;
   pageSize?: number;
-}
-
-interface ResolvedPaymentConfig {
-  enabled: boolean;
-  appId: string;
-  privateKey: string;
-  alipayPublicKey: string;
-  productName: string;
-  notifyDomain: string | null;
-  feeRatePercent: string;
-  minCreditUsd: string;
-  maxCreditUsd: string;
 }
 
 export async function getRechargePaymentConfig(): Promise<RechargePaymentConfigPublic> {
@@ -79,7 +64,7 @@ export async function updateRechargePaymentConfig(
   input: RechargePaymentConfigInput,
   operatorUserId: number
 ): Promise<RechargePaymentConfigPublic> {
-  const created = await db.transaction(async (tx) => {
+  return db.transaction(async (tx) => {
     const [current] = await tx
       .select()
       .from(paymentConfigVersions)
@@ -87,8 +72,17 @@ export async function updateRechargePaymentConfig(
       .limit(1)
       .for("update");
 
-    const resolved = resolvePaymentConfigInput(input, current ?? null);
-    validatePaymentConfig(resolved);
+    const hasPrivateKey = Boolean(input.privateKey?.trim());
+    const hasAlipayPublicKey = Boolean(input.alipayPublicKey?.trim());
+    if (hasPrivateKey !== hasAlipayPublicKey) {
+      throw new RechargeError("CONFIG_REQUIRED_FIELDS_MISSING");
+    }
+    const resolved = resolveRechargePaymentConfig(input, current ?? null);
+    try {
+      validateRechargePaymentConfig(resolved);
+    } catch (error) {
+      throw new RechargeError(error instanceof Error ? error.message : "CONFIG_SAVE_FAILED");
+    }
 
     if (current) {
       await tx
@@ -106,10 +100,10 @@ export async function updateRechargePaymentConfig(
       })
       .returning();
     if (!next) throw new RechargeError("CONFIG_SAVE_FAILED");
-    return next;
+    // Keep public response conversion inside the transaction. A conversion failure must not
+    // make the client observe a failed save after the new version has already committed.
+    return toPublicConfig(next);
   });
-
-  return toPublicConfig(created);
 }
 
 export async function getRechargeAvailability(keyId: number): Promise<RechargeAvailability> {
@@ -229,7 +223,11 @@ export async function createRechargeOrder(input: {
       appId: created.config.appId,
       privateKey: created.config.privateKey,
       alipayPublicKey: created.config.alipayPublicKey,
-      notifyUrl: buildNotifyUrl(created.config.notifyDomain, input.requestOrigin),
+      notifyUrl: buildAlipayNotifyUrl(
+        created.config.notifyDomain,
+        process.env.APP_URL,
+        input.requestOrigin
+      ),
       orderNo: created.order.orderNo,
       subject: created.order.productName,
       totalAmount: created.order.paidAmountCny,
@@ -242,11 +240,18 @@ export async function createRechargeOrder(input: {
     if (!updated) throw new RechargeError("ORDER_NO_LONGER_PENDING");
     return toOrderView(updated);
   } catch (error) {
+    const errorMessage = safeErrorMessage(error);
+    logger.error("[Recharge] Alipay precreate failed", {
+      orderId: created.order.id,
+      orderNo: created.order.orderNo,
+      error: errorMessage,
+    });
     await db
       .update(rechargeOrders)
       .set({
         status: "cancelled",
         cancellationReason: "payment_creation_failed",
+        lastSettlementError: errorMessage,
         cancelledAt: new Date(),
         updatedAt: new Date(),
       })
@@ -887,49 +892,6 @@ async function getActivePaymentConfigRow(): Promise<PaymentConfigRow | null> {
   return row ?? null;
 }
 
-function resolvePaymentConfigInput(
-  input: RechargePaymentConfigInput,
-  current: PaymentConfigRow | null
-): ResolvedPaymentConfig {
-  return {
-    enabled: input.enabled ?? current?.enabled ?? false,
-    appId: input.appId?.trim() || current?.appId || "",
-    privateKey: input.privateKey?.trim() || current?.privateKey || "",
-    alipayPublicKey: input.alipayPublicKey?.trim() || current?.alipayPublicKey || "",
-    productName: input.productName?.trim() || current?.productName || "",
-    notifyDomain:
-      input.notifyDomain === undefined
-        ? (current?.notifyDomain ?? null)
-        : input.notifyDomain?.trim() || null,
-    feeRatePercent: input.feeRatePercent ?? current?.feeRatePercent ?? "0",
-    minCreditUsd: input.minCreditUsd ?? current?.minCreditUsd ?? "1",
-    maxCreditUsd: input.maxCreditUsd ?? current?.maxCreditUsd ?? "1000",
-  };
-}
-
-function validatePaymentConfig(config: ReturnType<typeof resolvePaymentConfigInput>): void {
-  if (!config.appId || !config.privateKey || !config.alipayPublicKey || !config.productName) {
-    throw new RechargeError("CONFIG_REQUIRED_FIELDS_MISSING");
-  }
-  const fee = new Decimal(config.feeRatePercent);
-  const min = new Decimal(config.minCreditUsd);
-  const max = new Decimal(config.maxCreditUsd);
-  if (fee.lt(0) || fee.gte(100) || fee.decimalPlaces() > 4) {
-    throw new RechargeError("CONFIG_INVALID_FEE_RATE");
-  }
-  if (min.lte(0) || max.lt(min) || min.decimalPlaces() > 2 || max.decimalPlaces() > 2) {
-    throw new RechargeError("CONFIG_INVALID_AMOUNT_RANGE");
-  }
-  if (config.notifyDomain) {
-    try {
-      const url = new URL(config.notifyDomain);
-      if (!["http:", "https:"].includes(url.protocol)) throw new Error("protocol");
-    } catch {
-      throw new RechargeError("CONFIG_INVALID_NOTIFY_DOMAIN");
-    }
-  }
-}
-
 function toPublicConfig(config: PaymentConfigRow | null): RechargePaymentConfigPublic {
   return {
     id: config?.id ?? null,
@@ -983,11 +945,6 @@ function createOrderNo(now: Date): string {
     .replace(/[-:TZ.]/g, "")
     .slice(0, 14);
   return `RC${stamp}${randomBytes(6).toString("hex").toUpperCase()}`;
-}
-
-function buildNotifyUrl(configuredDomain: string | null, requestOrigin: string): string {
-  const base = configuredDomain ? new URL(configuredDomain).origin : new URL(requestOrigin).origin;
-  return `${base}/api/v1/recharge/alipay/notify`;
 }
 
 function safeErrorMessage(error: unknown): string {

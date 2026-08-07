@@ -12,13 +12,13 @@
   "messages": { "cancelled": "訂單已取消" },
   "admin": {
     "config": {
-      "title": "支付寶付款設定", "description": "設定支付寶當面付、手續費與使用者可儲值範圍。", "sectionTitle": "支付寶當面付", "sectionDescription": "每次儲存會建立新版本，歷史訂單繼續使用建立時的版本驗簽。", "enabled": "允許建立儲值訂單", "enabledDescription": "關閉後只阻止新訂單，現有訂單仍可回呼與結算。", "appId": "App ID", "productName": "商品名稱", "privateKey": "應用程式私鑰", "alipayPublicKey": "支付寶公鑰", "notifyDomain": "通知網域覆寫", "feeRate": "付款手續費率（%）", "minCredit": "最小入帳額度（USD）", "maxCredit": "最大入帳額度（USD）", "configured": "已設定", "secretPlaceholder": "留空以保留目前金鑰", "activeVersion": "目前設定版本 #{id}，建立於 {time}", "save": "儲存新版本", "saved": "付款設定已儲存", "loadFailed": "載入付款設定失敗", "saveFailed": "儲存付款設定失敗"
+      "title": "支付寶付款設定", "description": "設定支付寶當面付、手續費與使用者可儲值範圍。", "sectionTitle": "支付寶當面付", "sectionDescription": "每次儲存會建立新版本，歷史訂單繼續使用建立時的版本驗簽。", "enabled": "允許建立儲值訂單", "enabledDescription": "關閉後只阻止新訂單，現有訂單仍可回呼與結算。", "appId": "App ID", "productName": "商品名稱", "privateKey": "應用程式私鑰", "alipayPublicKey": "支付寶公鑰", "notifyDomain": "通知網域覆寫", "feeRate": "付款手續費率（%）", "minCredit": "最小入帳額度（USD）", "maxCredit": "最大入帳額度（USD）", "configured": "已設定", "secretPlaceholder": "保留目前金鑰", "replaceKeys": "替換應用程式私鑰與支付寶公鑰", "replacementPending": "等待替換", "keysRequired": "替換金鑰時必須同時填寫應用程式私鑰與支付寶公鑰", "activeVersion": "目前設定版本 #{id}，建立於 {time}", "save": "儲存新版本", "saved": "付款設定已儲存", "loadFailed": "載入付款設定失敗", "saveFailed": "儲存付款設定失敗"
     },
     "orders": {
       "title": "儲值訂單", "description": "查看支付寶付款與額度結算狀態。", "manualCount": "待人工處理 {count}", "refresh": "重新整理", "search": "搜尋訂單號、交易號、使用者或金鑰", "allStatuses": "全部狀態", "manualOnly": "僅待人工處理", "orderNo": "訂單號", "owner": "使用者 / 金鑰", "amount": "額度 / 實付", "status": "狀態", "createdAt": "建立時間", "empty": "沒有符合條件的訂單", "loadFailed": "載入儲值訂單失敗"
     },
     "detail": {
-      "title": "儲值訂單詳情", "manualTitle": "此訂單需要人工處理", "credit": "入帳額度", "paidAmount": "支付寶實付", "feeRate": "手續費率", "user": "使用者", "key": "金鑰", "tradeNo": "支付寶交易號", "createdAt": "建立時間", "paidAt": "付款時間", "completedAt": "完成時間", "retryCount": "自動重試次數", "reason": "處理原因", "confirm": "手動確認付款", "cancel": "取消訂單", "retry": "重試結算", "close": "人工關閉/已退款", "reasonLabel": "操作原因", "submit": "確認操作", "back": "返回", "done": "訂單已更新", "loadFailed": "載入訂單詳情失敗", "actionFailed": "訂單操作失敗", "actions": { "confirm": "手動確認付款", "cancel": "取消訂單", "close": "人工關閉/已退款" }
+      "title": "儲值訂單詳情", "manualTitle": "此訂單需要人工處理", "credit": "入帳額度", "paidAmount": "支付寶實付", "feeRate": "手續費率", "user": "使用者", "key": "金鑰", "tradeNo": "支付寶交易號", "createdAt": "建立時間", "paidAt": "付款時間", "completedAt": "完成時間", "retryCount": "自動重試次數", "reason": "處理原因", "lastError": "最近一次錯誤", "confirm": "手動確認付款", "cancel": "取消訂單", "retry": "重試結算", "close": "人工關閉/已退款", "reasonLabel": "操作原因", "submit": "確認操作", "back": "返回", "done": "訂單已更新", "loadFailed": "載入訂單詳情失敗", "actionFailed": "訂單操作失敗", "actions": { "confirm": "手動確認付款", "cancel": "取消訂單", "close": "人工關閉/已退款" }
     }
   }
 }

@@ -11,6 +11,7 @@ import {
   RechargePaymentConfigUpdateSchema,
 } from "@/lib/api/v1/schemas/recharge";
 import { getRequestContext } from "@/lib/audit/request-context";
+import { logger } from "@/lib/logger";
 import { createAuditLogAsync } from "@/repository/audit-log";
 import {
   adminCancelRechargeOrder,
@@ -128,15 +129,24 @@ export async function updateRechargeConfigAdmin(c: Context): Promise<Response> {
   if (auth instanceof Response) return auth;
   const body = await parseHonoJsonBody(c, RechargePaymentConfigUpdateSchema);
   if (!body.ok) return body.response;
+  const before = await getRechargePaymentConfig();
+  let config;
   try {
-    const before = await getRechargePaymentConfig();
-    const config = await updateRechargePaymentConfig(body.data, auth.session.user.id);
-    audit(c, auth, "recharge.config.update", config.id, { before, after: config });
-    return jsonResponse(config);
+    config = await updateRechargePaymentConfig(body.data, auth.session.user.id);
   } catch (error) {
     audit(c, auth, "recharge.config.update", null, null, false, error);
     return rechargeProblem(c, error);
   }
+  try {
+    audit(c, auth, "recharge.config.update", config.id, { before, after: config });
+  } catch (error) {
+    // Auditing is best effort and must never turn a committed configuration into a failed save.
+    logger.warn("[Recharge] configuration audit failed after commit", {
+      error: error instanceof Error ? error.message : String(error),
+      configId: config.id,
+    });
+  }
+  return jsonResponse(config);
 }
 
 export async function listRechargeOrdersAdminHandler(c: Context): Promise<Response> {
@@ -237,14 +247,13 @@ function parseOrderId(c: Context): number | Response {
 
 function rechargeProblem(c: Context, error: unknown): Response {
   const code = error instanceof RechargeError ? error.code : "INTERNAL_ERROR";
-  const status =
-    code.includes("NOT_FOUND") || code.includes("MISSING")
-      ? 404
-      : code.includes("EXISTS") || code.includes("NOT_PENDING") || code.includes("CANNOT")
-        ? 409
-        : code.includes("DISABLED") || code.includes("ALIPAY")
-          ? 503
-          : 422;
+  const status = code.includes("NOT_FOUND")
+    ? 404
+    : code.includes("EXISTS") || code.includes("NOT_PENDING") || code.includes("CANNOT")
+      ? 409
+      : code.includes("DISABLED") || code.includes("ALIPAY")
+        ? 503
+        : 422;
   return createProblemResponse({
     status,
     instance: new URL(c.req.url).pathname,
@@ -262,20 +271,27 @@ function audit(
   success = true,
   error?: unknown
 ): void {
-  const request = getRequestContext();
-  void createAuditLogAsync({
-    actionCategory: "recharge",
-    actionType,
-    targetType: "recharge_order",
-    targetId: targetId === null ? null : String(targetId),
-    afterValue: afterValue ?? null,
-    operatorUserId: auth?.session.user.id ?? null,
-    operatorUserName: auth?.session.user.name ?? null,
-    operatorKeyId: auth?.session.key.id ?? null,
-    operatorKeyName: auth?.session.key.name ?? null,
-    operatorIp: request.ip,
-    userAgent: request.userAgent ?? c.req.header("user-agent") ?? null,
-    success,
-    errorMessage: success ? null : error instanceof Error ? error.message : String(error),
-  });
+  try {
+    const request = getRequestContext();
+    void createAuditLogAsync({
+      actionCategory: "recharge",
+      actionType,
+      targetType: "recharge_order",
+      targetId: targetId === null ? null : String(targetId),
+      afterValue: afterValue ?? null,
+      operatorUserId: auth?.session.user.id ?? null,
+      operatorUserName: auth?.session.user.name ?? null,
+      operatorKeyId: auth?.session.key.id ?? null,
+      operatorKeyName: auth?.session.key.name ?? null,
+      operatorIp: request.ip,
+      userAgent: request.userAgent ?? c.req.header("user-agent") ?? null,
+      success,
+      errorMessage: success ? null : error instanceof Error ? error.message : String(error),
+    });
+  } catch (auditError) {
+    logger.warn("[Recharge] audit event could not be queued", {
+      actionType,
+      error: auditError instanceof Error ? auditError.message : String(auditError),
+    });
+  }
 }
