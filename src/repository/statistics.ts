@@ -27,6 +27,15 @@ import { EXCLUDE_WARMUP_CONDITION } from "./_shared/message-request-conditions";
  * Size-bounded to avoid unbounded growth in multi-tenant scenarios.
  */
 const keyStringByIdCache = new TTLMap<number, string>({ ttlMs: 5 * 60 * 1000, maxSize: 1000 });
+const BATCH_COST_CRITERIA_SIZE = 1000;
+
+function chunkItems<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
+}
 
 async function getKeyStringByIdCached(keyId: number): Promise<string | null> {
   const cached = keyStringByIdCache.get(keyId);
@@ -571,49 +580,45 @@ export async function sumUserTotalCostBatch(
   resetAtMap?: Map<number, Date>
 ): Promise<Map<number, number>> {
   const result = new Map<number, number>();
-  if (userIds.length === 0) return result;
-  for (const id of userIds) result.set(id, 0);
+  const uniqueUserIds = Array.from(new Set(userIds));
+  if (uniqueUserIds.length === 0) return result;
 
-  // Split users: those with costResetAt need individual queries
-  const resetUserIds: number[] = [];
-  const batchUserIds: number[] = [];
-  for (const id of userIds) {
-    if (resetAtMap?.has(id)) {
-      resetUserIds.push(id);
-    } else {
-      batchUserIds.push(id);
+  const maxAgeCutoff =
+    Number.isFinite(maxAgeDays) && maxAgeDays > 0
+      ? new Date(Date.now() - Math.floor(maxAgeDays) * 24 * 60 * 60 * 1000)
+      : null;
+
+  for (const batch of chunkItems(uniqueUserIds, BATCH_COST_CRITERIA_SIZE)) {
+    for (const id of batch) result.set(id, 0);
+
+    const values = batch.map((id) => {
+      const resetAt = resetAtMap?.get(id);
+      const validResetAt =
+        resetAt instanceof Date && !Number.isNaN(resetAt.getTime()) ? resetAt : null;
+      const cutoff =
+        validResetAt && (!maxAgeCutoff || validResetAt > maxAgeCutoff)
+          ? validResetAt
+          : maxAgeCutoff;
+      return sql`(${id}::integer, ${cutoff?.toISOString() ?? null}::timestamptz)`;
+    });
+    const rows = await db.execute(sql`
+      SELECT
+        criteria.user_id AS "userId",
+        COALESCE(SUM(${usageLedger.costUsd}), 0) AS "total"
+      FROM (VALUES ${sql.join(values, sql`, `)}) AS criteria(user_id, cutoff_at)
+      LEFT JOIN ${usageLedger}
+        ON ${usageLedger.userId} = criteria.user_id
+        AND (criteria.cutoff_at IS NULL OR ${usageLedger.createdAt} >= criteria.cutoff_at)
+        AND ${LEDGER_BILLING_CONDITION}
+      GROUP BY criteria.user_id
+    `);
+
+    for (const row of Array.from(rows) as Array<{
+      userId: number;
+      total: string | number | null;
+    }>) {
+      result.set(Number(row.userId), Number(row.total ?? 0));
     }
-  }
-
-  // Individual queries for users with costResetAt
-  if (resetUserIds.length > 0) {
-    const resetResults = await Promise.all(
-      resetUserIds.map(async (id) => ({
-        id,
-        total: await sumUserTotalCost(id, maxAgeDays, resetAtMap!.get(id)),
-      }))
-    );
-    for (const { id, total } of resetResults) result.set(id, total);
-  }
-
-  // Batch query for users without costResetAt
-  if (batchUserIds.length > 0) {
-    const conditions: SQL[] = [inArray(usageLedger.userId, batchUserIds), LEDGER_BILLING_CONDITION];
-    if (Number.isFinite(maxAgeDays) && maxAgeDays > 0) {
-      const cutoffDate = new Date(Date.now() - Math.floor(maxAgeDays) * 24 * 60 * 60 * 1000);
-      conditions.push(gte(usageLedger.createdAt, cutoffDate));
-    }
-
-    const rows = await db
-      .select({
-        userId: usageLedger.userId,
-        total: sql<number>`COALESCE(SUM(${usageLedger.costUsd}), 0)`,
-      })
-      .from(usageLedger)
-      .where(and(...conditions))
-      .groupBy(usageLedger.userId);
-
-    for (const row of rows) result.set(row.userId, Number(row.total || 0));
   }
 
   return result;
@@ -633,66 +638,52 @@ export async function sumKeyTotalCostBatchByIds(
   resetAtMap?: Map<number, Date>
 ): Promise<Map<number, number>> {
   const result = new Map<number, number>();
-  if (keyIds.length === 0) return result;
-  for (const id of keyIds) result.set(id, 0);
+  const uniqueKeyIds = Array.from(new Set(keyIds));
+  if (uniqueKeyIds.length === 0) return result;
+  for (const id of uniqueKeyIds) result.set(id, 0);
 
-  // Step 1: PK lookup -> key strings
-  const keyMappings = await db
-    .select({ id: keys.id, key: keys.key })
-    .from(keys)
-    .where(inArray(keys.id, keyIds));
-
-  const keyStringToId = new Map(keyMappings.map((k) => [k.key, k.id]));
-  const idToKeyString = new Map(keyMappings.map((k) => [k.id, k.key]));
-  const keyStrings = keyMappings.map((k) => k.key);
-  if (keyStrings.length === 0) return result;
-
-  // Split keys: those with costResetAt need individual queries
-  const resetKeyIds: number[] = [];
-  const batchKeyStrings: string[] = [];
-  for (const mapping of keyMappings) {
-    if (resetAtMap?.has(mapping.id)) {
-      resetKeyIds.push(mapping.id);
-    } else {
-      batchKeyStrings.push(mapping.key);
-    }
+  // Step 1: bounded PK lookups -> key strings
+  const keyMappings: Array<{ id: number; key: string }> = [];
+  for (const batch of chunkItems(uniqueKeyIds, BATCH_COST_CRITERIA_SIZE)) {
+    const mappings = await db
+      .select({ id: keys.id, key: keys.key })
+      .from(keys)
+      .where(inArray(keys.id, batch));
+    keyMappings.push(...mappings);
   }
+  if (keyMappings.length === 0) return result;
 
-  // Individual queries for keys with costResetAt
-  if (resetKeyIds.length > 0) {
-    const resetResults = await Promise.all(
-      resetKeyIds.map(async (id) => {
-        const keyString = idToKeyString.get(id);
-        if (!keyString) return { id, total: 0 };
-        return {
-          id,
-          total: await sumKeyTotalCost(keyString, maxAgeDays, resetAtMap!.get(id)),
-        };
-      })
-    );
-    for (const { id, total } of resetResults) result.set(id, total);
-  }
+  const maxAgeCutoff =
+    Number.isFinite(maxAgeDays) && maxAgeDays > 0
+      ? new Date(Date.now() - Math.floor(maxAgeDays) * 24 * 60 * 60 * 1000)
+      : null;
 
-  // Step 2: Batch aggregate for keys without costResetAt
-  if (batchKeyStrings.length > 0) {
-    const conditions: SQL[] = [inArray(usageLedger.key, batchKeyStrings), LEDGER_BILLING_CONDITION];
-    if (Number.isFinite(maxAgeDays) && maxAgeDays > 0) {
-      const cutoffDate = new Date(Date.now() - Math.floor(maxAgeDays) * 24 * 60 * 60 * 1000);
-      conditions.push(gte(usageLedger.createdAt, cutoffDate));
-    }
+  // Step 2: join per-key cutoff criteria to the ledger in bounded batches.
+  for (const batch of chunkItems(keyMappings, BATCH_COST_CRITERIA_SIZE)) {
+    const values = batch.map(({ id, key }) => {
+      const resetAt = resetAtMap?.get(id);
+      const validResetAt =
+        resetAt instanceof Date && !Number.isNaN(resetAt.getTime()) ? resetAt : null;
+      const cutoff =
+        validResetAt && (!maxAgeCutoff || validResetAt > maxAgeCutoff)
+          ? validResetAt
+          : maxAgeCutoff;
+      return sql`(${id}::integer, ${key}::text, ${cutoff?.toISOString() ?? null}::timestamptz)`;
+    });
+    const rows = await db.execute(sql`
+      SELECT
+        criteria.key_id AS "keyId",
+        COALESCE(SUM(${usageLedger.costUsd}), 0) AS "total"
+      FROM (VALUES ${sql.join(values, sql`, `)}) AS criteria(key_id, key_value, cutoff_at)
+      LEFT JOIN ${usageLedger}
+        ON ${usageLedger.key} = criteria.key_value
+        AND (criteria.cutoff_at IS NULL OR ${usageLedger.createdAt} >= criteria.cutoff_at)
+        AND ${LEDGER_BILLING_CONDITION}
+      GROUP BY criteria.key_id
+    `);
 
-    const rows = await db
-      .select({
-        key: usageLedger.key,
-        total: sql<number>`COALESCE(SUM(${usageLedger.costUsd}), 0)`,
-      })
-      .from(usageLedger)
-      .where(and(...conditions))
-      .groupBy(usageLedger.key);
-
-    for (const row of rows) {
-      const keyId = keyStringToId.get(row.key);
-      if (keyId !== undefined) result.set(keyId, Number(row.total || 0));
+    for (const row of Array.from(rows) as Array<{ keyId: number; total: string | number | null }>) {
+      result.set(Number(row.keyId), Number(row.total ?? 0));
     }
   }
 
@@ -752,6 +743,49 @@ export async function sumUserCostInTimeRange(
     );
 
   return Number(result[0]?.total || 0);
+}
+
+/**
+ * Batch query user costs where each user can have a different time range.
+ * Criteria are joined through VALUES so the operation stays bounded instead
+ * of issuing one query per user.
+ */
+export async function sumUserCostInTimeRangeBatch(
+  rangesByUserId: Map<number, { startTime: Date; endTime: Date }>
+): Promise<Map<number, number>> {
+  const result = new Map<number, number>();
+  const criteria = Array.from(rangesByUserId, ([userId, range]) => ({ userId, ...range }));
+  if (criteria.length === 0) return result;
+
+  for (const batch of chunkItems(criteria, BATCH_COST_CRITERIA_SIZE)) {
+    for (const { userId } of batch) result.set(userId, 0);
+
+    const values = batch.map(
+      ({ userId, startTime, endTime }) =>
+        sql`(${userId}::integer, ${startTime.toISOString()}::timestamptz, ${endTime.toISOString()}::timestamptz)`
+    );
+    const rows = await db.execute(sql`
+      SELECT
+        criteria.user_id AS "userId",
+        COALESCE(SUM(${usageLedger.costUsd}), 0) AS "total"
+      FROM (VALUES ${sql.join(values, sql`, `)}) AS criteria(user_id, start_at, end_at)
+      LEFT JOIN ${usageLedger}
+        ON ${usageLedger.userId} = criteria.user_id
+        AND ${usageLedger.createdAt} >= criteria.start_at
+        AND ${usageLedger.createdAt} < criteria.end_at
+        AND ${LEDGER_BILLING_CONDITION}
+      GROUP BY criteria.user_id
+    `);
+
+    for (const row of Array.from(rows) as Array<{
+      userId: number;
+      total: string | number | null;
+    }>) {
+      result.set(Number(row.userId), Number(row.total ?? 0));
+    }
+  }
+
+  return result;
 }
 
 /**

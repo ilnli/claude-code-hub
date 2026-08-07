@@ -31,6 +31,11 @@ export interface ResetInfo {
   period?: string; // 滚动窗口的周期描述
 }
 
+export interface TimeCalculationOptions {
+  timezone?: string;
+  now?: Date;
+}
+
 export function getResetAtFromTtlSeconds(ttlSeconds: number | null | undefined): Date | null {
   if (!Number.isFinite(ttlSeconds) || ttlSeconds == null || ttlSeconds <= 0) {
     return null;
@@ -49,11 +54,12 @@ export function getResetAtFromTtlSeconds(ttlSeconds: number | null | undefined):
  */
 export async function getTimeRangeForPeriod(
   period: TimePeriod,
-  resetTime = "00:00"
+  resetTime = "00:00",
+  options?: TimeCalculationOptions
 ): Promise<TimeRange> {
-  const timezone = await resolveSystemTimezone();
+  const timezone = options?.timezone ?? (await resolveSystemTimezone());
   const normalizedResetTime = normalizeResetTime(resetTime);
-  const now = new Date();
+  const now = options?.now ?? new Date();
   const endTime = now;
   let startTime: Date;
 
@@ -98,10 +104,11 @@ export async function getTimeRangeForPeriod(
 export async function getTimeRangeForPeriodWithMode(
   period: TimePeriod,
   resetTime = "00:00",
-  mode: DailyResetMode = "fixed"
+  mode: DailyResetMode = "fixed",
+  options?: TimeCalculationOptions
 ): Promise<TimeRange> {
   if (period === "5h" && mode === "rolling") {
-    const now = new Date();
+    const now = options?.now ?? new Date();
     return {
       startTime: new Date(now.getTime() - 5 * 60 * 60 * 1000),
       endTime: now,
@@ -110,7 +117,7 @@ export async function getTimeRangeForPeriodWithMode(
 
   if (period === "daily" && mode === "rolling") {
     // 滚动窗口：过去 24 小时
-    const now = new Date();
+    const now = options?.now ?? new Date();
     return {
       startTime: new Date(now.getTime() - 24 * 60 * 60 * 1000),
       endTime: now,
@@ -118,7 +125,7 @@ export async function getTimeRangeForPeriodWithMode(
   }
 
   // 其他情况使用原有逻辑
-  return getTimeRangeForPeriod(period, resetTime);
+  return getTimeRangeForPeriod(period, resetTime, options);
 }
 
 /**
@@ -189,9 +196,13 @@ export async function getTTLForPeriodWithMode(
 /**
  * 获取重置信息（用于前端展示）
  */
-export async function getResetInfo(period: TimePeriod, resetTime = "00:00"): Promise<ResetInfo> {
-  const timezone = await resolveSystemTimezone();
-  const now = new Date();
+export async function getResetInfo(
+  period: TimePeriod,
+  resetTime = "00:00",
+  options?: TimeCalculationOptions
+): Promise<ResetInfo> {
+  const timezone = options?.timezone ?? (await resolveSystemTimezone());
+  const now = options?.now ?? new Date();
   const normalizedResetTime = normalizeResetTime(resetTime);
 
   switch (period) {
@@ -242,7 +253,8 @@ export async function getResetInfoWithMode(
   period: TimePeriod,
   resetTime = "00:00",
   mode: DailyResetMode = "fixed",
-  ttlSeconds?: number | null
+  ttlSeconds?: number | null,
+  options?: TimeCalculationOptions
 ): Promise<ResetInfo> {
   if (period === "5h" && mode === "fixed") {
     const resetAt = getResetAtFromTtlSeconds(ttlSeconds);
@@ -259,7 +271,7 @@ export async function getResetInfoWithMode(
     };
   }
 
-  return getResetInfo(period, resetTime);
+  return getResetInfo(period, resetTime, options);
 }
 
 function getCustomDailyResetTime(now: Date, resetTime: string, timezone: string): Date {

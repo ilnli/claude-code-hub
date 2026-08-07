@@ -1,11 +1,12 @@
 import { Info } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 import { Suspense } from "react";
-import { getUserLimitUsage, getUsersBatch } from "@/actions/users";
+import { getUsersBatch } from "@/actions/users";
 import { QuotaToolbar } from "@/components/quota/quota-toolbar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Link, redirect } from "@/i18n/routing";
 import { getSession } from "@/lib/auth";
+import { loadUserQuotaSnapshots } from "@/lib/dashboard/user-quota-loader";
 import { resolveKeyCostResetAt } from "@/lib/rate-limit/cost-reset-utils";
 import { sumKeyTotalCostBatchByIds, sumUserTotalCostBatch } from "@/repository/statistics";
 import { getSystemSettings } from "@/repository/system-config";
@@ -66,9 +67,9 @@ async function getUsersWithQuotas(): Promise<UserQuotaWithUsage[]> {
     }
   }
 
-  // 3 queries total instead of N+M individual SUM queries
+  // Each aggregate uses bounded batch queries, including entities with reset timestamps.
   const [quotaResults, userCostMap, keyCostMap] = await Promise.all([
-    Promise.all(users.map((u) => getUserLimitUsage(u.id))),
+    loadUserQuotaSnapshots(users),
     sumUserTotalCostBatch(
       allUserIds,
       Infinity,
@@ -81,9 +82,7 @@ async function getUsersWithQuotas(): Promise<UserQuotaWithUsage[]> {
     ),
   ]);
 
-  return users.map((user, idx) => {
-    const quotaResult = quotaResults[idx];
-
+  return users.map((user) => {
     const keysWithUsage: UserKeyWithUsage[] = user.keys.map((key) => ({
       id: key.id,
       name: key.name,
@@ -109,7 +108,7 @@ async function getUsersWithQuotas(): Promise<UserQuotaWithUsage[]> {
       expiresAt: user.expiresAt ?? null,
       providerGroup: user.providerGroup,
       tags: user.tags,
-      quota: quotaResult.ok ? quotaResult.data : null,
+      quota: quotaResults.get(user.id) ?? null,
       limit5hUsd: user.limit5hUsd ?? null,
       limitWeeklyUsd: user.limitWeeklyUsd ?? null,
       limitMonthlyUsd: user.limitMonthlyUsd ?? null,

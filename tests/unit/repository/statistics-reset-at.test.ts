@@ -9,6 +9,7 @@ function chain(): Record<string, unknown> {
   for (const method of ["select", "from", "where", "groupBy", "limit"]) {
     obj[method] = vi.fn(() => chain());
   }
+  obj.execute = vi.fn(() => dbResultMock());
   // Make it thenable so `await db.select().from().where()` works
   // biome-ignore lint/suspicious/noThenProperty: thenable mock for drizzle query chain
   obj.then = (resolve: (v: unknown) => void, reject: (e: unknown) => void) => {
@@ -110,19 +111,19 @@ describe("statistics resetAt parameter", () => {
   });
 
   describe("sumUserTotalCostBatch", () => {
-    test("with resetAtMap -- splits users: individual queries for reset users", async () => {
+    test("with resetAtMap -- aggregates reset and non-reset users in one query", async () => {
       const resetAtMap = new Map([[10, new Date("2026-02-15T00:00:00Z")]]);
-      // Calls: 1) individual sumUserTotalCost(10) => where => [{ total: 25 }]
-      //        2) batch for user 20 => groupBy => [{ userId: 20, total: 50 }]
-      dbResultMock
-        .mockReturnValueOnce([{ total: 25.0 }])
-        .mockReturnValueOnce([{ userId: 20, total: 50.0 }]);
+      dbResultMock.mockReturnValueOnce([
+        { userId: 10, total: 25.0 },
+        { userId: 20, total: 50.0 },
+      ]);
 
       const { sumUserTotalCostBatch } = await import("@/repository/statistics");
       const result = await sumUserTotalCostBatch([10, 20], 365, resetAtMap);
 
       expect(result.get(10)).toBe(25.0);
       expect(result.get(20)).toBe(50.0);
+      expect(dbResultMock).toHaveBeenCalledTimes(1);
     });
 
     test("with empty resetAtMap -- single batch query for all users", async () => {
@@ -138,6 +139,23 @@ describe("statistics resetAt parameter", () => {
       expect(result.get(20)).toBe(50.0);
     });
 
+    test("keeps more than 32 reset users in one admitted operation", async () => {
+      const userIds = Array.from({ length: 64 }, (_, index) => index + 1);
+      const resetAtMap = new Map(
+        userIds.map((id) => [
+          id,
+          new Date(`2026-02-${String((id % 20) + 1).padStart(2, "0")}T00:00:00Z`),
+        ])
+      );
+      dbResultMock.mockReturnValueOnce(userIds.map((userId) => ({ userId, total: userId })));
+
+      const { sumUserTotalCostBatch } = await import("@/repository/statistics");
+      const result = await sumUserTotalCostBatch(userIds, Infinity, resetAtMap);
+
+      expect(result.get(64)).toBe(64);
+      expect(dbResultMock).toHaveBeenCalledTimes(1);
+    });
+
     test("empty userIds -- returns empty map immediately", async () => {
       const { sumUserTotalCostBatch } = await import("@/repository/statistics");
       const result = await sumUserTotalCostBatch([], 365);
@@ -147,7 +165,7 @@ describe("statistics resetAt parameter", () => {
   });
 
   describe("sumKeyTotalCostBatchByIds", () => {
-    test("with resetAtMap -- splits keys into individual vs batch", async () => {
+    test("with resetAtMap -- aggregates all key cutoffs in one query", async () => {
       const resetAtMap = new Map([[1, new Date("2026-02-15T00:00:00Z")]]);
       dbResultMock
         // 1) PK lookup: key strings
@@ -155,16 +173,18 @@ describe("statistics resetAt parameter", () => {
           { id: 1, key: "sk-a" },
           { id: 2, key: "sk-b" },
         ])
-        // 2) individual sumKeyTotalCost for key 1
-        .mockReturnValueOnce([{ total: 10.0 }])
-        // 3) batch for key 2
-        .mockReturnValueOnce([{ key: "sk-b", total: 20.0 }]);
+        // 2) one aggregate for both per-key cutoff criteria
+        .mockReturnValueOnce([
+          { keyId: 1, total: 10.0 },
+          { keyId: 2, total: 20.0 },
+        ]);
 
       const { sumKeyTotalCostBatchByIds } = await import("@/repository/statistics");
       const result = await sumKeyTotalCostBatchByIds([1, 2], 365, resetAtMap);
 
       expect(result.get(1)).toBe(10.0);
       expect(result.get(2)).toBe(20.0);
+      expect(dbResultMock).toHaveBeenCalledTimes(2);
     });
 
     test("empty keyIds -- returns empty map immediately", async () => {
@@ -172,6 +192,62 @@ describe("statistics resetAt parameter", () => {
       const result = await sumKeyTotalCostBatchByIds([], 365);
 
       expect(result.size).toBe(0);
+    });
+
+    test("keeps more than 32 reset keys in one aggregate operation", async () => {
+      const keyIds = Array.from({ length: 64 }, (_, index) => index + 1);
+      const resetAtMap = new Map(
+        keyIds.map((id) => [
+          id,
+          new Date(`2026-02-${String((id % 20) + 1).padStart(2, "0")}T00:00:00Z`),
+        ])
+      );
+      dbResultMock
+        .mockReturnValueOnce(keyIds.map((id) => ({ id, key: `sk-${id}` })))
+        .mockReturnValueOnce(keyIds.map((keyId) => ({ keyId, total: keyId })));
+
+      const { sumKeyTotalCostBatchByIds } = await import("@/repository/statistics");
+      const result = await sumKeyTotalCostBatchByIds(keyIds, Infinity, resetAtMap);
+
+      expect(result.get(64)).toBe(64);
+      expect(dbResultMock).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("sumUserCostInTimeRangeBatch", () => {
+    test("aggregates different user windows in one query", async () => {
+      dbResultMock.mockReturnValueOnce([
+        { userId: 10, total: "12.5" },
+        { userId: 20, total: "7.25" },
+      ]);
+
+      const { sumUserCostInTimeRangeBatch } = await import("@/repository/statistics");
+      const result = await sumUserCostInTimeRangeBatch(
+        new Map([
+          [
+            10,
+            {
+              startTime: new Date("2026-02-15T00:00:00Z"),
+              endTime: new Date("2026-02-16T00:00:00Z"),
+            },
+          ],
+          [
+            20,
+            {
+              startTime: new Date("2026-02-15T08:00:00Z"),
+              endTime: new Date("2026-02-16T08:00:00Z"),
+            },
+          ],
+        ])
+      );
+
+      expect(result).toEqual(
+        new Map([
+          [10, 12.5],
+          [20, 7.25],
+        ])
+      );
+      expect(dbResultMock).toHaveBeenCalledTimes(1);
     });
   });
 
