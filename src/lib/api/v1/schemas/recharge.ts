@@ -88,6 +88,11 @@ export const RechargePaymentConfigUpdateSchema = z
   })
   .strict();
 
+export const RechargePaymentConfigTestSchema = z.object({
+  success: z.literal(true),
+  orderNo: z.string(),
+});
+
 export const RechargeAdminOrderQuerySchema = z.object({
   status: RechargeOrderStatusSchema.optional(),
   needsManualHandling: z.enum(["true", "false"]).optional(),

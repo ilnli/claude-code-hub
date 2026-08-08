@@ -102,7 +102,7 @@
     },
     "recharge": {
       "order": { "create": "チャージ注文作成", "cancel": "チャージ注文キャンセル", "expire": "チャージ注文期限切れ", "confirm": "チャージ手動確認", "admin_cancel": "チャージ注文を管理者がキャンセル", "close": "チャージ注文終了", "retry": "チャージ決済を再試行" },
-      "config": { "update": "チャージ支払い設定更新" },
+      "config": { "update": "チャージ支払い設定更新", "test": "チャージ支払い設定をテスト" },
       "callback": { "accept": "チャージ決済コールバック受付", "reject": "チャージ決済コールバック拒否" },
       "settlement": { "complete": "チャージ決済完了", "failed": "チャージ決済失敗" }
     }

@@ -8,12 +8,11 @@ export default async function RechargePage({ params }: { params: Promise<{ local
   const { locale } = await params;
   const session = await getSession({ allowReadOnlyAccess: true });
   if (!session) return redirect({ href: "/login?from=/recharge", locale });
+  if (session.user.role === "admin") return redirect({ href: "/dashboard", locale });
 
   return (
     <RechargePageClient
-      returnHref={
-        session.user.role === "admin" || session.key.canLoginWebUi ? "/dashboard" : "/my-usage"
-      }
+      returnHref={session.key.canLoginWebUi ? "/dashboard" : "/my-usage"}
       keyName={session.key.name}
     />
   );

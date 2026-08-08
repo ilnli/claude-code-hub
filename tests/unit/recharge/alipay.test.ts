@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   buildAlipaySignContent,
   createAlipayPrecreatePayment,
+  isValidAlipayPublicKey,
   signAlipayParameters,
   verifyAlipaySignature,
 } from "@/lib/recharge/alipay";
@@ -55,6 +56,18 @@ describe("Alipay RSA2 signing", () => {
     const params = { out_trade_no: "RC002", trade_status: "TRADE_SUCCESS" };
     const sign = signAlipayParameters(params, rawPrivate);
     expect(verifyAlipaySignature({ ...params, sign }, rawPublic)).toBe(true);
+  });
+
+  it("validates PEM and raw Alipay public keys", () => {
+    const pair = testKeyPair();
+    const rawPublic = pair.publicKey
+      .replace("-----BEGIN PUBLIC KEY-----", "")
+      .replace("-----END PUBLIC KEY-----", "")
+      .replaceAll(/\s/g, "");
+
+    expect(isValidAlipayPublicKey(pair.publicKey)).toBe(true);
+    expect(isValidAlipayPublicKey(rawPublic)).toBe(true);
+    expect(isValidAlipayPublicKey("not-a-public-key")).toBe(false);
   });
 
   it("uses the v2board-compatible GET query for precreate", async () => {

@@ -102,7 +102,7 @@
     },
     "recharge": {
       "order": { "create": "Create recharge order", "cancel": "Cancel recharge order", "expire": "Expire recharge order", "confirm": "Manually confirm recharge", "admin_cancel": "Admin cancel recharge order", "close": "Close recharge order", "retry": "Retry recharge settlement" },
-      "config": { "update": "Update recharge payment settings" },
+      "config": { "update": "Update recharge payment settings", "test": "Test recharge payment settings" },
       "callback": { "accept": "Accept recharge payment callback", "reject": "Reject recharge payment callback" },
       "settlement": { "complete": "Complete recharge settlement", "failed": "Recharge settlement failed" }
     }

@@ -13,8 +13,9 @@ export default async function RechargeLayout({
   const { locale } = await params;
   const session = await getSession({ allowReadOnlyAccess: true });
   if (!session) return redirect({ href: "/login?from=/recharge", locale });
+  if (session.user.role === "admin") return redirect({ href: "/dashboard", locale });
 
-  const hasFullDashboard = session.user.role === "admin" || session.key.canLoginWebUi;
+  const hasFullDashboard = session.key.canLoginWebUi;
   return (
     <div className="min-h-[var(--cch-viewport-height,100vh)] bg-background">
       {hasFullDashboard ? <DashboardHeader session={session} locale={locale} /> : null}

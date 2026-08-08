@@ -6,7 +6,11 @@ import { and, asc, count, desc, eq, ilike, inArray, isNull, lte, or, sql } from 
 import { db } from "@/drizzle/db";
 import { keys, paymentConfigVersions, rechargeOrders, users } from "@/drizzle/schema";
 import { logger } from "@/lib/logger";
-import { createAlipayPrecreatePayment, verifyAlipaySignature } from "@/lib/recharge/alipay";
+import {
+  createAlipayPrecreatePayment,
+  isValidAlipayPublicKey,
+  verifyAlipaySignature,
+} from "@/lib/recharge/alipay";
 import {
   calculateAlipayAmount,
   isAmountWithinRange,
@@ -58,6 +62,41 @@ export interface RechargeAdminOrderFilters {
 export async function getRechargePaymentConfig(): Promise<RechargePaymentConfigPublic> {
   const config = await getActivePaymentConfigRow();
   return toPublicConfig(config);
+}
+
+export async function testRechargePaymentConfig(
+  input: RechargePaymentConfigInput,
+  requestOrigin: string
+): Promise<{ orderNo: string }> {
+  const current = await getActivePaymentConfigRow();
+  const resolved = resolveRechargePaymentConfig(input, current);
+  try {
+    validateRechargePaymentConfig(resolved);
+  } catch (error) {
+    throw new RechargeError(error instanceof Error ? error.message : "CONFIG_TEST_FAILED");
+  }
+  if (!isValidAlipayPublicKey(resolved.alipayPublicKey)) {
+    throw new RechargeError("ALIPAY_PUBLIC_KEY_INVALID");
+  }
+
+  const orderNo = `RCTEST${Date.now()}${randomBytes(4).toString("hex").toUpperCase()}`;
+  try {
+    await createAlipayPrecreatePayment({
+      appId: resolved.appId,
+      privateKey: resolved.privateKey,
+      alipayPublicKey: resolved.alipayPublicKey,
+      notifyUrl: buildAlipayNotifyUrl(resolved.notifyDomain, process.env.APP_URL, requestOrigin),
+      orderNo,
+      subject: resolved.productName,
+      totalAmount: "0.01",
+    });
+  } catch (error) {
+    throw new RechargeError(
+      "ALIPAY_PRECREATE_FAILED",
+      error instanceof Error ? error.message : "ALIPAY_PRECREATE_FAILED"
+    );
+  }
+  return { orderNo };
 }
 
 export async function updateRechargePaymentConfig(

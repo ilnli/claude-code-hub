@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Loader2, Save } from "lucide-react";
+import { CheckCircle2, Loader2, Save, TestTube } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -14,6 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
   getRechargePaymentConfig,
+  testRechargePaymentConfig,
   updateRechargePaymentConfig,
 } from "@/lib/api-client/v1/actions/recharge";
 import type { RechargePaymentConfigPublic } from "@/types/recharge";
@@ -48,6 +49,7 @@ export function PaymentSettingsForm() {
   const [form, setForm] = useState<PaymentFormState>(EMPTY_FORM);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
   const [replaceKeys, setReplaceKeys] = useState(true);
 
   useEffect(() => {
@@ -102,6 +104,38 @@ export function PaymentSettingsForm() {
       toast.error(t("saveFailed"));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleTest = async () => {
+    const privateKey = form.privateKey.trim();
+    const alipayPublicKey = form.alipayPublicKey.trim();
+    if (replaceKeys && (!privateKey || !alipayPublicKey)) {
+      toast.error(t("keysRequired"));
+      return;
+    }
+
+    setTesting(true);
+    try {
+      const result = await testRechargePaymentConfig({
+        enabled: form.enabled,
+        appId: form.appId,
+        ...(replaceKeys ? { privateKey, alipayPublicKey } : {}),
+        productName: form.productName,
+        notifyDomain: form.notifyDomain || null,
+        feeRatePercent: form.feeRatePercent,
+        minCreditUsd: form.minCreditUsd,
+        maxCreditUsd: form.maxCreditUsd,
+      });
+      toast.success(t("testSucceeded"), {
+        description: t("testOrder", { orderNo: result.orderNo }),
+      });
+    } catch (error) {
+      toast.error(t("testFailed"), {
+        description: error instanceof Error ? error.message : undefined,
+      });
+    } finally {
+      setTesting(false);
     }
   };
 
@@ -254,8 +288,16 @@ export function PaymentSettingsForm() {
           </Alert>
         ) : null}
 
-        <div className="flex justify-end">
-          <Button onClick={handleSave} disabled={saving}>
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="outline" onClick={handleTest} disabled={saving || testing}>
+            {testing ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <TestTube className="h-4 w-4" />
+            )}
+            {testing ? t("testing") : t("test")}
+          </Button>
+          <Button type="button" onClick={handleSave} disabled={saving || testing}>
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             {t("save")}
           </Button>

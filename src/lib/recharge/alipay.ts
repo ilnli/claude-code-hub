@@ -54,6 +54,15 @@ export function verifyAlipaySignature(
   }
 }
 
+export function isValidAlipayPublicKey(alipayPublicKey: string): boolean {
+  try {
+    parsePublicKey(alipayPublicKey);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function createAlipayPrecreatePayment(
   input: AlipayPrecreateInput
 ): Promise<AlipayPrecreateResult> {

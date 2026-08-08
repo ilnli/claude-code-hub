@@ -45,6 +45,20 @@ export function updateRechargePaymentConfig(input: {
   return apiClient.put<RechargePaymentConfigPublic>("/api/v1/recharge/config", input);
 }
 
+export function testRechargePaymentConfig(input: {
+  enabled?: boolean;
+  appId?: string;
+  privateKey?: string;
+  alipayPublicKey?: string;
+  productName?: string;
+  notifyDomain?: string | null;
+  feeRatePercent?: string;
+  minCreditUsd?: string;
+  maxCreditUsd?: string;
+}) {
+  return apiClient.post<{ success: true; orderNo: string }>("/api/v1/recharge/config:test", input);
+}
+
 export function listRechargeOrdersAdmin(
   params: {
     status?: RechargeOrderStatus;

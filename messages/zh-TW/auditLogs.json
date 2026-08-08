@@ -102,7 +102,7 @@
     },
     "recharge": {
       "order": { "create": "建立儲值訂單", "cancel": "取消儲值訂單", "expire": "儲值訂單過期", "confirm": "手動確認儲值", "admin_cancel": "管理員取消儲值訂單", "close": "關閉儲值訂單", "retry": "重試儲值結算" },
-      "config": { "update": "更新儲值付款設定" },
+      "config": { "update": "更新儲值付款設定", "test": "測試儲值付款設定" },
       "callback": { "accept": "接受儲值付款回呼", "reject": "拒絕儲值付款回呼" },
       "settlement": { "complete": "完成儲值結算", "failed": "儲值結算失敗" }
     }

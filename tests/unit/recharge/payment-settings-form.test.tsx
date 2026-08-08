@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const getConfigMock = vi.fn();
 const updateConfigMock = vi.fn();
+const testConfigMock = vi.fn();
 const toastErrorMock = vi.fn();
 const toastSuccessMock = vi.fn();
 
@@ -18,6 +19,7 @@ vi.mock("next-intl", () => {
 vi.mock("sonner", () => ({ toast: { error: toastErrorMock, success: toastSuccessMock } }));
 vi.mock("@/lib/api-client/v1/actions/recharge", () => ({
   getRechargePaymentConfig: getConfigMock,
+  testRechargePaymentConfig: testConfigMock,
   updateRechargePaymentConfig: updateConfigMock,
 }));
 vi.mock("@/components/section", () => ({
@@ -83,6 +85,7 @@ describe("PaymentSettingsForm key replacement", () => {
       createdAt: new Date().toISOString(),
     });
     updateConfigMock.mockRejectedValue(new Error("request failed"));
+    testConfigMock.mockResolvedValue({ success: true, orderNo: "RCTEST123" });
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -127,6 +130,40 @@ describe("PaymentSettingsForm key replacement", () => {
     expect(textareas[0]?.value).toBe("new-private");
     expect(textareas[1]?.value).toBe("new-public");
     expect(toastErrorMock).toHaveBeenCalledWith("saveFailed");
+  });
+
+  it("tests replacement secrets without saving them", async () => {
+    const { PaymentSettingsForm } = await import(
+      "@/app/[locale]/settings/payment/payment-settings-form"
+    );
+    await act(async () => {
+      root.render(<PaymentSettingsForm />);
+    });
+
+    const replace = container.querySelector<HTMLInputElement>("#replacePaymentKeys");
+    await act(async () => {
+      replace?.click();
+    });
+    const textareas = container.querySelectorAll<HTMLTextAreaElement>("textarea");
+    await act(async () => {
+      setTextareaValue(textareas[0], "new-private");
+      setTextareaValue(textareas[1], "new-public");
+    });
+
+    const test = Array.from(container.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("test")
+    );
+    await act(async () => {
+      test?.click();
+    });
+
+    expect(testConfigMock).toHaveBeenCalledWith(
+      expect.objectContaining({ privateKey: "new-private", alipayPublicKey: "new-public" })
+    );
+    expect(updateConfigMock).not.toHaveBeenCalled();
+    expect(toastSuccessMock).toHaveBeenCalledWith("testSucceeded", {
+      description: "testOrder",
+    });
   });
 });
 

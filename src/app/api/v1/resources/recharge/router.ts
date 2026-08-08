@@ -12,6 +12,7 @@ import {
   RechargeOrderListSchema,
   RechargeOrderSchema,
   RechargePaymentConfigSchema,
+  RechargePaymentConfigTestSchema,
   RechargePaymentConfigUpdateSchema,
 } from "@/lib/api/v1/schemas/recharge";
 import {
@@ -28,6 +29,7 @@ import {
   listMyRechargeOrders,
   listRechargeOrdersAdminHandler,
   retryRechargeOrderAdminHandler,
+  testRechargeConfigAdmin,
   updateRechargeConfigAdmin,
 } from "./handlers";
 
@@ -164,6 +166,20 @@ registerJsonRoute({
     },
   },
   handler: updateRechargeConfigAdmin as never,
+});
+registerJsonRoute({
+  method: "post",
+  path: "/recharge/config:test",
+  tier: "admin",
+  summary: "Test Alipay recharge configuration",
+  responseSchema: RechargePaymentConfigTestSchema,
+  request: {
+    body: {
+      required: true,
+      content: { "application/json": { schema: RechargePaymentConfigUpdateSchema } },
+    },
+  },
+  handler: testRechargeConfigAdmin as never,
 });
 registerJsonRoute({
   method: "get",

@@ -28,6 +28,7 @@ import {
   listRechargeOrdersAdmin,
   listRechargeOrdersForKey,
   RechargeError,
+  testRechargePaymentConfig,
   updateRechargePaymentConfig,
 } from "@/repository/recharge";
 
@@ -149,6 +150,21 @@ export async function updateRechargeConfigAdmin(c: Context): Promise<Response> {
   return jsonResponse(config);
 }
 
+export async function testRechargeConfigAdmin(c: Context): Promise<Response> {
+  const auth = requireSession(c);
+  if (auth instanceof Response) return auth;
+  const body = await parseHonoJsonBody(c, RechargePaymentConfigUpdateSchema);
+  if (!body.ok) return body.response;
+  try {
+    const result = await testRechargePaymentConfig(body.data, new URL(c.req.url).origin);
+    audit(c, auth, "recharge.config.test", null, { orderNo: result.orderNo });
+    return jsonResponse({ success: true, ...result });
+  } catch (error) {
+    audit(c, auth, "recharge.config.test", null, null, false, error);
+    return rechargeProblem(c, error);
+  }
+}
+
 export async function listRechargeOrdersAdminHandler(c: Context): Promise<Response> {
   const query = RechargeAdminOrderQuerySchema.safeParse({
     status: c.req.query("status"),
@@ -258,7 +274,7 @@ function rechargeProblem(c: Context, error: unknown): Response {
     status,
     instance: new URL(c.req.url).pathname,
     errorCode: `recharge.${code.toLowerCase()}`,
-    detail: code,
+    detail: error instanceof RechargeError ? error.message : code,
   });
 }
 
