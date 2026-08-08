@@ -22,17 +22,27 @@ export interface AlipayPrecreateResult {
   qrCode: string;
 }
 
-export function buildAlipaySignContent(params: Record<string, string>): string {
+export function buildAlipaySignContent(
+  params: Record<string, string>,
+  options: { excludeSignType?: boolean } = {}
+): string {
   return Object.entries(params)
-    .filter(([key, value]) => key !== "sign" && key !== "sign_type" && value !== "")
+    .filter(
+      ([key, value]) =>
+        key !== "sign" && (!options.excludeSignType || key !== "sign_type") && value !== ""
+    )
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([key, value]) => `${key}=${value}`)
     .join("&");
 }
 
-export function signAlipayParameters(params: Record<string, string>, privateKey: string): string {
+export function signAlipayParameters(
+  params: Record<string, string>,
+  privateKey: string,
+  options: { excludeSignType?: boolean } = {}
+): string {
   const signer = createSign("RSA-SHA256");
-  signer.update(buildAlipaySignContent(params), "utf8");
+  signer.update(buildAlipaySignContent(params, options), "utf8");
   signer.end();
   return signer.sign(parsePrivateKey(privateKey), "base64");
 }
@@ -46,7 +56,7 @@ export function verifyAlipaySignature(
 
   try {
     const verifier = createVerify("RSA-SHA256");
-    verifier.update(buildAlipaySignContent(params), "utf8");
+    verifier.update(buildAlipaySignContent(params, { excludeSignType: true }), "utf8");
     verifier.end();
     return verifier.verify(parsePublicKey(alipayPublicKey), signature, "base64");
   } catch {

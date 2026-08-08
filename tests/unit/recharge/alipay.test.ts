@@ -1,4 +1,4 @@
-import { generateKeyPairSync } from "node:crypto";
+import { createVerify, generateKeyPairSync } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   buildAlipaySignContent,
@@ -21,9 +21,15 @@ function testKeyPair() {
 }
 
 describe("Alipay RSA2 signing", () => {
-  it("sorts parameters and excludes sign fields", () => {
+  it("includes sign_type for requests and excludes it for notifications", () => {
     expect(
       buildAlipaySignContent({ b: "2", a: "1", sign: "ignored", sign_type: "RSA2", empty: "" })
+    ).toBe("a=1&b=2&sign_type=RSA2");
+    expect(
+      buildAlipaySignContent(
+        { b: "2", a: "1", sign: "ignored", sign_type: "RSA2", empty: "" },
+        { excludeSignType: true }
+      )
     ).toBe("a=1&b=2");
   });
 
@@ -32,11 +38,12 @@ describe("Alipay RSA2 signing", () => {
     const params = {
       app_id: "20240001",
       out_trade_no: "RC001",
+      sign_type: "RSA2",
       trade_no: "ALI001",
       trade_status: "TRADE_SUCCESS",
       total_amount: "100.39",
     };
-    const sign = signAlipayParameters(params, pair.privateKey);
+    const sign = signAlipayParameters(params, pair.privateKey, { excludeSignType: true });
     expect(verifyAlipaySignature({ ...params, sign }, pair.publicKey)).toBe(true);
     expect(verifyAlipaySignature({ ...params, total_amount: "100.38", sign }, pair.publicKey)).toBe(
       false
@@ -54,7 +61,7 @@ describe("Alipay RSA2 signing", () => {
       .replace("-----END PUBLIC KEY-----", "")
       .replaceAll(/\s/g, "");
     const params = { out_trade_no: "RC002", trade_status: "TRADE_SUCCESS" };
-    const sign = signAlipayParameters(params, rawPrivate);
+    const sign = signAlipayParameters(params, rawPrivate, { excludeSignType: true });
     expect(verifyAlipaySignature({ ...params, sign }, rawPublic)).toBe(true);
   });
 
@@ -109,6 +116,22 @@ describe("Alipay RSA2 signing", () => {
     expect(params.biz_content).toBe(
       JSON.stringify({ subject: "SKHUB", out_trade_no: "RC003", total_amount: "10.04" })
     );
-    expect(verifyAlipaySignature(params, pair.publicKey)).toBe(true);
+    expect(buildAlipaySignContent(params)).toBe(
+      [
+        "_input_charset=UTF-8",
+        "app_id=20240001",
+        `biz_content=${params.biz_content}`,
+        "charset=UTF-8",
+        "method=alipay.trade.precreate",
+        "notify_url=https://app.example.test/api/v1/recharge/alipay/notify",
+        "sign_type=RSA2",
+        `timestamp=${params.timestamp}`,
+        "version=1.0",
+      ].join("&")
+    );
+    const verifier = createVerify("RSA-SHA256");
+    verifier.update(buildAlipaySignContent(params), "utf8");
+    verifier.end();
+    expect(verifier.verify(pair.publicKey, params.sign, "base64")).toBe(true);
   });
 });
