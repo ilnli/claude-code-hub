@@ -73,8 +73,12 @@ async function ClientVersionsSettingsContent() {
 
 async function ClientVersionsStatsContent({ locale }: { locale: string }) {
   const t = await getTranslations({ locale, namespace: "settings" });
-  const statsResult = await fetchClientVersionStats();
+  const [statsResult, settingsResult] = await Promise.all([
+    fetchClientVersionStats(),
+    fetchSystemSettings(),
+  ]);
   const stats = statsResult.ok ? statsResult.data : [];
+  const globalEnabled = settingsResult.ok ? settingsResult.data.enableClientVersionCheck : false;
 
   if (!stats || stats.length === 0) {
     return (
@@ -87,5 +91,5 @@ async function ClientVersionsStatsContent({ locale }: { locale: string }) {
     );
   }
 
-  return <ClientVersionStatsTable data={stats} />;
+  return <ClientVersionStatsTable data={stats} globalEnabled={globalEnabled} />;
 }

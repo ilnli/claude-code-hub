@@ -1,57 +1,94 @@
 {
-  "description": "管理用戶端版本要求，確保使用者使用最新的穩定版本。VSCode 外掛和 CLI 作為獨立用戶端分別管理版本。",
-  "empty": {
-    "description": "過去 7 天內沒有活躍用戶使用可識別的用戶端",
-    "title": "暫無用戶端資料"
-  },
-  "features": {
-    "activeWindow": "活躍視窗：",
-    "activeWindowDesc": "僅統計過去 7 天內有請求的用戶",
-    "autoDetect": "系統會自動偵測每種用戶端的最新穩定版本（GA 版本）",
-    "blockOldVersion": "使用舊版本的用戶將收到 HTTP 400 錯誤，無法繼續使用服務",
-    "errorMessage": "錯誤提示中包含目前版本與需升級的版本號",
-    "gaRule": "判定規則：",
-    "gaRuleDesc": "當某個版本被 1 位以上用戶使用時，視為 GA 版本",
-    "recommendation": "建議作法：",
-    "recommendationDesc": "先觀察下方的版本分佈，確認新版本穩定後再啟用。",
-    "title": "功能說明",
-    "whatHappens": "啟用後會發生什麼："
-  },
+  "title": "用戶端升級提醒",
+  "description": "依用戶端類型管理允許的版本範圍。未設定策略的用戶端類型不會被檢查。",
   "section": {
-    "distribution": {
-      "description": "顯示過去 7 天內活躍用戶的用戶端版本資訊。每種用戶端類型獨立統計 GA 版本。",
-      "title": "用戶端版本分佈"
-    },
     "settings": {
-      "description": "啟用後，系統將自動偵測用戶端版本並攔截舊版本用戶的請求。",
-      "title": "升級提醒設定"
+      "title": "升級提醒設定",
+      "description": "全域開關只會暫停或恢復所有已設定的用戶端版本策略。"
+    },
+    "distribution": {
+      "title": "用戶端版本策略",
+      "description": "顯示過去 7 天內活躍的可識別用戶端、其策略與生效的允許版本範圍。"
     }
+  },
+  "empty": {
+    "title": "暫無用戶端資料",
+    "description": "過去 7 天內沒有活躍的可識別用戶端。"
+  },
+  "toggle": {
+    "enable": "啟用用戶端版本檢查",
+    "description": "暫停檢查會保留所有已設定的策略及其自動基準歷程。",
+    "enableSuccess": "已啟用用戶端版本檢查",
+    "disableSuccess": "已暫停用戶端版本檢查",
+    "toggleFailed": "無法更新用戶端版本檢查狀態"
+  },
+  "state": {
+    "active": "已啟用",
+    "paused": "已暫停",
+    "preview": "檢查暫停時，策略只會以預覽狀態顯示。",
+    "unconfigured": "未設定",
+    "waitingForBaseline": "等待自動基準"
+  },
+  "actions": {
+    "failed": "無法儲存用戶端版本策略",
+    "bulkCreated": "已建立 {count} 條自動策略",
+    "createAll": "設定全部（{count}）",
+    "updated": "用戶端版本策略已更新",
+    "created": "用戶端版本策略已建立",
+    "deleted": "用戶端版本策略已刪除",
+    "save": "儲存策略",
+    "delete": "刪除策略",
+    "applyFixed": "套用固定範圍"
+  },
+  "metrics": {
+    "clientTypes": "用戶端類型",
+    "totalUsers": "活躍用戶",
+    "configured": "已設定",
+    "outOfRange": "超出範圍"
+  },
+  "modes": {
+    "automatic_baseline": "自動基準版本",
+    "minimum": "限制最小版本",
+    "maximum": "限制最大版本",
+    "range": "限制版本範圍",
+    "baseline_lag": "自動基準版本並允許落後"
+  },
+  "range": {
+    "any": "任意版本",
+    "unavailable": "沒有有效的固定範圍"
+  },
+  "editor": {
+    "mode": "規則模式",
+    "minimum": "最小版本",
+    "maximum": "最大版本",
+    "automaticBaseline": "自動基準版本",
+    "lag": "允許落後的修補數",
+    "previousSeries": "前一版本系列的最後版本",
+    "overrideVersion": "設定固定版本",
+    "overridePreview": "固定範圍預覽"
+  },
+  "validation": {
+    "invalid": "請輸入有效的 X.Y.Z 版本與策略值。"
+  },
+  "deleteDialog": {
+    "title": "刪除用戶端版本策略？",
+    "description": "刪除後，{clientType} 不再進行用戶端版本檢查。",
+    "cancel": "取消操作",
+    "confirm": "刪除策略"
+  },
+  "status": {
+    "below_minimum": "低於最低版本",
+    "within_range": "在允許範圍內",
+    "above_maximum": "高於最高版本",
+    "unparseable": "版本無法解析",
+    "unchecked": "未檢查"
   },
   "table": {
-    "currentGA": "目前 GA 版本：",
-    "internalType": "內部類型：",
-    "lastActive": "最後活躍時間",
-    "latest": "最新版",
-    "needsUpgrade": "需升級",
-    "noUsers": "暫無用戶資料",
-    "status": "狀態",
-    "unknown": "不明",
-    "user": "用戶",
     "usersCount": "{count} 位用戶",
+    "user": "用戶",
     "version": "目前版本",
-    "stats": {
-      "clientTypes": "用戶端類型",
-      "totalUsers": "用戶總數",
-      "withGA": "有 GA 版本",
-      "coverage": "GA 覆蓋率"
-    }
-  },
-  "title": "用戶端升級提醒",
-  "toggle": {
-    "description": "啟用後，系統將自動偵測用戶端版本並攔截舊版本使用者的請求。",
-    "disableSuccess": "已關閉用戶端版本檢查",
-    "enable": "啟用用戶端版本檢查",
-    "enableSuccess": "已啟用用戶端版本檢查",
-    "toggleFailed": "狀態切換失敗"
+    "lastActive": "最後活躍",
+    "status": "狀態",
+    "noUsers": "暫無活躍用戶"
   }
 }

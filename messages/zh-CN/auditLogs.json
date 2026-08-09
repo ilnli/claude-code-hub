@@ -80,6 +80,12 @@
     "system_settings": {
       "update": "更新系统设置"
     },
+    "client_version_policy": {
+      "create": "创建客户端版本策略",
+      "update": "更新客户端版本策略",
+      "delete": "删除客户端版本策略",
+      "bulk_create": "批量创建自动客户端版本策略"
+    },
     "key": {
       "create": "创建密钥",
       "update": "更新密钥",

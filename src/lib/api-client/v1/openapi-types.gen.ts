@@ -1220,6 +1220,94 @@ export interface paths {
         patch: operations["patchSensitiveWordsById"];
         trace?: never;
     };
+    "/api/v1/client-version-policies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List client version policies
+         * @description Lists every explicit client version policy and its automatic baseline history.
+         */
+        get: operations["getClientVersionPolicies"];
+        put?: never;
+        /**
+         * Create client version policy
+         * @description Creates a policy for an observed active client type.
+         */
+        post: operations["postClientVersionPolicies"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/client-version-policies/bulk/automatic": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create automatic policies for all unconfigured active client types
+         * @description Creates automatic-baseline policies for every currently active unconfigured type.
+         */
+        post: operations["postClientVersionPoliciesBulkAutomatic"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/client-version-policies/{clientType}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete client version policy
+         * @description Deletes a policy so requests from this client type are no longer version-checked.
+         */
+        delete: operations["deleteClientVersionPoliciesByClienttype"];
+        options?: never;
+        head?: never;
+        /**
+         * Update client version policy
+         * @description Replaces the mode and values of one client version policy.
+         */
+        patch: operations["patchClientVersionPoliciesByClienttype"];
+        trace?: never;
+    };
+    "/api/v1/client-version-policies/{clientType}/override": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Convert an automatic policy to a fixed range
+         * @description Converts an automatic or lag policy into its confirmed fixed version range.
+         */
+        post: operations["postClientVersionPoliciesByClienttypeOverride"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/error-rules": {
         parameters: {
             query?: never;
@@ -19950,6 +20038,1455 @@ export interface operations {
             };
             /** @description Sensitive word not found. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    getClientVersionPolicies: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Client version policies. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            id: number;
+                            clientType: string;
+                            /** @enum {string} */
+                            mode: "automatic_baseline" | "minimum" | "maximum" | "range" | "baseline_lag";
+                            minimumVersion: string | null;
+                            maximumVersion: string | null;
+                            baselineLag: number | null;
+                            automaticBaseline: string | null;
+                            previousSeriesTerminalVersion: string | null;
+                            /**
+                             * Format: date-time
+                             * @description ISO 8601 date-time string.
+                             */
+                            baselineUpdatedAt: string | null;
+                            /**
+                             * Format: date-time
+                             * @description ISO 8601 date-time string.
+                             */
+                            createdAt: string;
+                            /**
+                             * Format: date-time
+                             * @description ISO 8601 date-time string.
+                             */
+                            updatedAt: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Invalid client version policy. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Admin access required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Client version policy not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Client version policy already exists. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    postClientVersionPolicies: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required only when authenticating with the auth-token cookie on mutation requests. */
+                "X-CCH-CSRF"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    clientType: string;
+                    policy: {
+                        /** @enum {string} */
+                        mode: "automatic_baseline";
+                    } | {
+                        /** @enum {string} */
+                        mode: "minimum";
+                        /** @description Client version value. */
+                        minimumVersion: string;
+                    } | {
+                        /** @enum {string} */
+                        mode: "maximum";
+                        /** @description Client version value. */
+                        maximumVersion: string;
+                    } | {
+                        /** @enum {string} */
+                        mode: "range";
+                        /** @description Client version value. */
+                        minimumVersion: string;
+                        /** @description Client version value. */
+                        maximumVersion: string;
+                    } | {
+                        /** @enum {string} */
+                        mode: "baseline_lag";
+                        baselineLag: number;
+                        /** @description Client version value. */
+                        previousSeriesTerminalVersion?: string | null;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Created client version policy. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: number;
+                        clientType: string;
+                        /** @enum {string} */
+                        mode: "automatic_baseline" | "minimum" | "maximum" | "range" | "baseline_lag";
+                        minimumVersion: string | null;
+                        maximumVersion: string | null;
+                        baselineLag: number | null;
+                        automaticBaseline: string | null;
+                        previousSeriesTerminalVersion: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        baselineUpdatedAt: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        createdAt: string;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        updatedAt: string;
+                    };
+                };
+            };
+            /** @description Invalid client version policy. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Admin access required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Client version policy not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Client version policy already exists. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    postClientVersionPoliciesBulkAutomatic: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required only when authenticating with the auth-token cookie on mutation requests. */
+                "X-CCH-CSRF"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Created automatic policies. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            id: number;
+                            clientType: string;
+                            /** @enum {string} */
+                            mode: "automatic_baseline" | "minimum" | "maximum" | "range" | "baseline_lag";
+                            minimumVersion: string | null;
+                            maximumVersion: string | null;
+                            baselineLag: number | null;
+                            automaticBaseline: string | null;
+                            previousSeriesTerminalVersion: string | null;
+                            /**
+                             * Format: date-time
+                             * @description ISO 8601 date-time string.
+                             */
+                            baselineUpdatedAt: string | null;
+                            /**
+                             * Format: date-time
+                             * @description ISO 8601 date-time string.
+                             */
+                            createdAt: string;
+                            /**
+                             * Format: date-time
+                             * @description ISO 8601 date-time string.
+                             */
+                            updatedAt: string;
+                        }[];
+                        createdCount: number;
+                    };
+                };
+            };
+            /** @description Invalid client version policy. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Admin access required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Client version policy not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Client version policy already exists. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    deleteClientVersionPoliciesByClienttype: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required only when authenticating with the auth-token cookie on mutation requests. */
+                "X-CCH-CSRF"?: string;
+            };
+            path: {
+                clientType: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Client version policy deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid client version policy. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Admin access required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Client version policy not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Client version policy already exists. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    patchClientVersionPoliciesByClienttype: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required only when authenticating with the auth-token cookie on mutation requests. */
+                "X-CCH-CSRF"?: string;
+            };
+            path: {
+                clientType: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    mode: "automatic_baseline";
+                } | {
+                    /** @enum {string} */
+                    mode: "minimum";
+                    /** @description Client version value. */
+                    minimumVersion: string;
+                } | {
+                    /** @enum {string} */
+                    mode: "maximum";
+                    /** @description Client version value. */
+                    maximumVersion: string;
+                } | {
+                    /** @enum {string} */
+                    mode: "range";
+                    /** @description Client version value. */
+                    minimumVersion: string;
+                    /** @description Client version value. */
+                    maximumVersion: string;
+                } | {
+                    /** @enum {string} */
+                    mode: "baseline_lag";
+                    baselineLag: number;
+                    /** @description Client version value. */
+                    previousSeriesTerminalVersion?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Updated client version policy. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: number;
+                        clientType: string;
+                        /** @enum {string} */
+                        mode: "automatic_baseline" | "minimum" | "maximum" | "range" | "baseline_lag";
+                        minimumVersion: string | null;
+                        maximumVersion: string | null;
+                        baselineLag: number | null;
+                        automaticBaseline: string | null;
+                        previousSeriesTerminalVersion: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        baselineUpdatedAt: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        createdAt: string;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        updatedAt: string;
+                    };
+                };
+            };
+            /** @description Invalid client version policy. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Admin access required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Client version policy not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Client version policy already exists. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    postClientVersionPoliciesByClienttypeOverride: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required only when authenticating with the auth-token cookie on mutation requests. */
+                "X-CCH-CSRF"?: string;
+            };
+            path: {
+                clientType: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Client version value. */
+                    selectedVersion: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Generated fixed client version range. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: number;
+                        clientType: string;
+                        /** @enum {string} */
+                        mode: "automatic_baseline" | "minimum" | "maximum" | "range" | "baseline_lag";
+                        minimumVersion: string | null;
+                        maximumVersion: string | null;
+                        baselineLag: number | null;
+                        automaticBaseline: string | null;
+                        previousSeriesTerminalVersion: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        baselineUpdatedAt: string | null;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        createdAt: string;
+                        /**
+                         * Format: date-time
+                         * @description ISO 8601 date-time string.
+                         */
+                        updatedAt: string;
+                    };
+                };
+            };
+            /** @description Invalid client version policy. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Authentication required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Admin access required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Client version policy not found. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": {
+                        /** @description Stable problem type URI or URN. */
+                        type: string;
+                        /** @description Short problem title. */
+                        title: string;
+                        /** @description HTTP status code. */
+                        status: number;
+                        /** @description Human-readable error detail. */
+                        detail: string;
+                        /** @description Request path that produced the problem. */
+                        instance: string;
+                        /** @description Application error code for frontend i18n. */
+                        errorCode: string;
+                        /** @description Optional i18n parameters. */
+                        errorParams?: {
+                            [key: string]: unknown;
+                        };
+                        /** @description Optional request trace identifier. */
+                        traceId?: string;
+                        /** @description Validation failure details. */
+                        invalidParams?: {
+                            /** @description Path to the invalid input field. */
+                            path: (string | number)[];
+                            /** @description Machine-readable validation error code. */
+                            code: string;
+                            /** @description Validation error message. */
+                            message: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Client version policy already exists. */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

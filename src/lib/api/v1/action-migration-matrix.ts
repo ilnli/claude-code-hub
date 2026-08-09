@@ -328,6 +328,14 @@ export const ACTION_MIGRATION_MATRIX = [
     access: "admin",
     exportPolicy: "all-action-exports",
   },
+  {
+    module: "client-version-policies",
+    sourceFile: "client-version-policies.ts",
+    resource: "client-version-policies",
+    endpointFamilies: ["/api/v1/client-version-policies"],
+    access: "admin",
+    exportPolicy: "all-action-exports",
+  },
 ] as const satisfies readonly ActionMigrationEntry[];
 
 export const CLIENT_ACTION_IMPORT_ALLOWLIST: readonly ClientActionImportAllowlistEntry[] = [];

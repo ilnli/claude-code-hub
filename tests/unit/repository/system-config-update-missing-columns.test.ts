@@ -298,10 +298,11 @@ describe("SystemSettings：数据库缺列时的保存兜底", () => {
     vi.useFakeTimers();
     vi.setSystemTime(now);
 
-    // 前两次 select 仍包含缺失的 providerWeightAdjustmentIntervalMinutes；
-    // 第三次累计去掉 semanticErrorRoutingMode 与该列后命中。
+    // 前三次 select 仍包含缺失的 providerWeightAdjustmentIntervalMinutes；
+    // 第四次累计去掉初始化标记、semanticErrorRoutingMode 与该列后命中。
     const selectMock = vi
       .fn()
+      .mockReturnValueOnce(createRejectedThenableQuery({ code: "42703" }))
       .mockReturnValueOnce(createRejectedThenableQuery({ code: "42703" }))
       .mockReturnValueOnce(createRejectedThenableQuery({ code: "42703" }))
       .mockReturnValueOnce(
@@ -336,31 +337,38 @@ describe("SystemSettings：数据库缺列时的保存兜底", () => {
     const result = await getSystemSettings();
 
     // 降级读取成功（未抛错），缺失列由 transformer 落默认值。
-    expect(selectMock).toHaveBeenCalledTimes(3);
+    expect(selectMock).toHaveBeenCalledTimes(4);
     expect(result.siteTitle).toBe("CC Hub");
     expect(result.enableHttp2).toBe(true);
     expect(result.affinityIgnoreClientSessionId).toBe(true);
     expect(result.streamGateMode).toBe("enforce");
     expect(result.semanticErrorRoutingMode).toBe("shadow");
 
-    // 新列按引入顺序从外向内累计剥离：先语义路由模式，再权重调整间隔。
+    // 新列按引入顺序从外向内累计剥离：初始化标记、语义路由模式、权重调整间隔。
     const secondSelection = selectMock.mock.calls[1]?.[0] as Record<string, unknown>;
-    expect(secondSelection).not.toHaveProperty("semanticErrorRoutingMode");
+    expect(secondSelection).not.toHaveProperty("clientVersionPolicyInitialized");
+    expect(secondSelection).toHaveProperty("semanticErrorRoutingMode");
     expect(secondSelection).toHaveProperty("providerWeightAdjustmentIntervalMinutes");
 
     const thirdSelection = selectMock.mock.calls[2]?.[0] as Record<string, unknown>;
+    expect(thirdSelection).not.toHaveProperty("clientVersionPolicyInitialized");
     expect(thirdSelection).not.toHaveProperty("semanticErrorRoutingMode");
-    expect(thirdSelection).not.toHaveProperty("providerWeightAdjustmentIntervalMinutes");
-    expect(thirdSelection).toHaveProperty("upstreamBillingProbeIntervalMinutes");
-    expect(thirdSelection).toHaveProperty("upstreamBillingProbeEnabled");
-    expect(thirdSelection).toHaveProperty("cacheEffectivenessEnabled");
-    expect(thirdSelection).toHaveProperty("replayEnabled");
-    expect(thirdSelection).toHaveProperty("affinityIgnoreClientSessionId");
-    expect(thirdSelection).toHaveProperty("streamGateMode");
-    expect(thirdSelection).toHaveProperty("stickyTimeoutCooldownMs");
-    expect(thirdSelection).toHaveProperty("racingTotalTimeoutMs");
-    expect(thirdSelection).toHaveProperty("enableGeminiFunctionIdRectifier");
-    expect(thirdSelection).toHaveProperty("enableThinkingEffortConflictRectifier");
+    expect(thirdSelection).toHaveProperty("providerWeightAdjustmentIntervalMinutes");
+
+    const fourthSelection = selectMock.mock.calls[3]?.[0] as Record<string, unknown>;
+    expect(fourthSelection).not.toHaveProperty("clientVersionPolicyInitialized");
+    expect(fourthSelection).not.toHaveProperty("semanticErrorRoutingMode");
+    expect(fourthSelection).not.toHaveProperty("providerWeightAdjustmentIntervalMinutes");
+    expect(fourthSelection).toHaveProperty("upstreamBillingProbeIntervalMinutes");
+    expect(fourthSelection).toHaveProperty("upstreamBillingProbeEnabled");
+    expect(fourthSelection).toHaveProperty("cacheEffectivenessEnabled");
+    expect(fourthSelection).toHaveProperty("replayEnabled");
+    expect(fourthSelection).toHaveProperty("affinityIgnoreClientSessionId");
+    expect(fourthSelection).toHaveProperty("streamGateMode");
+    expect(fourthSelection).toHaveProperty("stickyTimeoutCooldownMs");
+    expect(fourthSelection).toHaveProperty("racingTotalTimeoutMs");
+    expect(fourthSelection).toHaveProperty("enableGeminiFunctionIdRectifier");
+    expect(fourthSelection).toHaveProperty("enableThinkingEffortConflictRectifier");
 
     vi.useRealTimers();
   });

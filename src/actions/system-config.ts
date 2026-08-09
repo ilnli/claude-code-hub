@@ -5,6 +5,7 @@ import { ZodError } from "zod";
 import { locales } from "@/i18n/config";
 import { emitActionAudit } from "@/lib/audit/emit";
 import { getSession } from "@/lib/auth";
+import { initializePoliciesWithSettings } from "@/lib/client-version-policy-service";
 import { invalidateSystemSettingsCache } from "@/lib/config";
 import { DEFAULT_SETTINGS } from "@/lib/config/system-settings-cache";
 import { logger } from "@/lib/logger";
@@ -30,6 +31,7 @@ import type {
   SemanticErrorRoutingMode,
   StreamGateSettingMode,
   SystemSettings,
+  UpdateSystemSettingsInput,
 } from "@/types/system-config";
 import type { ActionResult } from "./types";
 
@@ -161,7 +163,7 @@ export async function saveSystemSettings(formData: {
         errorCode: DISCOVERY_WINDOW_INVALID_ERROR_CODE,
       };
     }
-    const updated = await updateSystemSettings({
+    const settingsUpdate: UpdateSystemSettingsInput = {
       siteTitle: validated.siteTitle?.trim(),
       allowGlobalUsageView: validated.allowGlobalUsageView,
       currencyDisplay: validated.currencyDisplay,
@@ -218,7 +220,11 @@ export async function saveSystemSettings(formData: {
       publicStatusAggregationIntervalMinutes: validated.publicStatusAggregationIntervalMinutes,
       ipExtractionConfig: validated.ipExtractionConfig,
       ipGeoLookupEnabled: validated.ipGeoLookupEnabled,
-    });
+    };
+    const updated =
+      validated.enableClientVersionCheck === true
+        ? (await initializePoliciesWithSettings(settingsUpdate)).settings
+        : await updateSystemSettings(settingsUpdate);
 
     // Invalidate the system settings cache so proxy requests get fresh settings
     invalidateSystemSettingsCache();

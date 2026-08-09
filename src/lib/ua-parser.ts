@@ -45,9 +45,9 @@ export function parseUserAgent(ua: string | null | undefined): ClientInfo | null
     return null;
   }
 
-  // 正则匹配: {clientType}/{version} ...
-  // 提取斜杠前的客户端名称和斜杠后的版本号（直到空格或字符串结束）
-  const regex = /^([a-zA-Z0-9_-]+)\/([0-9]+\.[0-9]+\.[0-9]+(?:-[a-zA-Z0-9.]+)?)/;
+  // Client Type identification is independent from version validation. The policy layer extracts
+  // a comparable X.Y.Z core and keeps malformed versions visible instead of dropping the client.
+  const regex = /^([a-zA-Z0-9_-]+)\/([^\s)]+)/;
   const match = ua.match(regex);
 
   if (!match) {

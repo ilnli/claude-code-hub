@@ -80,6 +80,12 @@
     "system_settings": {
       "update": "更新系統設定"
     },
+    "client_version_policy": {
+      "create": "建立用戶端版本策略",
+      "update": "更新用戶端版本策略",
+      "delete": "刪除用戶端版本策略",
+      "bulk_create": "批次建立自動用戶端版本策略"
+    },
     "key": {
       "create": "建立金鑰",
       "update": "更新金鑰",

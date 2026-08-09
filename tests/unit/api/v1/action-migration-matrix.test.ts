@@ -126,6 +126,7 @@ describe("v1 action migration matrix", () => {
       "public-status",
       "provider-slots",
       "client-versions",
+      "client-version-policies",
       "upstream-billing",
     ];
 

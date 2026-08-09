@@ -287,6 +287,13 @@ const RECENT_COLUMN_LADDER: ReadonlyArray<{
   updateWarn: string;
 }> = [
   {
+    key: "clientVersionPolicyInitialized",
+    column: systemSettings.clientVersionPolicyInitialized,
+    selectWarn:
+      "system_settings 缺少 clientVersionPolicyInitialized，继续回退并使用未初始化默认值。",
+    updateWarn: "system_settings 缺少 clientVersionPolicyInitialized，跳过该字段后继续降级更新。",
+  },
+  {
     key: "semanticErrorRoutingMode",
     column: systemSettings.semanticErrorRoutingMode,
     selectWarn: "system_settings 缺少 semanticErrorRoutingMode，继续回退并使用 shadow 默认值。",
@@ -439,6 +446,7 @@ const RECENT_COLUMN_LADDER: ReadonlyArray<{
 // 历史世代字段集（冻结）：passThrough 世代之前的 schema 没有以下五列。
 // 注意：世代字段集相对近代阶梯末层会重新选取更晚引入的列（与历史实现一致）。
 const PASS_THROUGH_ERA_OMIT: readonly string[] = [
+  "clientVersionPolicyInitialized",
   "billHedgeLosers",
   "billNonSuccessfulRequests",
   "passThroughUpstreamErrorMessage",
@@ -783,6 +791,9 @@ export async function updateSystemSettings(
     // 客户端版本检查配置字段（如果提供）
     if (payload.enableClientVersionCheck !== undefined) {
       updates.enableClientVersionCheck = payload.enableClientVersionCheck;
+    }
+    if (payload.clientVersionPolicyInitialized !== undefined) {
+      updates.clientVersionPolicyInitialized = payload.clientVersionPolicyInitialized;
     }
 
     // 上游倍率探测配置字段（如果提供）

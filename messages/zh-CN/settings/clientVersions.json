@@ -1,57 +1,94 @@
 {
   "title": "客户端升级提醒",
-  "description": "管理客户端版本要求，确保用户使用最新的稳定版本。VSCode 插件和 CLI 作为独立客户端分别管理版本。",
+  "description": "按客户端类型管理允许的版本范围。未配置策略的客户端类型不会被检查。",
   "section": {
     "settings": {
       "title": "升级提醒设置",
-      "description": "启用后，系统将自动检测客户端版本并拦截旧版本用户的请求。"
+      "description": "全局开关只暂停或恢复所有已配置的客户端版本策略。"
     },
     "distribution": {
-      "title": "客户端版本分布",
-      "description": "显示过去 7 天内活跃用户的客户端版本信息。每种客户端类型独立统计 GA 版本。"
+      "title": "客户端版本策略",
+      "description": "显示过去 7 天内活跃的可识别客户端、其策略和生效的允许版本范围。"
     }
   },
   "empty": {
     "title": "暂无客户端数据",
-    "description": "过去 7 天内没有活跃用户使用可识别的客户端"
+    "description": "过去 7 天内没有活跃的可识别客户端。"
   },
   "toggle": {
-    "enable": "启用升级提醒",
-    "description": "启用后，系统将拦截使用旧版本客户端的请求",
+    "enable": "启用客户端版本检查",
+    "description": "暂停检查会保留所有已配置的策略及其自动基准历史。",
     "enableSuccess": "已启用客户端版本检查",
-    "disableSuccess": "已关闭客户端版本检查",
-    "toggleFailed": "更新失败"
+    "disableSuccess": "已暂停客户端版本检查",
+    "toggleFailed": "无法更新客户端版本检查状态"
   },
-  "features": {
-    "title": "功能说明",
-    "whatHappens": "启用后会发生什么：",
-    "autoDetect": "系统会自动检测每种客户端的最新稳定版本（GA 版本）",
-    "gaRule": "判定规则：",
-    "gaRuleDesc": "当某个版本被 1 个以上用户使用时，视为 GA 版本",
-    "activeWindow": "活跃窗口：",
-    "activeWindowDesc": "仅统计过去 7 天内有请求的用户",
-    "blockOldVersion": "使用旧版本的用户将收到 HTTP 400 错误，无法继续使用服务",
-    "errorMessage": "错误提示中包含当前版本和需要升级的版本号",
-    "recommendation": "推荐做法：",
-    "recommendationDesc": "先观察下方的版本分布，确认新版本稳定后再启用。"
+  "state": {
+    "active": "已启用",
+    "paused": "已暂停",
+    "preview": "检查暂停时，策略仅以预览状态显示。",
+    "unconfigured": "未配置",
+    "waitingForBaseline": "等待自动基准"
+  },
+  "actions": {
+    "failed": "无法保存客户端版本策略",
+    "bulkCreated": "已创建 {count} 条自动策略",
+    "createAll": "配置全部（{count}）",
+    "updated": "客户端版本策略已更新",
+    "created": "客户端版本策略已创建",
+    "deleted": "客户端版本策略已删除",
+    "save": "保存策略",
+    "delete": "删除策略",
+    "applyFixed": "应用固定范围"
+  },
+  "metrics": {
+    "clientTypes": "客户端类型",
+    "totalUsers": "活跃用户",
+    "configured": "已配置",
+    "outOfRange": "超出范围"
+  },
+  "modes": {
+    "automatic_baseline": "自动基准版本",
+    "minimum": "限制最低版本",
+    "maximum": "限制最高版本",
+    "range": "限制版本范围",
+    "baseline_lag": "自动基准版本并允许滞后"
+  },
+  "range": {
+    "any": "不限版本",
+    "unavailable": "没有有效的固定范围"
+  },
+  "editor": {
+    "mode": "策略模式",
+    "minimum": "最低版本",
+    "maximum": "最高版本",
+    "automaticBaseline": "自动基准版本",
+    "lag": "允许落后的补丁数",
+    "previousSeries": "上一版本系列的末尾版本",
+    "overrideVersion": "设置固定版本",
+    "overridePreview": "固定范围预览"
+  },
+  "validation": {
+    "invalid": "请输入有效的 X.Y.Z 版本和策略值。"
+  },
+  "deleteDialog": {
+    "title": "删除客户端版本策略？",
+    "description": "删除后，{clientType} 不再进行客户端版本检查。",
+    "cancel": "取消",
+    "confirm": "删除策略"
+  },
+  "status": {
+    "below_minimum": "低于最低版本",
+    "within_range": "在允许范围内",
+    "above_maximum": "高于最高版本",
+    "unparseable": "版本无法解析",
+    "unchecked": "未检查"
   },
   "table": {
-    "internalType": "内部类型：",
-    "currentGA": "当前 GA 版本：",
     "usersCount": "{count} 位用户",
     "user": "用户",
-    "version": "当前版本",
-    "lastActive": "最后活跃时间",
+    "version": "版本",
+    "lastActive": "最后活跃",
     "status": "状态",
-    "noUsers": "暂无用户数据",
-    "latest": "最新",
-    "needsUpgrade": "需升级",
-    "unknown": "未知",
-    "stats": {
-      "clientTypes": "客户端类型",
-      "totalUsers": "用户总数",
-      "withGA": "有 GA 版本",
-      "coverage": "GA 覆盖率"
-    }
+    "noUsers": "暂无活跃用户"
   }
 }

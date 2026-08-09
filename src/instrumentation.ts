@@ -474,6 +474,17 @@ export async function register() {
         });
       }
 
+      try {
+        const { startClientVersionPolicyInitializationScheduler } = await import(
+          "@/lib/client-version-policy-service"
+        );
+        startClientVersionPolicyInitializationScheduler();
+      } catch (error) {
+        logger.warn("[Instrumentation] Client version policy initialization failed to start", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
       await startRoutingTraceOutboxRecovery();
 
       // Ledger backfill: fire-and-forget after migration (non-blocking, idempotent)
@@ -709,6 +720,16 @@ export async function register() {
       const isConnected = await checkDatabaseConnection();
       if (isConnected) {
         await runMigrations();
+        try {
+          const { startClientVersionPolicyInitializationScheduler } = await import(
+            "@/lib/client-version-policy-service"
+          );
+          startClientVersionPolicyInitializationScheduler();
+        } catch (error) {
+          logger.warn("[Instrumentation] Client version policy initialization failed to start", {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
         await startRoutingTraceOutboxRecovery();
 
         // Ledger backfill: fire-and-forget after migration (non-blocking, idempotent)

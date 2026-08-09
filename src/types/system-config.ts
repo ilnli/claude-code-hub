@@ -229,6 +229,8 @@ export interface UpdateSystemSettingsInput {
 
   // 客户端版本检查配置（可选）
   enableClientVersionCheck?: boolean;
+  /** Internal one-time policy initialization marker; not accepted by public schemas. */
+  clientVersionPolicyInitialized?: boolean;
 
   // 上游倍率探测（可选）
   upstreamBillingProbeEnabled?: boolean;

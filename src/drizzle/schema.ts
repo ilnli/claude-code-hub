@@ -1081,6 +1081,9 @@ export const systemSettings = pgTable('system_settings', {
 
   // 客户端版本检查配置
   enableClientVersionCheck: boolean('enable_client_version_check').notNull().default(false),
+  clientVersionPolicyInitialized: boolean('client_version_policy_initialized')
+    .notNull()
+    .default(false),
 
   // 上游倍率探测（套娃场景）：全局开关（默认关闭）与探测间隔（分钟）
   upstreamBillingProbeEnabled: boolean('upstream_billing_probe_enabled').notNull().default(false),
@@ -1243,6 +1246,46 @@ export const systemSettings = pgTable('system_settings', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 });
+
+// Explicit per-client version policies and their durable automatic-baseline history.
+export const clientVersionPolicies = pgTable(
+  'client_version_policies',
+  {
+    id: serial('id').primaryKey(),
+    clientType: varchar('client_type', { length: 128 }).notNull(),
+    mode: varchar('mode', { length: 32 })
+      .notNull()
+      .$type<'automatic_baseline' | 'minimum' | 'maximum' | 'range' | 'baseline_lag'>(),
+    minimumVersion: varchar('minimum_version', { length: 64 }),
+    maximumVersion: varchar('maximum_version', { length: 64 }),
+    baselineLag: integer('baseline_lag'),
+    automaticBaseline: varchar('automatic_baseline', { length: 64 }),
+    previousSeriesTerminalVersion: varchar('previous_series_terminal_version', { length: 64 }),
+    baselineUpdatedAt: timestamp('baseline_updated_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    clientVersionPoliciesClientTypeUniqueIdx: uniqueIndex(
+      'idx_client_version_policies_client_type_unique'
+    ).on(table.clientType),
+    clientVersionPoliciesModeIdx: index('idx_client_version_policies_mode').on(table.mode),
+    clientVersionPoliciesModeCheck: check(
+      'client_version_policies_mode_check',
+      sql`${table.mode} IN ('automatic_baseline', 'minimum', 'maximum', 'range', 'baseline_lag')`
+    ),
+    clientVersionPoliciesShapeCheck: check(
+      'client_version_policies_shape_check',
+      sql`(
+        (${table.mode} = 'automatic_baseline' AND ${table.minimumVersion} IS NULL AND ${table.maximumVersion} IS NULL AND ${table.baselineLag} IS NULL)
+        OR (${table.mode} = 'minimum' AND ${table.minimumVersion} IS NOT NULL AND ${table.maximumVersion} IS NULL AND ${table.baselineLag} IS NULL)
+        OR (${table.mode} = 'maximum' AND ${table.minimumVersion} IS NULL AND ${table.maximumVersion} IS NOT NULL AND ${table.baselineLag} IS NULL)
+        OR (${table.mode} = 'range' AND ${table.minimumVersion} IS NOT NULL AND ${table.maximumVersion} IS NOT NULL AND ${table.baselineLag} IS NULL)
+        OR (${table.mode} = 'baseline_lag' AND ${table.minimumVersion} IS NULL AND ${table.maximumVersion} IS NULL AND ${table.baselineLag} > 0)
+      )`
+    ),
+  })
+);
 
 // Notification Settings table - Webhook 通知配置
 export const notificationSettings = pgTable('notification_settings', {

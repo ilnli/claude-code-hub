@@ -28,34 +28,38 @@ export interface RawUserVersion {
  * ```
  */
 export async function getActiveUserVersions(days = 7): Promise<RawUserVersion[]> {
-  const cutoffDate = new Date();
-  cutoffDate.setDate(cutoffDate.getDate() - days);
-
   try {
-    const results = await db
-      .select({
-        userId: messageRequest.userId,
-        username: users.name,
-        userAgent: messageRequest.userAgent,
-        lastSeen: sql<Date>`MAX(${messageRequest.createdAt})`.as("last_seen"),
-      })
-      .from(messageRequest)
-      .leftJoin(users, and(sql`${messageRequest.userId} = ${users.id}`, isNull(users.deletedAt)))
-      .where(
-        and(gte(messageRequest.createdAt, cutoffDate), sql`${messageRequest.userAgent} IS NOT NULL`)
-      )
-      .groupBy(messageRequest.userId, users.name, messageRequest.userAgent)
-      .orderBy(sql`MAX(${messageRequest.createdAt}) DESC`);
-
-    return results.map((row) => ({
-      userId: row.userId,
-      username: row.username || `User ${row.userId}`,
-      userAgent: row.userAgent || "",
-      lastSeen: new Date(row.lastSeen),
-    }));
+    return await getActiveUserVersionsStrict(days);
   } catch (error) {
     // Fail Open: 查询失败返回空数组
     logger.error({ error }, "[ClientVersions] 查询活跃用户失败");
     return [];
   }
+}
+
+/** Same query as getActiveUserVersions, but propagates failures for atomic initialization. */
+export async function getActiveUserVersionsStrict(days = 7): Promise<RawUserVersion[]> {
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - days);
+  const results = await db
+    .select({
+      userId: messageRequest.userId,
+      username: users.name,
+      userAgent: messageRequest.userAgent,
+      lastSeen: sql<Date>`MAX(${messageRequest.createdAt})`.as("last_seen"),
+    })
+    .from(messageRequest)
+    .leftJoin(users, and(sql`${messageRequest.userId} = ${users.id}`, isNull(users.deletedAt)))
+    .where(
+      and(gte(messageRequest.createdAt, cutoffDate), sql`${messageRequest.userAgent} IS NOT NULL`)
+    )
+    .groupBy(messageRequest.userId, users.name, messageRequest.userAgent)
+    .orderBy(sql`MAX(${messageRequest.createdAt}) DESC`);
+
+  return results.map((row) => ({
+    userId: row.userId,
+    username: row.username || `User ${row.userId}`,
+    userAgent: row.userAgent || "",
+    lastSeen: new Date(row.lastSeen),
+  }));
 }

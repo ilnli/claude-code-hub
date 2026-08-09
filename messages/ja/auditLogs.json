@@ -80,6 +80,12 @@
     "system_settings": {
       "update": "システム設定更新"
     },
+    "client_version_policy": {
+      "create": "クライアントバージョンポリシー作成",
+      "update": "クライアントバージョンポリシー更新",
+      "delete": "クライアントバージョンポリシー削除",
+      "bulk_create": "自動クライアントバージョンポリシー一括作成"
+    },
     "key": {
       "create": "キー作成",
       "update": "キー更新",

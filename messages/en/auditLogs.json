@@ -80,6 +80,12 @@
     "system_settings": {
       "update": "Update system settings"
     },
+    "client_version_policy": {
+      "create": "Create client version policy",
+      "update": "Update client version policy",
+      "delete": "Delete client version policy",
+      "bulk_create": "Create automatic client version policies"
+    },
     "key": {
       "create": "Create key",
       "update": "Update key",

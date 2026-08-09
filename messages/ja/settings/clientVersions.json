@@ -1,57 +1,94 @@
 {
-  "description": "クライアントバージョン要件を管理し、ユーザーが最新の安定版を使用していることを確認します。VSCodeとCLIは個別に管理されます。",
-  "empty": {
-    "description": "過去7日間に認識可能なクライアントを使用したアクティブユーザーがいません",
-    "title": "クライアントデータなし"
-  },
-  "features": {
-    "activeWindow": "アクティブウィンドウ：",
-    "activeWindowDesc": "過去7日間にリクエストがあったユーザーのみを集計",
-    "autoDetect": "システムは各クライアントの最新安定版（GAバージョン）を自動検出します",
-    "blockOldVersion": "旧バージョンを使用するユーザーはHTTP 400エラーを受信し、サービスを継続使用できません",
-    "errorMessage": "エラーメッセージには現在のバージョンとアップグレード必要バージョン番号が含まれます",
-    "gaRule": "判定ルール：",
-    "gaRuleDesc": "1人以上のユーザーが使用しているバージョンをGAバージョンとみなします",
-    "recommendation": "推奨方法：",
-    "recommendationDesc": "まず下記のバージョン分布を確認し、新バージョンが安定していることを確認してから有効にしてください。",
-    "title": "機能説明",
-    "whatHappens": "有効化後の動作："
-  },
+  "title": "クライアント更新リマインダー",
+  "description": "クライアントタイプごとに許可するバージョン範囲を管理します。ポリシー未設定のクライアントタイプは検査されません。",
   "section": {
-    "distribution": {
-      "description": "過去7日間のアクティブユーザーのクライアントバージョン情報を表示します。各クライアントタイプごとにGAバージョンを独立して集計します。",
-      "title": "クライアントバージョン分布"
-    },
     "settings": {
-      "description": "有効にすると、システムはクライアントバージョンを自動的に検出し、旧バージョンユーザーのリクエストをブロックします。",
-      "title": "アップグレードリマインダー設定"
+      "title": "更新リマインダー設定",
+      "description": "グローバルスイッチは、設定済みのクライアントバージョンポリシーを一時停止または再開します。"
+    },
+    "distribution": {
+      "title": "クライアントバージョンポリシー",
+      "description": "過去 7 日間にアクティブだった認識可能なクライアント、そのポリシー、有効な許可バージョン範囲を表示します。"
     }
+  },
+  "empty": {
+    "title": "クライアントデータなし",
+    "description": "過去 7 日間にアクティブな認識可能クライアントがありません。"
+  },
+  "toggle": {
+    "enable": "クライアントバージョンチェックを有効にする",
+    "description": "チェックを一時停止しても、設定済みのすべてのポリシーと自動基準の履歴は保持されます。",
+    "enableSuccess": "クライアントバージョンチェックを有効にしました",
+    "disableSuccess": "クライアントバージョンチェックを一時停止しました",
+    "toggleFailed": "クライアントバージョンチェックを更新できませんでした"
+  },
+  "state": {
+    "active": "有効",
+    "paused": "一時停止",
+    "preview": "チェック停止中は、ポリシーがプレビューとして表示されます。",
+    "unconfigured": "未設定",
+    "waitingForBaseline": "自動基準を待機中"
+  },
+  "actions": {
+    "failed": "クライアントバージョンポリシーを保存できませんでした",
+    "bulkCreated": "{count} 件の自動ポリシーを作成しました",
+    "createAll": "すべて設定（{count}）",
+    "updated": "クライアントバージョンポリシーを更新しました",
+    "created": "クライアントバージョンポリシーを作成しました",
+    "deleted": "クライアントバージョンポリシーを削除しました",
+    "save": "ポリシーを保存",
+    "delete": "ポリシーを削除",
+    "applyFixed": "固定範囲を適用"
+  },
+  "metrics": {
+    "clientTypes": "クライアントタイプ",
+    "totalUsers": "アクティブユーザー",
+    "configured": "設定済み",
+    "outOfRange": "範囲外"
+  },
+  "modes": {
+    "automatic_baseline": "自動基準バージョン",
+    "minimum": "最小バージョンを制限",
+    "maximum": "最大バージョンを制限",
+    "range": "バージョン範囲を制限",
+    "baseline_lag": "自動基準バージョンと遅延を許可"
+  },
+  "range": {
+    "any": "すべてのバージョン",
+    "unavailable": "有効な固定範囲がありません"
+  },
+  "editor": {
+    "mode": "ポリシーモード",
+    "minimum": "最小バージョン",
+    "maximum": "最大バージョン",
+    "automaticBaseline": "自動基準バージョン",
+    "lag": "許可するパッチ差",
+    "previousSeries": "前バージョン系列の最終バージョン",
+    "overrideVersion": "固定バージョンを設定",
+    "overridePreview": "固定範囲のプレビュー"
+  },
+  "validation": {
+    "invalid": "有効な X.Y.Z バージョンとポリシー値を入力してください。"
+  },
+  "deleteDialog": {
+    "title": "クライアントバージョンポリシーを削除しますか？",
+    "description": "削除後、{clientType} のクライアントバージョンチェックは行われません。",
+    "cancel": "キャンセル",
+    "confirm": "ポリシーを削除"
+  },
+  "status": {
+    "below_minimum": "最小バージョン未満",
+    "within_range": "許可範囲内",
+    "above_maximum": "最大バージョン超過",
+    "unparseable": "バージョンを解析できません",
+    "unchecked": "未チェック"
   },
   "table": {
-    "currentGA": "現在のGAバージョン：",
-    "internalType": "内部タイプ：",
-    "lastActive": "最終アクティブ時間",
-    "latest": "最新版",
-    "needsUpgrade": "アップグレード必要",
-    "noUsers": "ユーザーデータなし",
-    "status": "ステータス",
-    "unknown": "不明",
+    "usersCount": "{count} 人のユーザー",
     "user": "ユーザー",
-    "usersCount": "{count}名のユーザー",
-    "version": "現在のバージョン",
-    "stats": {
-      "clientTypes": "クライアントタイプ",
-      "totalUsers": "ユーザー総数",
-      "withGA": "GA版あり",
-      "coverage": "GAカバレッジ"
-    }
-  },
-  "title": "クライアント更新リマインダー",
-  "toggle": {
-    "description": "有効にすると、システムはクライアントバージョンを自動的に検出し、古いバージョンをブロックします。",
-    "disableSuccess": "クライアントバージョンチェックが無効になりました",
-    "enable": "クライアントバージョンチェックを有効にする",
-    "enableSuccess": "クライアントバージョンチェックが有効になりました",
-    "toggleFailed": "トグルに失敗しました"
+    "version": "バージョン",
+    "lastActive": "最終アクティブ",
+    "status": "ステータス",
+    "noUsers": "アクティブユーザーなし"
   }
 }

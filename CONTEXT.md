@@ -149,6 +149,150 @@ A system notification that opens a fault episode when an Adjustment Run fails, i
 execute, or succeeds with an operational warning, and closes it after recovery.
 _Avoid_: Adjustment Run history, application log
 
+## Client Version Language
+
+**Client Type**:
+A recognizable category of calling software, such as the Claude CLI or Claude VSCode extension,
+whose version sequence is managed independently from other client categories.
+_Avoid_: Client, User-Agent
+
+**Client Version Policy**:
+The version-compatibility policy assigned to one Client Type. It is either an Automatic Baseline
+Policy or Version Constraints, independently of the policies for other Client Types.
+_Avoid_: Global version rule, implicit baseline fallback
+
+**Comparable Client Version**:
+The numeric `major.minor.patch` core extracted from a client version. Prefixes and suffixes do not
+affect policy ordering, so prerelease and build variants with the same core are equal; the original
+version remains available for display.
+_Avoid_: Full SemVer precedence, raw User-Agent version
+
+**Unparseable Client Version**:
+A client request whose User-Agent does not contain a comparable `major.minor.patch` core. It is
+allowed through version enforcement but remains visible as an identification problem.
+_Avoid_: Version zero, unsupported client version
+
+**Effective Client Version Range**:
+The inclusive range actually enforced for one Client Type after evaluating its selected policy mode,
+automatic baseline, and any stored version-line boundary.
+_Avoid_: Configured fields, observed version spread
+
+**Client Version Status**:
+The classification of a recognized client version against its Effective Client Version Range:
+below minimum, within range, above maximum, or unparseable.
+_Avoid_: Latest/oldest label, generic client health
+
+**Version Enforcement Preview**:
+The non-enforcing classification of observed client versions against stored policies while the
+Global Client Version Check is disabled.
+_Avoid_: Active enforcement, version distribution alone
+
+**Client Upgrade Required**:
+The blocking outcome for a client version below its Effective Client Version Range, retaining the
+existing client-facing error identity.
+_Avoid_: Client Version Too New, update suggestion
+
+**Client Version Too New**:
+The blocking outcome for a client version above its Effective Client Version Range, directing the
+caller to a supported version at or below the maximum.
+_Avoid_: Client Upgrade Required, unknown client
+
+**Automatic Version Baseline**:
+The highest Comparable Client Version whose distinct-user adoption during the Client Observation
+Window reaches the configured threshold; suffix variants share one adoption bucket, and one user may
+count once for each comparable version they used in that window.
+It is a locally detected compatibility baseline, not a vendor-declared GA release or the highest
+version seen from any single user. Until such a baseline exists, the policy imposes no restriction;
+once advanced, the baseline never decreases when older observations leave the Client Observation
+Window. If recalculation fails, version enforcement follows the existing fail-open behavior for that
+request.
+_Avoid_: GA version, latest observed version, official stable release
+
+**Client Observation Window**:
+The preceding seven days of client requests used to discover active Client Types and measure version
+adoption for an Automatic Version Baseline. Observations continue while the Global Client Version
+Check is disabled and include requests blocked by version enforcement, although enforcement and
+baseline advancement remain paused while the global check is disabled.
+_Avoid_: All historical clients, policy lifetime
+
+**Automatic Baseline Policy**:
+A Client Version Policy that uses the Automatic Version Baseline as its compatibility threshold
+rather than administrator-entered version boundaries. Returning to this policy after an override
+discards the prior baseline and detects a new one from the current Client Observation Window while
+retaining the Previous Series Terminal Version only when it remains lower than the new baseline and
+belongs to a different Version Series.
+_Avoid_: Version Constraints, official GA policy
+
+**Baseline-Driven Policy**:
+An Automatic Baseline Policy or Baseline Lag Tolerance mode whose Effective Client Version Range
+depends on the Automatic Version Baseline. Switching between those two modes preserves the baseline
+and previous-series history; returning from fixed Version Constraints recalculates the baseline.
+_Avoid_: Fixed Version Constraints, automatic policy creation
+
+**Automatic Policy Override**:
+An administrator operation that replaces a Baseline-Driven Policy with fixed Version Constraints. An
+Automatic Baseline Policy becomes an exact range whose minimum and maximum are the selected version;
+a Baseline Lag Tolerance becomes a range whose maximum is selected and whose minimum is derived from
+the retained tolerance within the selected Version Series and clamped to its `.0` release, without
+using the Previous Series Terminal Version. Later baseline observations do not move the generated range.
+Editing an existing fixed constraint preserves its mode and changes only its configured boundaries.
+Fixed modes suspend automatic baseline tracking until the policy is explicitly changed back to a
+Baseline-Driven Policy.
+_Avoid_: Automatic baseline correction, continuing automatic detection
+
+**Version Constraints**:
+A Client Version Policy with exactly one constraint mode: a Minimum Supported Version, a Maximum
+Supported Version, both boundaries, or a Baseline Lag Tolerance. Constraint modes do not combine.
+_Avoid_: Automatic Baseline Policy, global version rule
+
+**Baseline Lag Tolerance**:
+The positive maximum permitted number of patch-number steps below the Automatic Version Baseline.
+Steps descend within the current Version Series; when the tolerance reaches the previously adopted
+series, the minimum is clamped to that series' terminal version and never crosses into an earlier
+series. Versions newer than the baseline are not restricted.
+_Avoid_: Symmetric version window, maximum supported version
+
+**Version Series**:
+The ordered client releases sharing the same major and minor version components, such as `2.0.x`.
+_Avoid_: Client Type, arbitrary version range
+
+**Previous Series Terminal Version**:
+The last Automatic Version Baseline in the previously adopted Version Series, even when intervening
+numeric series never reached the adoption threshold. It is the hard floor when a Baseline Lag
+Tolerance crosses the current series boundary and may be seeded or corrected by an administrator;
+no earlier series is considered. If it is missing, the lag floor remains at the current series' `.0`
+release until an administrator supplies it.
+_Avoid_: Latest observed version, Minimum Supported Version
+
+**Unconfigured Client Type**:
+A Client Type for which no Client Version Policy exists. It has no version restriction even when the
+Global Client Version Check is enabled; removing a policy also removes its detection history and
+returns its type to this state.
+_Avoid_: Automatic Baseline Policy, disabled policy record
+
+**Minimum Supported Version**:
+The inclusive lower boundary of a Client Version Policy. A client version below it is unsupported.
+_Avoid_: Recommended version, Automatic Version Baseline
+
+**Maximum Supported Version**:
+The inclusive upper boundary of a Client Version Policy. A client version above it is unsupported.
+_Avoid_: Latest version, recommended version
+
+**Global Client Version Check**:
+The administrator-controlled switch that enables or suspends all Client Version Policies without
+deleting their per-client boundaries. Migration or the first enable establishes an Automatic
+Baseline Policy for each Client Type recognized during the Client Observation Window at that time;
+later Client Types remain unconfigured, and disabling then re-enabling does not create missing
+policies. Disabling pauses enforcement while preserving policy and automatic-baseline history.
+_Avoid_: Per-client policy, Automatic Version Baseline
+
+**Policy Initialization**:
+The one-time migration or first-enable operation that preserves existing policies and creates
+Automatic Baseline Policies only for other Client Types active in the Client Observation Window,
+immediately deriving any available initial baselines from that window. Later toggles do not repeat
+initialization.
+_Avoid_: Policy refresh, automatic policy recreation
+
 ## Recharge Language
 
 **Login Key**:
