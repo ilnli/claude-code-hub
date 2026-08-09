@@ -2,7 +2,7 @@ import { Context } from "hono";
 import { DrizzleQueryError } from "drizzle-orm";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { ProxyErrorHandler } from "@/app/v1/_lib/proxy/error-handler";
-import { ProxyError } from "@/app/v1/_lib/proxy/errors";
+import { ProxyError, RateLimitError } from "@/app/v1/_lib/proxy/errors";
 import { ProxySession } from "@/app/v1/_lib/proxy/session";
 import { DbPoolAdmissionError } from "@/drizzle/admitted-client";
 import type { ErrorDetectionResult } from "@/lib/error-rule-detector";
@@ -171,13 +171,17 @@ describe("ProxyErrorHandler.handle durable persistence", () => {
       901,
       expect.objectContaining({
         durationMs: expect.any(Number),
-        errorMessage: "fetch failed",
+        errorMessage: "fetch failed (cch_session_id: s_durable)",
         providerChain: [],
         statusCode: 500,
         model: "claude-sonnet-4-20250514",
         context1mApplied: false,
         swapCacheTtlApplied: false,
       })
+    );
+    expect(mocks.emitProxyLangfuseTrace).toHaveBeenCalledWith(
+      session,
+      expect.objectContaining({ errorMessage: "fetch failed (cch_session_id: s_durable)" })
     );
     expect(mocks.endRequest).toHaveBeenCalledWith(USER.id, 901);
     const endOrder = mocks.endRequest.mock.invocationCallOrder[0];
@@ -195,7 +199,10 @@ describe("ProxyErrorHandler.handle durable persistence", () => {
 
     expect(mocks.emitProxyLangfuseTrace).toHaveBeenCalledWith(
       session,
-      expect.objectContaining({ statusCode: 500, errorMessage: "fetch failed" })
+      expect.objectContaining({
+        statusCode: 500,
+        errorMessage: "fetch failed (cch_session_id: s_durable)",
+      })
     );
     expect(mocks.endRequest).not.toHaveBeenCalled();
   });
@@ -221,6 +228,37 @@ describe("ProxyErrorHandler.handle durable persistence", () => {
       })
     );
     expect(mocks.endRequest).toHaveBeenCalledWith(USER.id, 901);
+  });
+
+  test("persists the session id for terminal 402 rate-limit errors", async () => {
+    const session = await createSession();
+    attachMessageContext(session);
+    const error = new RateLimitError(
+      "rate_limit_error",
+      "daily quota exceeded",
+      "daily_quota",
+      12,
+      20,
+      null
+    );
+
+    const response = await ProxyErrorHandler.handle(session, error);
+
+    expect(response.status).toBe(402);
+    expect(mocks.updateMessageRequestDetailsDurably).toHaveBeenCalledWith(
+      901,
+      expect.objectContaining({
+        statusCode: 402,
+        errorMessage: expect.stringContaining("cch_session_id: s_durable"),
+      })
+    );
+    expect(mocks.emitProxyLangfuseTrace).toHaveBeenCalledWith(
+      session,
+      expect.objectContaining({
+        statusCode: 402,
+        errorMessage: expect.stringContaining("cch_session_id: s_durable"),
+      })
+    );
   });
 
   test("skips persistence and tracking when no message context exists", async () => {

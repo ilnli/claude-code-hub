@@ -388,6 +388,7 @@ export class ProxyProviderResolver {
             logger.error("ProviderSelector: No fallback providers available", {
               excludedCount: excludedProviders.length,
               totalAttempts: attemptCount,
+              cch_session_id: session.sessionId,
             });
             break;
           }
@@ -525,6 +526,7 @@ export class ProxyProviderResolver {
       totalAttempts: attemptCount,
       errorType,
       filteredProviders: session.getLastSelectionContext()?.filteredProviders,
+      cch_session_id: session.sessionId,
     });
 
     // 根据 verboseProviderError 配置决定返回详细错误还是简洁错误
@@ -1313,6 +1315,7 @@ export class ProxyProviderResolver {
         requestedModel,
         totalProviders: visibleProviders.length,
         excludedCount: excludeIds.length,
+        cch_session_id: session?.sessionId,
       });
       return { provider: null, context };
     }
@@ -1366,7 +1369,9 @@ export class ProxyProviderResolver {
     }
 
     if (healthyProviders.length === 0) {
-      logger.warn("ProviderSelector: All providers rate limited or unavailable");
+      logger.warn("ProviderSelector: All providers rate limited or unavailable", {
+        cch_session_id: session?.sessionId,
+      });
       // 所有供应商都被限流或不可用，返回 null 触发 503 错误
       return { provider: null, context };
     }

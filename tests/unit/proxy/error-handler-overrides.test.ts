@@ -100,7 +100,7 @@ describe("ProxyErrorHandler.handle overrides", () => {
       expect.objectContaining({
         responseText: expect.stringContaining("masked quota message"),
         statusCode: 429,
-        errorMessage: "masked quota message",
+        errorMessage: "masked quota message (cch_session_id: s_override)",
       })
     );
     const trace = mocks.emitProxyLangfuseTrace.mock.calls[0]?.[1];

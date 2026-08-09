@@ -14,7 +14,7 @@ import { sanitizeErrorTextForDetail } from "@/lib/utils/upstream-error-detection
 import { updateMessageRequestDetailsDurably } from "@/repository/message";
 import type { SystemSettings } from "@/types/system-config";
 import { deriveClientSafeUpstreamErrorMessage } from "./client-error-message";
-import { attachSessionIdToErrorResponse } from "./error-session-id";
+import { attachSessionIdToErrorMessage, attachSessionIdToErrorResponse } from "./error-session-id";
 import {
   ALL_PROVIDERS_UNAVAILABLE_MESSAGE,
   getErrorOverrideAsync,
@@ -757,6 +757,7 @@ export class ProxyErrorHandler {
     if (rateLimitMetadata) {
       finalErrorMessage = `${errorMessage} | rate_limit_metadata: ${JSON.stringify(rateLimitMetadata)}`;
     }
+    finalErrorMessage = attachSessionIdToErrorMessage(session.sessionId, finalErrorMessage);
 
     // 保存错误信息和决策链
     await updateMessageRequestDetailsDurably(session.messageContext.id, {
@@ -801,7 +802,7 @@ export class ProxyErrorHandler {
       durationMs: Math.max(0, Date.now() - session.startTime),
       isStreaming,
       sseEventCount: isStreaming ? 0 : undefined,
-      errorMessage: data.errorMessage,
+      errorMessage: attachSessionIdToErrorMessage(session.sessionId, data.errorMessage),
     });
   }
 

@@ -6,7 +6,10 @@ import { ProxyStatusTracker } from "@/lib/proxy-status-tracker";
 import { SessionManager } from "@/lib/session-manager";
 import { SessionTracker } from "@/lib/session-tracker";
 import { ProxyErrorHandler } from "./proxy/error-handler";
-import { attachSessionIdToErrorResponse } from "./proxy/error-session-id";
+import {
+  attachSessionIdToErrorMessage,
+  attachSessionIdToErrorResponse,
+} from "./proxy/error-session-id";
 import { ProxyError } from "./proxy/errors";
 import { tryFakeStreamingPath } from "./proxy/fake-streaming/proxy-integration";
 import { detectClientFormat, detectFormatByEndpoint } from "./proxy/format-mapper";
@@ -184,7 +187,11 @@ export async function handleProxyRequest(c: Context): Promise<Response> {
   } catch (error) {
     const databaseError = findSafeDatabaseError(error);
     logger.error("Proxy handler error:", {
-      error: databaseError?.message ?? (error instanceof Error ? error.message : String(error)),
+      error: attachSessionIdToErrorMessage(
+        session?.sessionId,
+        databaseError?.message ?? (error instanceof Error ? error.message : String(error))
+      ),
+      cch_session_id: session?.sessionId,
       databaseCode: databaseError?.code,
       databasePool: databaseError?.pool,
     });
