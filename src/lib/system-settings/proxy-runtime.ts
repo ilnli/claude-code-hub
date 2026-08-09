@@ -2,6 +2,7 @@ import "server-only";
 
 import { getEnvConfig } from "@/lib/config/env.schema";
 import { getCachedSystemSettings } from "@/lib/config/system-settings-cache";
+import { REPLAY_CACHE_TTL_MINUTES_DEFAULT } from "@/lib/validation/replay-settings";
 
 /**
  * 代理热路径消费的系统设置快照。
@@ -21,6 +22,7 @@ export interface ProxyRuntimeSettings {
   semanticErrorRoutingMode: "legacy" | "shadow" | "enforce";
   affinityIgnoreClientSessionId: boolean;
   replayEnabled: boolean;
+  replayCacheTtlMinutes: number;
   cacheEffectivenessEnabled: boolean;
 }
 
@@ -51,6 +53,7 @@ function envFallback(): ProxyRuntimeSettings {
       semanticErrorRoutingMode: "shadow",
       affinityIgnoreClientSessionId: true,
       replayEnabled: env.ENABLE_REQUEST_REPLAY,
+      replayCacheTtlMinutes: REPLAY_CACHE_TTL_MINUTES_DEFAULT,
       cacheEffectivenessEnabled: env.ENABLE_CACHE_EFFECTIVENESS,
     };
   } catch {
@@ -59,6 +62,7 @@ function envFallback(): ProxyRuntimeSettings {
       semanticErrorRoutingMode: "shadow",
       affinityIgnoreClientSessionId: true,
       replayEnabled: false,
+      replayCacheTtlMinutes: REPLAY_CACHE_TTL_MINUTES_DEFAULT,
       cacheEffectivenessEnabled: true,
     };
   }
@@ -72,6 +76,7 @@ export async function getProxyRuntimeSettings(): Promise<ProxyRuntimeSettings> {
       semanticErrorRoutingMode: settings.semanticErrorRoutingMode ?? "shadow",
       affinityIgnoreClientSessionId: settings.affinityIgnoreClientSessionId,
       replayEnabled: settings.replayEnabled ?? envReplayDefault(),
+      replayCacheTtlMinutes: settings.replayCacheTtlMinutes ?? REPLAY_CACHE_TTL_MINUTES_DEFAULT,
       cacheEffectivenessEnabled:
         settings.cacheEffectivenessEnabled ?? envCacheEffectivenessDefault(),
     };

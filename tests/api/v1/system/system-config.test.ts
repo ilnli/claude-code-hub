@@ -80,6 +80,7 @@ const settings: SystemSettings = {
   quotaLeaseCapUsd: null,
   publicStatusWindowHours: 24,
   publicStatusAggregationIntervalMinutes: 5,
+  replayCacheTtlMinutes: 30,
   ipExtractionConfig: null,
   ipGeoLookupEnabled: true,
   createdAt: new Date("2026-04-28T00:00:00.000Z"),
@@ -94,7 +95,7 @@ describe("v1 system config endpoints", () => {
     getSystemSettingsRepoMock.mockResolvedValue(settings);
     saveSystemSettingsMock.mockResolvedValue({
       ok: true,
-      data: { ...settings, siteTitle: "CCH Ops", timezone: "UTC" },
+      data: { ...settings, siteTitle: "CCH Ops", timezone: "UTC", replayCacheTtlMinutes: 45 },
     });
     getServerTimeZoneMock.mockResolvedValue({ ok: true, data: { timeZone: "Asia/Shanghai" } });
   });
@@ -118,15 +119,21 @@ describe("v1 system config endpoints", () => {
       body: {
         siteTitle: "CCH Ops",
         timezone: "UTC",
+        replayCacheTtlMinutes: 45,
         upstreamBillingProbeEnabled: true,
         upstreamBillingProbeIntervalMinutes: 15,
       },
     });
     expect(updated.response.status).toBe(200);
-    expect(updated.json).toMatchObject({ siteTitle: "CCH Ops", timezone: "UTC" });
+    expect(updated.json).toMatchObject({
+      siteTitle: "CCH Ops",
+      timezone: "UTC",
+      replayCacheTtlMinutes: 45,
+    });
     expect(saveSystemSettingsMock).toHaveBeenCalledWith({
       siteTitle: "CCH Ops",
       timezone: "UTC",
+      replayCacheTtlMinutes: 45,
       upstreamBillingProbeEnabled: true,
       upstreamBillingProbeIntervalMinutes: 15,
     });
@@ -183,6 +190,34 @@ describe("v1 system config endpoints", () => {
     });
     expect(invalidTimezone.response.status).toBe(400);
     expect(invalidTimezone.json).toMatchObject({ errorCode: "request.validation_failed" });
+
+    const invalidReplayTtl = await callV1Route({
+      method: "PUT",
+      pathname: "/api/v1/system/settings",
+      headers: { Authorization: "Bearer admin-token" },
+      body: { replayCacheTtlMinutes: 4 },
+    });
+    expect(invalidReplayTtl.response.status).toBe(400);
+    expect(invalidReplayTtl.json).toMatchObject({ errorCode: "REPLAY_CACHE_TTL_INVALID" });
+
+    const invalidReplayTtlUpper = await callV1Route({
+      method: "PUT",
+      pathname: "/api/v1/system/settings",
+      headers: { Authorization: "Bearer admin-token" },
+      body: { replayCacheTtlMinutes: 121 },
+    });
+    expect(invalidReplayTtlUpper.response.status).toBe(400);
+    expect(invalidReplayTtlUpper.json).toMatchObject({ errorCode: "REPLAY_CACHE_TTL_INVALID" });
+
+    for (const value of [5, 120]) {
+      const validReplayTtl = await callV1Route({
+        method: "PUT",
+        pathname: "/api/v1/system/settings",
+        headers: { Authorization: "Bearer admin-token" },
+        body: { replayCacheTtlMinutes: value },
+      });
+      expect(validReplayTtl.response.status).toBe(200);
+    }
   });
 
   test("returns a stable error code for out-of-range Discovery settings", async () => {

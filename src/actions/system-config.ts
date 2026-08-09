@@ -21,6 +21,10 @@ import {
   DISCOVERY_WINDOW_INVALID_ERROR_CODE,
   getDiscoveryValidationErrorCode,
 } from "@/lib/validation/discovery-settings";
+import {
+  getReplayCacheTtlValidationErrorCode,
+  REPLAY_CACHE_TTL_INVALID_ERROR_CODE,
+} from "@/lib/validation/replay-settings";
 import { UpdateSystemSettingsSchema } from "@/lib/validation/schemas";
 import { getSystemSettings, updateSystemSettings } from "@/repository/system-config";
 import type { IpExtractionConfig } from "@/types/ip-extraction";
@@ -35,9 +39,13 @@ import type {
 } from "@/types/system-config";
 import type { ActionResult } from "./types";
 
-function discoveryValidationErrorCode(error: unknown): string | null {
+function systemSettingsValidationErrorCode(error: unknown): string | null {
   if (!(error instanceof ZodError)) return null;
-  return getDiscoveryValidationErrorCode(error.issues) ?? null;
+  return (
+    getDiscoveryValidationErrorCode(error.issues) ??
+    getReplayCacheTtlValidationErrorCode(error.issues) ??
+    null
+  );
 }
 
 export async function fetchSystemSettings(): Promise<ActionResult<SystemSettings>> {
@@ -112,6 +120,7 @@ export async function saveSystemSettings(formData: {
   semanticErrorRoutingMode?: SemanticErrorRoutingMode;
   affinityIgnoreClientSessionId?: boolean;
   replayEnabled?: boolean | null;
+  replayCacheTtlMinutes?: number;
   cacheEffectivenessEnabled?: boolean | null;
   enableCodexSessionIdCompletion?: boolean;
   enableClaudeMetadataUserIdInjection?: boolean;
@@ -205,6 +214,7 @@ export async function saveSystemSettings(formData: {
       semanticErrorRoutingMode: validated.semanticErrorRoutingMode,
       affinityIgnoreClientSessionId: validated.affinityIgnoreClientSessionId,
       replayEnabled: validated.replayEnabled,
+      replayCacheTtlMinutes: validated.replayCacheTtlMinutes,
       cacheEffectivenessEnabled: validated.cacheEffectivenessEnabled,
       enableCodexSessionIdCompletion: validated.enableCodexSessionIdCompletion,
       enableClaudeMetadataUserIdInjection: validated.enableClaudeMetadataUserIdInjection,
@@ -310,9 +320,11 @@ export async function saveSystemSettings(formData: {
     return { ok: true, data: { ...updated, publicStatusProjectionWarningCode } };
   } catch (error) {
     logger.error("更新系统设置失败:", error);
-    const validationErrorCode = discoveryValidationErrorCode(error);
+    const validationErrorCode = systemSettingsValidationErrorCode(error);
     const message = validationErrorCode
-      ? "Discovery settings validation failed."
+      ? validationErrorCode === REPLAY_CACHE_TTL_INVALID_ERROR_CODE
+        ? "Replay cache TTL validation failed."
+        : "Discovery settings validation failed."
       : error instanceof Error
         ? error.message
         : "更新系统设置失败";

@@ -34,6 +34,7 @@ function createSettings(overrides: Partial<SystemSettings> = {}): Partial<System
     semanticErrorRoutingMode: "shadow",
     affinityIgnoreClientSessionId: true,
     replayEnabled: null,
+    replayCacheTtlMinutes: 30,
     cacheEffectivenessEnabled: null,
     ...overrides,
   };
@@ -77,6 +78,7 @@ describe("getProxyRuntimeSettings / getCachedProxyRuntimeSettings", () => {
       semanticErrorRoutingMode: "enforce",
       affinityIgnoreClientSessionId: false,
       replayEnabled: false,
+      replayCacheTtlMinutes: 30,
       cacheEffectivenessEnabled: true,
     });
     expect(getCachedProxyRuntimeSettings()).toEqual({
@@ -84,6 +86,7 @@ describe("getProxyRuntimeSettings / getCachedProxyRuntimeSettings", () => {
       semanticErrorRoutingMode: "enforce",
       affinityIgnoreClientSessionId: false,
       replayEnabled: false,
+      replayCacheTtlMinutes: 30,
       cacheEffectivenessEnabled: true,
     });
   });
@@ -103,6 +106,7 @@ describe("getProxyRuntimeSettings / getCachedProxyRuntimeSettings", () => {
       semanticErrorRoutingMode: "shadow",
       affinityIgnoreClientSessionId: true,
       replayEnabled: false,
+      replayCacheTtlMinutes: 30,
       cacheEffectivenessEnabled: true,
     });
   });
@@ -119,6 +123,7 @@ describe("getProxyRuntimeSettings / getCachedProxyRuntimeSettings", () => {
       semanticErrorRoutingMode: "shadow",
       affinityIgnoreClientSessionId: true,
       replayEnabled: false,
+      replayCacheTtlMinutes: 30,
       cacheEffectivenessEnabled: true,
     });
   });

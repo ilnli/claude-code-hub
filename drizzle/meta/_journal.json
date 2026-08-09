@@ -890,6 +890,13 @@
       "when": 1786285200074,
       "tag": "0126_orange_pyro",
       "breakpoints": true
+    },
+    {
+      "idx": 127,
+      "version": "7",
+      "when": 1786288928081,
+      "tag": "0127_smart_retro_girl",
+      "breakpoints": true
     }
   ]
 }
