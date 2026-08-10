@@ -199,7 +199,7 @@ describe("handleProxyRequest public success behavior", () => {
     });
   });
 
-  it("routes remote compaction v2 through the v1 compact management policy", async () => {
+  it("rejects remote compaction v2 without stream=true", async () => {
     boundary.send.mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -216,14 +216,15 @@ describe("handleProxyRequest public success behavior", () => {
       })
     );
 
-    expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({
-      output: [{ type: "compaction", encrypted_content: "opaque-state" }],
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: { code: "remote_compaction_v2_requires_stream" },
     });
     expect(observedSession?.getEndpoint()).toBe("/v1/responses");
     expect(observedSession?.getManagedEndpoint()).toBe("/v1/responses/compact");
     expect(observedSession?.getEndpointPolicy().kind).toBe("raw_passthrough");
     expect(boundary.fakeStreamingCalls).toBe(0);
+    expect(boundary.send).not.toHaveBeenCalled();
   });
 
   it("normalizes object-form remote compaction before raw passthrough", async () => {

@@ -5,6 +5,8 @@ const mocks = vi.hoisted(() => ({
   commitAttempt: vi.fn(async () => true),
   settleLeaseBudgets: vi.fn(async () => undefined),
   trackCost: vi.fn(async () => undefined),
+  checkTotalCostLimit: vi.fn(async () => ({ allowed: true })),
+  checkCostLimitsWithLease: vi.fn(async () => ({ allowed: true })),
 }));
 
 vi.mock("@/lib/utils/cost-calculation", () => ({
@@ -19,6 +21,8 @@ vi.mock("@/lib/rate-limit/service", () => ({
   RateLimitService: {
     settleLeaseBudgets: mocks.settleLeaseBudgets,
     trackCost: mocks.trackCost,
+    checkTotalCostLimit: mocks.checkTotalCostLimit,
+    checkCostLimitsWithLease: mocks.checkCostLimitsWithLease,
   },
 }));
 
@@ -37,6 +41,7 @@ function createProvider(): Provider {
   return {
     id: 7,
     name: "provider-7",
+    providerType: "codex",
     costMultiplier: 1.5,
   } as Provider;
 }
@@ -79,6 +84,8 @@ describe("explicit compaction attempt billing", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.commitAttempt.mockResolvedValue(true);
+    mocks.checkTotalCostLimit.mockResolvedValue({ allowed: true });
+    mocks.checkCostLimitsWithLease.mockResolvedValue({ allowed: true });
   });
 
   it("normalizes returned usage and commits the attempt before retry", async () => {
@@ -106,7 +113,7 @@ describe("explicit compaction attempt billing", () => {
 
     expect(mocks.calculateRequestCost).toHaveBeenCalledWith(
       expect.objectContaining({
-        input_tokens: 20,
+        input_tokens: 12,
         output_tokens: 5,
         cache_read_input_tokens: 8,
       }),
@@ -120,7 +127,7 @@ describe("explicit compaction attempt billing", () => {
         providerId: 7,
         providerEndpointId: 701,
         usage: expect.objectContaining({
-          inputTokens: 20,
+          inputTokens: 12,
           outputTokens: 5,
           cacheReadInputTokens: 8,
           reasoningTokens: 3,
@@ -218,5 +225,27 @@ describe("explicit compaction attempt billing", () => {
         pricingState: "pricing_pending",
       })
     );
+  });
+
+  it("stops another attempt when the charged attempt exhausts a budget", async () => {
+    const session = createSession({
+      source: "provider_model",
+      priceData: { input_cost_per_token: 0.001 },
+    });
+    mocks.checkCostLimitsWithLease.mockResolvedValueOnce({ allowed: false });
+
+    await expect(
+      commitExplicitCompactionValidationAttempt({
+        session,
+        provider: createProvider(),
+        providerEndpointId: 701,
+        attemptOrdinal: 1,
+        attemptedAt: new Date(),
+        completedAt: new Date(),
+        validation: validation({ input_tokens: 10 }),
+      })
+    ).rejects.toMatchObject({ name: "ExplicitCompactionQuotaError" });
+    expect(mocks.commitAttempt).toHaveBeenCalledTimes(1);
+    expect(mocks.trackCost).toHaveBeenCalledTimes(1);
   });
 });

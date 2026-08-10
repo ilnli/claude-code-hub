@@ -69,6 +69,7 @@ export interface RoutingState {
   rateMarkupValue: number;
   // 上游探测协议（sub2api/newapi）与 newapi 分组名（日志校准兜底）
   rateUpstreamType: UpstreamProbeType;
+  isSub2Api: boolean;
   newapiGroup: string;
   cacheTtlPreference: "inherit" | "5m" | "1h";
   swapCacheTtlBilling: boolean;
@@ -172,6 +173,7 @@ export type ProviderFormAction =
   | { type: "SET_RATE_MARKUP_TYPE"; payload: RateMarkupType }
   | { type: "SET_RATE_MARKUP_VALUE"; payload: number }
   | { type: "SET_RATE_UPSTREAM_TYPE"; payload: UpstreamProbeType }
+  | { type: "SET_IS_SUB2API"; payload: boolean }
   | { type: "SET_NEWAPI_GROUP"; payload: string }
   | { type: "SET_CACHE_TTL_PREFERENCE"; payload: "inherit" | "5m" | "1h" }
   | { type: "SET_SWAP_CACHE_TTL_BILLING"; payload: boolean }

@@ -35,6 +35,8 @@ const EXPLICIT_COMPACTION_PUBLIC_ERROR_CODES = new Set([
   "remote_compaction_invalid_response",
   "remote_compaction_response_too_large",
   "remote_compaction_timeout",
+  "remote_compaction_v2_requires_stream",
+  "remote_compaction_retry_budget_exhausted",
   "billing_persistence_unavailable",
   "billing_pricing_unavailable",
 ]);

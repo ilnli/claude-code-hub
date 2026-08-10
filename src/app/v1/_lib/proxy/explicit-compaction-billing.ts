@@ -1,4 +1,5 @@
 import { logger } from "@/lib/logger";
+import { resolveKeyCostResetAt, resolveUser5hCostResetAt } from "@/lib/rate-limit/cost-reset-utils";
 import { RateLimitService } from "@/lib/rate-limit/service";
 import { calculateRequestCost } from "@/lib/utils/cost-calculation";
 import { commitExplicitCompactionAttempt } from "@/repository/usage-attempt-ledger";
@@ -26,12 +27,15 @@ function record(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
-function normalizeAttemptUsage(usage: Record<string, unknown>): NormalizedAttemptUsage {
+function normalizeAttemptUsage(
+  usage: Record<string, unknown>,
+  providerType: Provider["providerType"]
+): NormalizedAttemptUsage {
   const inputDetails = record(usage.input_tokens_details) ?? record(usage.prompt_tokens_details);
   const outputDetails =
     record(usage.output_tokens_details) ?? record(usage.completion_tokens_details);
   const cacheCreation = record(usage.cache_creation);
-  return {
+  const normalized: NormalizedAttemptUsage = {
     inputTokens: nonNegativeNumber(usage.input_tokens) ?? nonNegativeNumber(usage.prompt_tokens),
     outputTokens:
       nonNegativeNumber(usage.output_tokens) ?? nonNegativeNumber(usage.completion_tokens),
@@ -47,6 +51,18 @@ function normalizeAttemptUsage(usage: Record<string, unknown>): NormalizedAttemp
       nonNegativeNumber(cacheCreation?.ephemeral_1h_input_tokens),
     reasoningTokens: nonNegativeNumber(outputDetails?.reasoning_tokens),
   };
+  if (
+    (providerType === "codex" || providerType === "openai-compatible") &&
+    normalized.inputTokens !== undefined
+  ) {
+    normalized.inputTokens = Math.max(
+      0,
+      normalized.inputTokens -
+        (normalized.cacheReadInputTokens ?? 0) -
+        (normalized.cacheCreationInputTokens ?? 0)
+    );
+  }
+  return normalized;
 }
 
 export class ExplicitCompactionBillingError extends Error {
@@ -56,6 +72,84 @@ export class ExplicitCompactionBillingError extends Error {
     super(publicCode);
     this.name = "ExplicitCompactionBillingError";
   }
+}
+
+export class ExplicitCompactionQuotaError extends Error {
+  constructor() {
+    super("remote_compaction_retry_budget_exhausted");
+    this.name = "ExplicitCompactionQuotaError";
+  }
+}
+
+async function hasRemainingRetryBudget(
+  session: ProxySession,
+  provider: Provider
+): Promise<boolean> {
+  const key = session.authState?.key;
+  const user = session.authState?.user;
+  if (!key || !user) return true;
+
+  const keyCostResetAt = resolveKeyCostResetAt(key.costResetAt ?? null, user.costResetAt ?? null);
+  const user5hCostResetAt = resolveUser5hCostResetAt(
+    user.costResetAt ?? null,
+    user.limit5hCostResetAt ?? null
+  );
+  const [keyTotal, userTotal, providerTotal, keyWindows, userWindows, providerWindows] =
+    await Promise.all([
+      RateLimitService.checkTotalCostLimit(key.id, "key", key.limitTotalUsd ?? null, {
+        keyHash: key.key,
+        resetAt: keyCostResetAt,
+      }),
+      RateLimitService.checkTotalCostLimit(user.id, "user", user.limitTotalUsd ?? null, {
+        resetAt: user.costResetAt ?? null,
+      }),
+      RateLimitService.checkTotalCostLimit(
+        provider.id,
+        "provider",
+        provider.limitTotalUsd ?? null,
+        { resetAt: provider.totalCostResetAt ?? null }
+      ),
+      RateLimitService.checkCostLimitsWithLease(key.id, "key", {
+        limit_5h_usd: key.limit5hUsd ?? null,
+        limit_5h_reset_mode: key.limit5hResetMode,
+        limit_daily_usd: key.limitDailyUsd ?? null,
+        daily_reset_time: key.dailyResetTime,
+        daily_reset_mode: key.dailyResetMode,
+        limit_weekly_usd: key.limitWeeklyUsd ?? null,
+        limit_monthly_usd: key.limitMonthlyUsd ?? null,
+        cost_reset_at: keyCostResetAt,
+      }),
+      RateLimitService.checkCostLimitsWithLease(user.id, "user", {
+        limit_5h_usd: user.limit5hUsd ?? null,
+        limit_5h_reset_mode: user.limit5hResetMode,
+        limit_daily_usd: user.dailyQuota ?? null,
+        daily_reset_time: user.dailyResetTime,
+        daily_reset_mode: user.dailyResetMode,
+        limit_weekly_usd: user.limitWeeklyUsd ?? null,
+        limit_monthly_usd: user.limitMonthlyUsd ?? null,
+        cost_reset_at: user.costResetAt ?? null,
+        limit_5h_cost_reset_at: user5hCostResetAt,
+      }),
+      RateLimitService.checkCostLimitsWithLease(provider.id, "provider", {
+        limit_5h_usd: provider.limit5hUsd ?? null,
+        limit_5h_reset_mode: provider.limit5hResetMode,
+        limit_daily_usd: provider.limitDailyUsd ?? null,
+        daily_reset_time: provider.dailyResetTime,
+        daily_reset_mode: provider.dailyResetMode,
+        limit_weekly_usd: provider.limitWeeklyUsd ?? null,
+        limit_monthly_usd: provider.limitMonthlyUsd ?? null,
+        cost_reset_at: provider.totalCostResetAt ?? null,
+      }),
+    ]);
+
+  return (
+    keyTotal.allowed &&
+    userTotal.allowed &&
+    providerTotal.allowed &&
+    keyWindows.allowed &&
+    userWindows.allowed &&
+    providerWindows.allowed
+  );
 }
 
 export async function commitExplicitCompactionValidationAttempt(input: {
@@ -74,7 +168,9 @@ export async function commitExplicitCompactionValidationAttempt(input: {
     throw new ExplicitCompactionBillingError("billing_persistence_unavailable");
   }
 
-  const normalizedUsage = validation.usage ? normalizeAttemptUsage(validation.usage) : null;
+  const normalizedUsage = validation.usage
+    ? normalizeAttemptUsage(validation.usage, provider.providerType)
+    : null;
   let resolvedPricing: Awaited<ReturnType<ProxySession["getResolvedPricingByBillingSource"]>> =
     null;
   let costUsd = "0";
@@ -217,5 +313,15 @@ export async function commitExplicitCompactionValidationAttempt(input: {
         });
       }
     }
+  }
+
+  if (
+    validation.outcome !== "valid" &&
+    validation.outcome !== "bypassed" &&
+    normalizedUsage &&
+    Number(costUsd) > 0 &&
+    !(await hasRemainingRetryBudget(session, provider))
+  ) {
+    throw new ExplicitCompactionQuotaError();
   }
 }

@@ -345,6 +345,8 @@ export interface Provider {
   upstreamRateSyncedAt: Date | null;
   // 上游探测协议：sub2api / newapi
   rateUpstreamType: UpstreamProbeType;
+  // 是否启用 sub2api 远端压缩传输兼容层
+  isSub2Api?: boolean;
   // newapi 协议：用户指定的分组名（日志校准不可用时的兜底）
   newapiGroup: string | null;
   // newapi 协议：最近一次探测观测到的实际落组分组（仅观测用）
@@ -482,6 +484,7 @@ export interface ProviderDisplay {
   upstreamRateSyncedAt: Date | null;
   // 上游探测协议与 newapi 分组观测
   rateUpstreamType: UpstreamProbeType;
+  isSub2Api: boolean;
   newapiGroup: string | null;
   newapiDetectedGroup: string | null;
   groupTag: string | null;
@@ -617,6 +620,8 @@ export interface CreateProviderData {
   rate_markup_value?: number;
   // 上游探测协议（默认 sub2api）与 newapi 分组名（日志校准兜底）
   rate_upstream_type?: UpstreamProbeType;
+  // 是否启用 sub2api 远端压缩传输兼容层（默认 false）
+  is_sub2api?: boolean;
   newapi_group?: string | null;
   group_tag?: string | null;
 
@@ -711,6 +716,8 @@ export interface UpdateProviderData {
   rate_markup_value?: number;
   // 上游探测协议（默认 sub2api）与 newapi 分组名（日志校准兜底）
   rate_upstream_type?: UpstreamProbeType;
+  // 是否启用 sub2api 远端压缩传输兼容层
+  is_sub2api?: boolean;
   newapi_group?: string | null;
   group_tag?: string | null;
 

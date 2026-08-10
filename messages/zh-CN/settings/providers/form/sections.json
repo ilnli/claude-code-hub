@@ -127,6 +127,12 @@
         "noGroups": "请先设置分组标签，才能配置分组优先级"
       }
     },
+    "remoteCompaction": {
+      "sub2api": {
+        "label": "启用 sub2api 压缩兼容",
+        "desc": "仅当该供应商上游为 sub2api 时开启。CCH 将使用其专用的远端压缩传输协议。"
+      }
+    },
     "upstreamRate": {
       "follow": {
         "label": "跟随上游倍率",

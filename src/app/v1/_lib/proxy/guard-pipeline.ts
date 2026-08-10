@@ -170,9 +170,13 @@ export class GuardPipelineBuilder {
 
   static fromSession(
     session: Pick<ProxySession, "getEndpointPolicy"> & {
+      isExplicitCompactionRequest?: (() => boolean) | undefined;
       isRawCrossProviderFallbackEnabled?: (() => boolean) | undefined;
     }
   ): GuardPipeline {
+    if (session.isExplicitCompactionRequest?.() === true) {
+      return GuardPipelineBuilder.build(EXPLICIT_COMPACTION_PIPELINE);
+    }
     return GuardPipelineBuilder.fromEndpointPolicy(
       session.getEndpointPolicy(),
       typeof session.isRawCrossProviderFallbackEnabled === "function"
@@ -233,6 +237,20 @@ export const RAW_PASSTHROUGH_PIPELINE: GuardConfig = {
 
 export const RAW_SAFE_SESSION_PIPELINE: GuardConfig = {
   steps: ["auth", "client", "model", "version", "probe", "session", "provider", "messageContext"],
+};
+
+export const EXPLICIT_COMPACTION_PIPELINE: GuardConfig = {
+  steps: [
+    "auth",
+    "client",
+    "model",
+    "version",
+    "probe",
+    "session",
+    "rateLimit",
+    "provider",
+    "messageContext",
+  ],
 };
 
 export const COUNT_TOKENS_PIPELINE: GuardConfig = RAW_SAFE_SESSION_PIPELINE;

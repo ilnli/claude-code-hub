@@ -253,6 +253,9 @@ export const providers = pgTable('providers', {
     .notNull()
     .default('sub2api')
     .$type<UpstreamProbeType>(),
+  // 是否使用 sub2api 的远端压缩传输兼容层。
+  // 与 rateUpstreamType 分离：后者只描述费率探测协议，历史默认值不能用于协议识别。
+  isSub2Api: boolean('is_sub2api').notNull().default(false),
   // newapi 协议：用户指定的新 api 分组名（日志校准失败/无日志时的兜底；为空表示完全依赖日志发现）
   newapiGroup: varchar('newapi_group', { length: 64 }),
   // newapi 协议：最近一次探测观测到的实际落组分组（仅观测快照，由探测写回）

@@ -88,7 +88,7 @@ describe("compaction capability memory", () => {
       "compaction-capability-probe:v1:provider:4",
       "1000000",
       "PX",
-      60_000,
+      600_000,
       "NX"
     );
   });

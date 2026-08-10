@@ -435,6 +435,12 @@
         "placeholder": "1"
       }
     },
+    "remoteCompaction": {
+      "sub2api": {
+        "label": "Enable sub2api compaction compatibility",
+        "desc": "Enable only when this provider is backed by sub2api. CCH will use its dedicated remote compaction transport."
+      }
+    },
     "upstreamRate": {
       "follow": {
         "label": "Follow upstream rate",

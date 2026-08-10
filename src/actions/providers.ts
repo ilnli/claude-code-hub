@@ -348,6 +348,7 @@ export async function getProviders(): Promise<ProviderDisplay[]> {
         upstreamRateMultiplier: provider.upstreamRateMultiplier,
         upstreamRateSyncedAt: provider.upstreamRateSyncedAt,
         rateUpstreamType: provider.rateUpstreamType,
+        isSub2Api: provider.isSub2Api === true,
         newapiGroup: provider.newapiGroup,
         newapiDetectedGroup: provider.newapiDetectedGroup,
         groupTag: provider.groupTag,
@@ -559,6 +560,7 @@ export async function addProvider(data: {
   rate_markup_type?: RateMarkupType;
   rate_markup_value?: number;
   rate_upstream_type?: UpstreamProbeType;
+  is_sub2api?: boolean;
   newapi_group?: string | null;
   group_tag?: string | null;
   provider_type?: ProviderType;
@@ -786,6 +788,7 @@ export async function editProvider(
     rate_markup_type?: RateMarkupType;
     rate_markup_value?: number;
     rate_upstream_type?: UpstreamProbeType;
+    is_sub2api?: boolean;
     newapi_group?: string | null;
     group_tag?: string | null;
     group_priorities?: Record<string, number> | null;
@@ -1653,6 +1656,7 @@ const SINGLE_EDIT_PREIMAGE_FIELD_TO_PROVIDER_KEY: Record<string, keyof Provider>
   rate_markup_type: "rateMarkupType",
   rate_markup_value: "rateMarkupValue",
   rate_upstream_type: "rateUpstreamType",
+  is_sub2api: "isSub2Api",
   newapi_group: "newapiGroup",
   group_tag: "groupTag",
   group_priorities: "groupPriorities",

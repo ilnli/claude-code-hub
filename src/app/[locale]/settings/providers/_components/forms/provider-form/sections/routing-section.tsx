@@ -472,6 +472,22 @@ export function RoutingSection({ subSectionRefs }: RoutingSectionProps) {
             </SmartInputWrapper>
           </div>
 
+          {!isBatch && (
+            <ToggleRow
+              label={t("sections.routing.remoteCompaction.sub2api.label")}
+              description={t("sections.routing.remoteCompaction.sub2api.desc")}
+            >
+              <Switch
+                id={isEdit ? "edit-is-sub2api" : "is-sub2api"}
+                checked={state.routing.isSub2Api}
+                onCheckedChange={(checked) =>
+                  dispatch({ type: "SET_IS_SUB2API", payload: checked })
+                }
+                disabled={state.ui.isPending}
+              />
+            </ToggleRow>
+          )}
+
           {/* Upstream rate follow (nested-upstream scenario; batch mode not supported) */}
           {!isBatch && (
             <div className="mt-4 space-y-3">

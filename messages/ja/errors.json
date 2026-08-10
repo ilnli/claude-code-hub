@@ -42,6 +42,8 @@
   "remote_compaction_invalid_response": "アップストリームの圧縮応答が無効です",
   "remote_compaction_response_too_large": "アップストリームの圧縮応答が許容サイズを超えました",
   "remote_compaction_timeout": "アップストリームの圧縮リクエストがタイムアウトしました",
+  "remote_compaction_v2_requires_stream": "リモート圧縮 v2 には stream=true が必要です",
+  "remote_compaction_retry_budget_exhausted": "利用上限に達したため圧縮の再試行を停止しました",
   "billing_persistence_unavailable": "圧縮リクエストの料金を記録できませんでした",
   "billing_pricing_unavailable": "圧縮リクエストの料金を算出できませんでした",
   "NOT_FOUND": "リソースが見つかりません",

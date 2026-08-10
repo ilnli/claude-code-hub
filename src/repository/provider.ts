@@ -230,6 +230,7 @@ export async function createProvider(providerData: CreateProviderData): Promise<
     rateMarkupValue:
       providerData.rate_markup_value != null ? providerData.rate_markup_value.toString() : "0",
     rateUpstreamType: providerData.rate_upstream_type ?? "sub2api",
+    isSub2Api: providerData.is_sub2api ?? false,
     newapiGroup: providerData.newapi_group ?? null,
     groupTag: providerData.group_tag,
     providerType: providerData.provider_type,
@@ -335,6 +336,7 @@ export async function createProvider(providerData: CreateProviderData): Promise<
         upstreamRateMultiplier: providers.upstreamRateMultiplier,
         upstreamRateSyncedAt: providers.upstreamRateSyncedAt,
         rateUpstreamType: providers.rateUpstreamType,
+        isSub2Api: providers.isSub2Api,
         newapiGroup: providers.newapiGroup,
         newapiDetectedGroup: providers.newapiDetectedGroup,
         groupTag: providers.groupTag,
@@ -435,6 +437,7 @@ export async function findProviderList(
       upstreamRateMultiplier: providers.upstreamRateMultiplier,
       upstreamRateSyncedAt: providers.upstreamRateSyncedAt,
       rateUpstreamType: providers.rateUpstreamType,
+      isSub2Api: providers.isSub2Api,
       newapiGroup: providers.newapiGroup,
       newapiDetectedGroup: providers.newapiDetectedGroup,
       groupTag: providers.groupTag,
@@ -534,6 +537,7 @@ export async function findAllProvidersFresh(): Promise<Provider[]> {
       upstreamRateMultiplier: providers.upstreamRateMultiplier,
       upstreamRateSyncedAt: providers.upstreamRateSyncedAt,
       rateUpstreamType: providers.rateUpstreamType,
+      isSub2Api: providers.isSub2Api,
       newapiGroup: providers.newapiGroup,
       newapiDetectedGroup: providers.newapiDetectedGroup,
       groupTag: providers.groupTag,
@@ -637,6 +641,7 @@ export async function findProviderById(id: number): Promise<Provider | null> {
       upstreamRateMultiplier: providers.upstreamRateMultiplier,
       upstreamRateSyncedAt: providers.upstreamRateSyncedAt,
       rateUpstreamType: providers.rateUpstreamType,
+      isSub2Api: providers.isSub2Api,
       newapiGroup: providers.newapiGroup,
       newapiDetectedGroup: providers.newapiDetectedGroup,
       groupTag: providers.groupTag,
@@ -740,6 +745,7 @@ export async function updateProvider(
       providerData.rate_markup_value != null ? providerData.rate_markup_value.toString() : "0";
   if (providerData.rate_upstream_type !== undefined)
     dbData.rateUpstreamType = providerData.rate_upstream_type;
+  if (providerData.is_sub2api !== undefined) dbData.isSub2Api = providerData.is_sub2api;
   if (providerData.newapi_group !== undefined) dbData.newapiGroup = providerData.newapi_group;
   if (providerData.group_tag !== undefined) dbData.groupTag = providerData.group_tag;
   if (providerData.provider_type !== undefined) dbData.providerType = providerData.provider_type;
@@ -928,6 +934,7 @@ export async function updateProvider(
         upstreamRateMultiplier: providers.upstreamRateMultiplier,
         upstreamRateSyncedAt: providers.upstreamRateSyncedAt,
         rateUpstreamType: providers.rateUpstreamType,
+        isSub2Api: providers.isSub2Api,
         newapiGroup: providers.newapiGroup,
         newapiDetectedGroup: providers.newapiDetectedGroup,
         groupTag: providers.groupTag,

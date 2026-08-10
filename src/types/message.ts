@@ -39,6 +39,9 @@ export interface ProviderChainItem {
     | "compaction_contract_violation" // 显式压缩返回不满足响应契约
     | "compaction_capability_gap" // 当前 Provider 不支持指定压缩版本
     | "compaction_response_too_large" // 显式压缩响应超过校验上限
+    | "compaction_transport_cooldown" // 端点指定压缩版本处于传输冷却期
+    | "compaction_transport_pool_exhausted" // 当前 Provider 的压缩端点均在冷却
+    | "compaction_transport_timeout" // 压缩上游首字节/字节间隔超时
     | "retry_with_official_instructions" // Codex instructions 自动重试（官方）
     | "retry_with_cached_instructions" // Codex instructions 智能重试（缓存）
     | "client_error_non_retryable" // 不可重试的客户端错误（Prompt 超限、内容过滤、PDF 限制、Thinking 格式）

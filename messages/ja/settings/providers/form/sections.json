@@ -435,6 +435,12 @@
         "placeholder": "1"
       }
     },
+    "remoteCompaction": {
+      "sub2api": {
+        "label": "sub2api 圧縮互換を有効化",
+        "desc": "このプロバイダーの上流が sub2api の場合のみ有効にします。CCH は専用のリモート圧縮転送を使用します。"
+      }
+    },
     "upstreamRate": {
       "follow": {
         "label": "上流倍率に従う",

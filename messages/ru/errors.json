@@ -42,6 +42,8 @@
   "remote_compaction_invalid_response": "Ответ вышестоящего сервиса на сжатие недействителен",
   "remote_compaction_response_too_large": "Ответ вышестоящего сервиса на сжатие превысил допустимый размер",
   "remote_compaction_timeout": "Время ожидания запроса на сжатие к вышестоящему сервису истекло",
+  "remote_compaction_v2_requires_stream": "Для удаленного сжатия v2 требуется stream=true",
+  "remote_compaction_retry_budget_exhausted": "Повторное сжатие остановлено из-за достижения лимита расходов",
   "billing_persistence_unavailable": "Не удалось записать стоимость запроса на сжатие",
   "billing_pricing_unavailable": "Не удалось рассчитать стоимость запроса на сжатие",
   "NOT_FOUND": "Ресурс не найден",

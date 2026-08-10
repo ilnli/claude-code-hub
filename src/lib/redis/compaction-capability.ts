@@ -1,10 +1,10 @@
 import type { ExplicitCompactionVersion } from "@/app/v1/_lib/proxy/remote-compaction";
+import { getEnvConfig } from "@/lib/config/env.schema";
 import { logger } from "@/lib/logger";
 import { getRedisClient } from "./client";
 
 const DEFAULT_GAP_TTL_MS = 30 * 60 * 1000;
 const EXPIRED_STATE_GRACE_MS = 60 * 1000;
-const PROBE_LEASE_MS = 60 * 1000;
 
 export type CompactionCapabilityGapReason = "invalid_response_contract" | "structured_unsupported";
 
@@ -65,7 +65,7 @@ export async function getCompactionCapabilityDecision(
       leaseKey(providerId, version),
       String(Date.now()),
       "PX",
-      PROBE_LEASE_MS,
+      getEnvConfig().REMOTE_COMPACTION_VALIDATION_TIMEOUT_MS,
       "NX"
     );
     return acquired === "OK" ? { status: "probe", gap } : { status: "unavailable", gap };

@@ -137,6 +137,82 @@ describe("explicit compaction response validation", () => {
     expect(result.reason).toBe("missing_successful_terminal");
   });
 
+  it("accepts response.done and rejects non-completed terminal status", () => {
+    const done = [
+      'data: {"type":"response.done","response":{"output":[{"type":"compaction","encrypted_content":"opaque"}]}}',
+      "",
+    ].join("\n");
+    expect(
+      validateExplicitCompactionPayload({
+        bytes: encoder.encode(done),
+        contentType: "text/event-stream",
+        version: "v2",
+      }).outcome
+    ).toBe("valid");
+
+    const queued = [
+      'data: {"type":"response.completed","response":{"status":"queued","output":[{"type":"compaction","encrypted_content":"opaque"}]}}',
+      "",
+    ].join("\n");
+    expect(
+      validateExplicitCompactionPayload({
+        bytes: encoder.encode(queued),
+        contentType: "text/event-stream",
+        version: "v2",
+      }).reason
+    ).toBe("failed_compaction_terminal");
+  });
+
+  it("accepts compaction_summary only for sub2api and normalizes the client output", async () => {
+    const sse = [
+      'data: {"type":"response.output_item.done","output_index":0,"item":{"type":"compaction_summary","encrypted_content":"opaque","extra":"keep"}}',
+      "",
+      'data: {"type":"response.done","response":{"usage":{"input_tokens":7},"output":[]}}',
+      "",
+    ].join("\n");
+
+    expect(
+      validateExplicitCompactionPayload({
+        bytes: encoder.encode(sse),
+        contentType: "text/event-stream",
+        version: "v1",
+      }).reason
+    ).toBe("missing_compaction_output");
+
+    const collected = await collectExplicitCompactionResponse({
+      response: new Response(sse, { headers: { "content-type": "text/event-stream" } }),
+      version: "v1",
+      isSub2Api: true,
+      upstreamMode: "sub2api_v1_bridge",
+      maxBytes: 4096,
+      timeoutMs: 1000,
+    });
+    expect(collected.response.headers.get("content-type")).toBe("application/json");
+    expect(await collected.response.json()).toMatchObject({
+      object: "response.compaction",
+      status: "completed",
+      usage: { input_tokens: 7 },
+      output: [{ type: "compaction", encrypted_content: "opaque", extra: "keep" }],
+    });
+  });
+
+  it("normalizes response.done to response.completed for v2 clients", async () => {
+    const sse = [
+      "event: response.done",
+      'data: {"type":"response.done","response":{"output":[{"type":"compaction","encrypted_content":"opaque"}]}}',
+      "",
+    ].join("\n");
+    const collected = await collectExplicitCompactionResponse({
+      response: new Response(sse, { headers: { "content-type": "text/event-stream" } }),
+      version: "v2",
+      maxBytes: 4096,
+      timeoutMs: 1000,
+    });
+    const normalized = await collected.response.text();
+    expect(normalized).toContain("event: response.completed");
+    expect(normalized).toContain('"type":"response.completed"');
+  });
+
   it("preserves the validated response bytes", async () => {
     const raw =
       '{ "object":"response.compaction", "output": [{"type":"compaction","encrypted_content":"opaque"}] }';
@@ -183,7 +259,9 @@ describe("explicit compaction response validation", () => {
     vi.useFakeTimers();
     const body = new ReadableStream<Uint8Array>({
       start(controller) {
-        controller.enqueue(encoder.encode('data: {"type":"response.created"}\n\n'));
+        controller.enqueue(
+          encoder.encode('data: {"type":"response.created","usage":{"input_tokens":9}}\n\n')
+        );
       },
     });
 
@@ -196,6 +274,7 @@ describe("explicit compaction response validation", () => {
     });
     const assertion = expect(promise).rejects.toMatchObject({
       publicCode: "remote_compaction_timeout",
+      validation: { usage: { input_tokens: 9 } },
     });
     try {
       await vi.advanceTimersByTimeAsync(100);

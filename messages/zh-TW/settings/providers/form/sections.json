@@ -435,6 +435,12 @@
         "placeholder": "1"
       }
     },
+    "remoteCompaction": {
+      "sub2api": {
+        "label": "啟用 sub2api 壓縮相容",
+        "desc": "僅在此供應商上游為 sub2api 時開啟。CCH 將使用其專用的遠端壓縮傳輸協定。"
+      }
+    },
     "upstreamRate": {
       "follow": {
         "label": "跟隨上游倍率",

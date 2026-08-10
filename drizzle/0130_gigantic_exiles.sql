@@ -1,0 +1,1 @@
+ALTER TABLE "providers" ADD COLUMN "is_sub2api" boolean DEFAULT false NOT NULL;

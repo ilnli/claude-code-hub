@@ -366,6 +366,7 @@ function ProviderFormContent({
           rate_markup_type: state.routing.rateMarkupType,
           rate_markup_value: state.routing.rateMarkupValue,
           rate_upstream_type: state.routing.rateUpstreamType,
+          is_sub2api: state.routing.isSub2Api,
           // sub2api 协议不使用分组字段，提交时置空避免残留脏数据
           newapi_group:
             state.routing.rateUpstreamType === "newapi" && state.routing.newapiGroup.trim()

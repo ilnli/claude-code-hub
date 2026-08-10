@@ -186,6 +186,14 @@ export const EnvSchema = z.object({
     .min(60_000)
     .max(1_800_000)
     .default(600_000),
+  // Cloudflare's proxied origin read timeout is 125s. Use a lower byte-idle
+  // threshold so CCH can switch upstream routes before the edge returns 524.
+  REMOTE_COMPACTION_TRANSPORT_IDLE_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .min(5_000)
+    .max(600_000)
+    .default(90_000),
   REMOTE_COMPACTION_MAX_RESPONSE_BYTES: z.coerce
     .number()
     .int()

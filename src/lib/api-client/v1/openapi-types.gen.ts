@@ -5118,6 +5118,8 @@ export interface operations {
                              * @enum {string}
                              */
                             rateUpstreamType: "sub2api" | "newapi";
+                            /** @description Whether CCH may use sub2api-specific remote compaction transports. */
+                            isSub2Api: boolean;
                             /** @description Configured new-api group name used as fallback when log-based group detection is unavailable. */
                             newapiGroup: string | null;
                             /** @description Most recently observed new-api billing group from token consume logs. */
@@ -5453,6 +5455,8 @@ export interface operations {
                      * @enum {string}
                      */
                     rate_upstream_type?: "sub2api" | "newapi";
+                    /** @description Enable sub2api-specific remote compaction transports. */
+                    is_sub2api?: boolean;
                     /** @description Configured new-api group name used as fallback when log-based group detection is unavailable. */
                     newapi_group?: string | null;
                     /** @description Provider group tag. */
@@ -5634,6 +5638,8 @@ export interface operations {
                          * @enum {string}
                          */
                         rateUpstreamType: "sub2api" | "newapi";
+                        /** @description Whether CCH may use sub2api-specific remote compaction transports. */
+                        isSub2Api: boolean;
                         /** @description Configured new-api group name used as fallback when log-based group detection is unavailable. */
                         newapiGroup: string | null;
                         /** @description Most recently observed new-api billing group from token consume logs. */
@@ -5987,6 +5993,8 @@ export interface operations {
                          * @enum {string}
                          */
                         rateUpstreamType: "sub2api" | "newapi";
+                        /** @description Whether CCH may use sub2api-specific remote compaction transports. */
+                        isSub2Api: boolean;
                         /** @description Configured new-api group name used as fallback when log-based group detection is unavailable. */
                         newapiGroup: string | null;
                         /** @description Most recently observed new-api billing group from token consume logs. */
@@ -6498,6 +6506,8 @@ export interface operations {
                      * @enum {string}
                      */
                     rate_upstream_type?: "sub2api" | "newapi";
+                    /** @description Enable sub2api-specific remote compaction transports. */
+                    is_sub2api?: boolean;
                     /** @description Configured new-api group name used as fallback when log-based group detection is unavailable. */
                     newapi_group?: string | null;
                     /** @description Provider group tag. */
@@ -6686,6 +6696,8 @@ export interface operations {
                          * @enum {string}
                          */
                         rateUpstreamType: "sub2api" | "newapi";
+                        /** @description Whether CCH may use sub2api-specific remote compaction transports. */
+                        isSub2Api: boolean;
                         /** @description Configured new-api group name used as fallback when log-based group detection is unavailable. */
                         newapiGroup: string | null;
                         /** @description Most recently observed new-api billing group from token consume logs. */

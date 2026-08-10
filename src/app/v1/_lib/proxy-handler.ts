@@ -6,12 +6,14 @@ import { logger } from "@/lib/logger";
 import { ProxyStatusTracker } from "@/lib/proxy-status-tracker";
 import { SessionManager } from "@/lib/session-manager";
 import { SessionTracker } from "@/lib/session-tracker";
+import { ERROR_CODES, getErrorMessageServer } from "@/lib/utils/error-messages";
 import { ProxyErrorHandler } from "./proxy/error-handler";
 import {
   attachSessionIdToErrorMessage,
   attachSessionIdToErrorResponse,
 } from "./proxy/error-session-id";
 import { ProxyError } from "./proxy/errors";
+import { createExplicitCompactionV2HeartbeatResponse } from "./proxy/explicit-compaction-heartbeat";
 import { tryFakeStreamingPath } from "./proxy/fake-streaming/proxy-integration";
 import { detectClientFormat, detectFormatByEndpoint } from "./proxy/format-mapper";
 import { ProxyForwarder } from "./proxy/forwarder";
@@ -178,6 +180,57 @@ export async function handleProxyRequest(c: Context): Promise<Response> {
       if (fakeStreamingResponse) {
         return await attachSessionIdToErrorResponse(session.sessionId, fakeStreamingResponse);
       }
+    }
+
+    const explicitCompactionVersion = session.getExplicitCompactionVersion?.() ?? null;
+    if (
+      explicitCompactionVersion === "v2" &&
+      (session.request.message as Record<string, unknown>).stream !== true
+    ) {
+      throw new ProxyError("remote_compaction_v2_requires_stream", 400);
+    }
+
+    if (explicitCompactionVersion === "v2") {
+      const compactionSession = session;
+      let fallbackErrorMessage: string = ERROR_CODES.INTERNAL_ERROR;
+      try {
+        const { getLocale } = await import("next-intl/server");
+        fallbackErrorMessage = await getErrorMessageServer(
+          await getLocale(),
+          ERROR_CODES.INTERNAL_ERROR
+        );
+      } catch {
+        // Keep the stable error code when locale resolution is unavailable.
+      }
+      const ownedConcurrencySessionId = acquiredConcurrencySessionId;
+      const ownedObservedSessionIdentity = acquiredObservedSessionIdentity;
+      acquiredConcurrencySessionId = null;
+      acquiredObservedSessionIdentity = null;
+      return createExplicitCompactionV2HeartbeatResponse({
+        fallbackErrorMessage,
+        requestId:
+          compactionSession.messageContext?.id != null
+            ? String(compactionSession.messageContext.id)
+            : null,
+        execute: async () => {
+          try {
+            const response = await ProxyForwarder.send(compactionSession);
+            return await ProxyResponseHandler.dispatch(compactionSession, response);
+          } catch (error) {
+            return await ProxyErrorHandler.handle(compactionSession, error);
+          }
+        },
+        onSettled: async () => {
+          await Promise.allSettled([
+            ownedConcurrencySessionId
+              ? SessionTracker.decrementConcurrentCount(ownedConcurrencySessionId)
+              : Promise.resolve(),
+            ownedObservedSessionIdentity
+              ? SessionTracker.decrementObservedConcurrentCount(ownedObservedSessionIdentity)
+              : Promise.resolve(),
+          ]);
+        },
+      });
     }
 
     const response = await ProxyForwarder.send(session);

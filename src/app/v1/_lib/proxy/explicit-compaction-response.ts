@@ -1,3 +1,4 @@
+import type { ExplicitCompactionUpstreamMode } from "./explicit-compaction-transport";
 import type { ExplicitCompactionVersion } from "./remote-compaction";
 
 export type CompactionValidationReason =
@@ -25,6 +26,8 @@ export interface ExplicitCompactionValidationEvidence {
   terminalSeen: boolean;
   compactionItemCount: number;
   sourceCount: number;
+  timeoutKind?: "validation" | "transport";
+  transportFailureReason?: "first_byte_timeout" | "idle_timeout";
 }
 
 export interface ExplicitCompactionValidationResult {
@@ -54,8 +57,17 @@ function getUsage(value: unknown): Record<string, unknown> | null {
   return isRecord(value) ? value : null;
 }
 
-function candidateFromItem(item: unknown, outputIndex?: unknown): CompactionCandidate | null {
-  if (!isRecord(item) || item.type !== "compaction") return null;
+function candidateFromItem(
+  item: unknown,
+  outputIndex?: unknown,
+  allowSub2Alias = false
+): CompactionCandidate | null {
+  if (
+    !isRecord(item) ||
+    (item.type !== "compaction" && !(allowSub2Alias && item.type === "compaction_summary"))
+  ) {
+    return null;
+  }
   const id = typeof item.id === "string" && item.id.length > 0 ? item.id : null;
   const index = Number.isInteger(outputIndex) ? (outputIndex as number) : null;
   const encryptedContent =
@@ -64,16 +76,30 @@ function candidateFromItem(item: unknown, outputIndex?: unknown): CompactionCand
     id,
     outputIndex: index,
     encryptedContent,
-    fingerprint: JSON.stringify({ type: item.type, encrypted_content: encryptedContent }),
+    fingerprint: JSON.stringify({ type: "compaction", encrypted_content: encryptedContent }),
   };
 }
 
-function candidatesFromOutput(output: unknown): CompactionCandidate[] {
+function candidatesFromOutput(output: unknown, allowSub2Alias = false): CompactionCandidate[] {
   if (!Array.isArray(output)) return [];
   return output.flatMap((item, index) => {
-    const candidate = candidateFromItem(item, index);
+    const candidate = candidateFromItem(item, index, allowSub2Alias);
     return candidate ? [candidate] : [];
   });
+}
+
+function normalizeCompactionItem(item: unknown, allowSub2Alias: boolean): unknown {
+  if (!isRecord(item)) return item;
+  if (allowSub2Alias && item.type === "compaction_summary") {
+    return { ...item, type: "compaction" };
+  }
+  return item;
+}
+
+function hasFailedStatus(payload: Record<string, unknown>): boolean {
+  return (
+    payload.error != null || (typeof payload.status === "string" && payload.status !== "completed")
+  );
 }
 
 function invalid(
@@ -86,6 +112,7 @@ function invalid(
     compactionItemCount?: number;
     sourceCount?: number;
     usage?: Record<string, unknown> | null;
+    timeoutKind?: "validation" | "transport";
   } = {}
 ): ExplicitCompactionValidationResult {
   return {
@@ -99,6 +126,7 @@ function invalid(
       terminalSeen: options.terminalSeen ?? false,
       compactionItemCount: options.compactionItemCount ?? 0,
       sourceCount: options.sourceCount ?? 0,
+      ...(options.timeoutKind ? { timeoutKind: options.timeoutKind } : {}),
     },
   };
 }
@@ -216,9 +244,109 @@ function deduplicateSseCandidates(candidates: CompactionCandidate[]): {
   return { candidates: canonical, inconsistent: false };
 }
 
+function normalizeSseForClient(text: string, isSub2Api: boolean): string {
+  const events = parseSse(text);
+  if (!events) return text;
+  return events
+    .map(({ event, data }) => {
+      if (!isRecord(data)) return null;
+      const normalized = structuredClone(data);
+      const type = typeof normalized.type === "string" ? normalized.type : event;
+      if (type === "response.done") {
+        normalized.type = "response.completed";
+        if (isRecord(normalized.response) && normalized.response.status === undefined) {
+          normalized.response.status = "completed";
+        }
+      }
+      if (type === "response.output_item.done" && normalized.item) {
+        normalized.item = normalizeCompactionItem(normalized.item, isSub2Api);
+      }
+      if (isRecord(normalized.response) && Array.isArray(normalized.response.output)) {
+        normalized.response.output = normalized.response.output.map((item) =>
+          normalizeCompactionItem(item, isSub2Api)
+        );
+      }
+      const outputEvent = type === "response.done" ? "response.completed" : event;
+      return `event: ${outputEvent ?? normalized.type ?? "message"}\ndata: ${JSON.stringify(normalized)}\n\n`;
+    })
+    .filter((event): event is string => event !== null)
+    .join("");
+}
+
+function normalizeBridgeV1Json(text: string, isSub2Api: boolean): string | null {
+  const events = parseSse(text);
+  if (!events) return null;
+  let terminal: Record<string, unknown> | null = null;
+  const itemOutputs: Array<{ index: number; item: unknown }> = [];
+  for (const parsed of events) {
+    if (!isRecord(parsed.data)) continue;
+    const type = typeof parsed.data.type === "string" ? parsed.data.type : parsed.event;
+    if (type === "response.output_item.done" && parsed.data.item) {
+      const index = Number.isInteger(parsed.data.output_index)
+        ? (parsed.data.output_index as number)
+        : itemOutputs.length;
+      itemOutputs.push({
+        index,
+        item: normalizeCompactionItem(parsed.data.item, isSub2Api),
+      });
+    }
+    if (
+      (type === "response.completed" || type === "response.done") &&
+      isRecord(parsed.data.response)
+    ) {
+      terminal = structuredClone(parsed.data.response);
+    }
+  }
+  if (!terminal) return null;
+  const terminalOutput = Array.isArray(terminal.output)
+    ? terminal.output.map((item) => normalizeCompactionItem(item, isSub2Api))
+    : null;
+  terminal.output =
+    terminalOutput && terminalOutput.length > 0
+      ? terminalOutput
+      : itemOutputs.sort((a, b) => a.index - b.index).map(({ item }) => item);
+  terminal.object = "response.compaction";
+  if (terminal.status === undefined) terminal.status = "completed";
+  return JSON.stringify(terminal);
+}
+
+function extractPartialUsage(chunks: Uint8Array[], isSse: boolean): Record<string, unknown> | null {
+  if (chunks.length === 0) return null;
+  const text = new TextDecoder().decode(concatBytes(chunks));
+  if (!isSse) {
+    try {
+      const payload = JSON.parse(text) as unknown;
+      return isRecord(payload) ? getUsage(payload.usage) : null;
+    } catch {
+      return null;
+    }
+  }
+  const events = parseSse(text);
+  if (!events) return null;
+  let usage: Record<string, unknown> | null = null;
+  for (const parsed of events) {
+    if (!isRecord(parsed.data)) continue;
+    const response = isRecord(parsed.data.response) ? parsed.data.response : null;
+    usage = getUsage(parsed.data.usage) ?? getUsage(response?.usage) ?? usage;
+  }
+  return usage;
+}
+
+function concatBytes(chunks: Uint8Array[]): Uint8Array {
+  const total = chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
+}
+
 export function validateExplicitCompactionPayload(input: {
   bytes: Uint8Array;
   contentType: string;
+  isSub2Api?: boolean;
   version: ExplicitCompactionVersion;
 }): ExplicitCompactionValidationResult {
   const { bytes, version } = input;
@@ -244,14 +372,14 @@ export function validateExplicitCompactionPayload(input: {
         usage: getUsage(payload.usage),
       });
     }
-    if (payload.status === "failed" || payload.status === "incomplete" || payload.error) {
+    if (hasFailedStatus(payload)) {
       return invalid(version, transport, responseBytes, "failed_compaction_terminal", {
         terminalSeen: true,
         usage: getUsage(payload.usage),
       });
     }
     return validateCandidates(
-      candidatesFromOutput(payload.output),
+      candidatesFromOutput(payload.output, input.isSub2Api === true),
       version,
       transport,
       responseBytes,
@@ -286,16 +414,23 @@ export function validateExplicitCompactionPayload(input: {
       failedTerminal = true;
     }
     if (eventType === "response.output_item.done") {
-      const candidate = candidateFromItem(parsedEvent.data.item, parsedEvent.data.output_index);
+      const candidate = candidateFromItem(
+        parsedEvent.data.item,
+        parsedEvent.data.output_index,
+        input.isSub2Api === true
+      );
       if (candidate) {
         candidates.push(candidate);
         sourceCount++;
       }
     }
-    if (eventType === "response.completed" && isRecord(parsedEvent.data.response)) {
+    if (
+      (eventType === "response.completed" || eventType === "response.done") &&
+      isRecord(parsedEvent.data.response)
+    ) {
       terminal = parsedEvent.data.response;
       usage = getUsage(terminal.usage) ?? usage;
-      const terminalCandidates = candidatesFromOutput(terminal.output);
+      const terminalCandidates = candidatesFromOutput(terminal.output, input.isSub2Api === true);
       candidates.push(...terminalCandidates);
       sourceCount += terminalCandidates.length > 0 ? 1 : 0;
     }
@@ -314,7 +449,7 @@ export function validateExplicitCompactionPayload(input: {
       usage,
     });
   }
-  if (terminal.status === "failed" || terminal.status === "incomplete" || terminal.error) {
+  if (hasFailedStatus(terminal)) {
     return invalid(version, transport, responseBytes, "failed_compaction_terminal", {
       terminalSeen: true,
       sourceCount,
@@ -354,9 +489,29 @@ export class ExplicitCompactionResponseError extends Error {
   }
 }
 
+export class ExplicitCompactionAttemptInterruptedError extends Error {
+  readonly code?: string;
+
+  constructor(
+    public readonly validation: ExplicitCompactionValidationResult,
+    original: unknown
+  ) {
+    super(original instanceof Error ? original.message : "Explicit compaction interrupted", {
+      cause: original,
+    });
+    this.name = original instanceof Error ? original.name : "Error";
+    this.code =
+      original && typeof original === "object" && "code" in original
+        ? String((original as { code?: unknown }).code ?? "") || undefined
+        : undefined;
+  }
+}
+
 export async function collectExplicitCompactionResponse(input: {
   response: Response;
   version: ExplicitCompactionVersion;
+  isSub2Api?: boolean;
+  upstreamMode?: ExplicitCompactionUpstreamMode;
   maxBytes: number;
   timeoutMs: number;
   idleTimeoutMs?: number;
@@ -391,7 +546,7 @@ export async function collectExplicitCompactionResponse(input: {
     idleTimeoutId = null;
   };
   const resetIdleTimeout = () => {
-    if (!isSse || !input.idleTimeoutMs || input.idleTimeoutMs <= 0) return;
+    if (!input.idleTimeoutMs || input.idleTimeoutMs <= 0) return;
     clearIdleTimeout();
     idleTimeoutId = setTimeout(() => {
       idleTimedOut = true;
@@ -417,11 +572,12 @@ export async function collectExplicitCompactionResponse(input: {
       }
       resetIdleTimeout();
       totalBytes += value.byteLength;
+      chunks.push(value);
       if (totalBytes > input.maxBytes) {
         await reader.cancel("remote_compaction_response_too_large").catch(() => undefined);
         const validation: ExplicitCompactionValidationResult = {
           outcome: "overflow",
-          usage: null,
+          usage: extractPartialUsage(chunks, isSse),
           evidence: {
             transport: response.headers.get("content-type")?.includes("text/event-stream")
               ? "sse"
@@ -438,12 +594,12 @@ export async function collectExplicitCompactionResponse(input: {
           "remote_compaction_response_too_large"
         );
       }
-      chunks.push(value);
     }
     if (timedOut || idleTimedOut || input.responseTimeoutSignal?.aborted) {
+      const transportTimeout = idleTimedOut || input.responseTimeoutSignal?.aborted;
       const validation: ExplicitCompactionValidationResult = {
         outcome: "timeout",
-        usage: null,
+        usage: extractPartialUsage(chunks, isSse),
         evidence: {
           transport: isSse ? "sse" : "json",
           version: input.version,
@@ -451,6 +607,14 @@ export async function collectExplicitCompactionResponse(input: {
           terminalSeen: false,
           compactionItemCount: 0,
           sourceCount: 0,
+          timeoutKind: transportTimeout ? "transport" : "validation",
+          ...(transportTimeout
+            ? {
+                transportFailureReason: idleTimedOut
+                  ? ("idle_timeout" as const)
+                  : ("first_byte_timeout" as const),
+              }
+            : {}),
         },
       };
       throw new ExplicitCompactionResponseError(validation, "remote_compaction_timeout");
@@ -461,10 +625,11 @@ export async function collectExplicitCompactionResponse(input: {
   } catch (error) {
     if (error instanceof ExplicitCompactionResponseError) throw error;
     const timeout = timedOut || idleTimedOut || input.responseTimeoutSignal?.aborted;
+    const transportTimeout = idleTimedOut || input.responseTimeoutSignal?.aborted;
     const outcome = timeout ? "timeout" : "aborted";
     const validation: ExplicitCompactionValidationResult = {
       outcome,
-      usage: null,
+      usage: extractPartialUsage(chunks, isSse),
       evidence: {
         transport: isSse ? "sse" : "json",
         version: input.version,
@@ -472,28 +637,34 @@ export async function collectExplicitCompactionResponse(input: {
         terminalSeen: false,
         compactionItemCount: 0,
         sourceCount: 0,
+        ...(timeout
+          ? { timeoutKind: transportTimeout ? ("transport" as const) : ("validation" as const) }
+          : {}),
+        ...(transportTimeout
+          ? {
+              transportFailureReason: idleTimedOut
+                ? ("idle_timeout" as const)
+                : ("first_byte_timeout" as const),
+            }
+          : {}),
       },
     };
     if (timeout) {
       throw new ExplicitCompactionResponseError(validation, "remote_compaction_timeout");
     }
-    throw error;
+    throw new ExplicitCompactionAttemptInterruptedError(validation, error);
   } finally {
     clearTimeout(timeoutId);
     clearIdleTimeout();
     input.abortSignal?.removeEventListener("abort", abortListener);
   }
 
-  const bytes = new Uint8Array(totalBytes);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
+  const bytes = concatBytes(chunks);
 
   const parsedValidation = validateExplicitCompactionPayload({
     bytes,
     contentType: response.headers.get("content-type") ?? "application/json",
+    isSub2Api: input.isSub2Api,
     version: input.version,
   });
   const validation: ExplicitCompactionValidationResult = input.bypassValidation
@@ -507,12 +678,27 @@ export async function collectExplicitCompactionResponse(input: {
     throw new ExplicitCompactionResponseError(validation, "remote_compaction_invalid_response");
   }
 
+  let outputBytes = bytes;
+  let outputContentType = response.headers.get("content-type") ?? "application/json";
+  const text = new TextDecoder().decode(bytes);
+  if (isSse && input.upstreamMode === "sub2api_v1_bridge") {
+    const normalizedJson = normalizeBridgeV1Json(text, input.isSub2Api === true);
+    if (normalizedJson !== null) {
+      outputBytes = new TextEncoder().encode(normalizedJson);
+      outputContentType = "application/json";
+    }
+  } else if (isSse) {
+    outputBytes = new TextEncoder().encode(normalizeSseForClient(text, input.isSub2Api === true));
+    outputContentType = "text/event-stream";
+  }
+
   const headers = new Headers(response.headers);
   headers.delete("transfer-encoding");
   headers.delete("content-encoding");
-  headers.set("content-length", String(bytes.byteLength));
+  headers.set("content-type", outputContentType);
+  headers.set("content-length", String(outputBytes.byteLength));
   return {
-    response: new Response(bytes, {
+    response: new Response(outputBytes as unknown as BodyInit, {
       status: response.status,
       statusText: response.statusText,
       headers,

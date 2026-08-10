@@ -78,6 +78,8 @@ export const SERVER_ERRORS = {
   REMOTE_COMPACTION_INVALID_RESPONSE: "remote_compaction_invalid_response",
   REMOTE_COMPACTION_RESPONSE_TOO_LARGE: "remote_compaction_response_too_large",
   REMOTE_COMPACTION_TIMEOUT: "remote_compaction_timeout",
+  REMOTE_COMPACTION_V2_REQUIRES_STREAM: "remote_compaction_v2_requires_stream",
+  REMOTE_COMPACTION_RETRY_BUDGET_EXHAUSTED: "remote_compaction_retry_budget_exhausted",
   BILLING_PERSISTENCE_UNAVAILABLE: "billing_persistence_unavailable",
   BILLING_PRICING_UNAVAILABLE: "billing_pricing_unavailable",
   NOT_FOUND: "NOT_FOUND",

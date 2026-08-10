@@ -86,6 +86,7 @@ const ACTION_TO_FIELD_PATH: Partial<Record<ProviderFormActionWith5hResetMode["ty
   SET_GROUP_PRIORITIES: "routing.groupPriorities",
   SET_CACHE_TTL_PREFERENCE: "routing.cacheTtlPreference",
   SET_SWAP_CACHE_TTL_BILLING: "routing.swapCacheTtlBilling",
+  SET_IS_SUB2API: "routing.isSub2Api",
   SET_CODEX_REASONING_EFFORT: "routing.codexReasoningEffortPreference",
   SET_CODEX_REASONING_SUMMARY: "routing.codexReasoningSummaryPreference",
   SET_CODEX_TEXT_VERBOSITY: "routing.codexTextVerbosityPreference",
@@ -195,6 +196,7 @@ export function createInitialState(
         rateMarkupType: "none",
         rateMarkupValue: 0,
         rateUpstreamType: "sub2api",
+        isSub2Api: false,
         newapiGroup: "",
         cacheTtlPreference:
           analysis.routing.cacheTtlPreference.status === "uniform"
@@ -374,6 +376,7 @@ export function createInitialState(
         rateMarkupType: "none",
         rateMarkupValue: 0,
         rateUpstreamType: "sub2api",
+        isSub2Api: false,
         newapiGroup: "",
         cacheTtlPreference: "inherit",
         swapCacheTtlBilling: false,
@@ -459,6 +462,7 @@ export function createInitialState(
       rateMarkupType: sourceProvider?.rateMarkupType ?? "none",
       rateMarkupValue: sourceProvider?.rateMarkupValue ?? 0,
       rateUpstreamType: sourceProvider?.rateUpstreamType ?? "sub2api",
+      isSub2Api: sourceProvider?.isSub2Api ?? false,
       newapiGroup: sourceProvider?.newapiGroup ?? "",
       cacheTtlPreference: sourceProvider?.cacheTtlPreference ?? "inherit",
       swapCacheTtlBilling: sourceProvider?.swapCacheTtlBilling ?? false,
@@ -587,6 +591,8 @@ export function providerFormReducer(
       return { ...state, routing: { ...state.routing, rateMarkupValue: action.payload } };
     case "SET_RATE_UPSTREAM_TYPE":
       return { ...state, routing: { ...state.routing, rateUpstreamType: action.payload } };
+    case "SET_IS_SUB2API":
+      return { ...state, routing: { ...state.routing, isSub2Api: action.payload } };
     case "SET_NEWAPI_GROUP":
       return { ...state, routing: { ...state.routing, newapiGroup: action.payload } };
     case "SET_CACHE_TTL_PREFERENCE":

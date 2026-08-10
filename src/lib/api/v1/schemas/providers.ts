@@ -57,6 +57,9 @@ export const ProviderSummarySchema = z
       .describe(
         "Upstream rate probing protocol: sub2api (/sub2api/billing) or newapi (/api/pricing group ratio + /api/log/token group calibration)."
       ),
+    isSub2Api: z
+      .boolean()
+      .describe("Whether CCH may use sub2api-specific remote compaction transports."),
     newapiGroup: NullableStringSchema.describe(
       "Configured new-api group name used as fallback when log-based group detection is unavailable."
     ),
@@ -454,6 +457,10 @@ export const ProviderCreateSchema = z
       .describe(
         "Upstream rate probing protocol: sub2api (/sub2api/billing) or newapi (/api/pricing group ratio + /api/log/token group calibration)."
       ),
+    is_sub2api: z
+      .boolean()
+      .optional()
+      .describe("Enable sub2api-specific remote compaction transports."),
     newapi_group: z
       .string()
       .trim()

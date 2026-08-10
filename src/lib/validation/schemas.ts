@@ -516,6 +516,7 @@ export const CreateProviderSchema = z
       .default(0),
     // 上游探测协议：sub2api=探测端点；newapi=倍率表+日志校准落组
     rate_upstream_type: z.enum(["sub2api", "newapi"]).optional().default("sub2api"),
+    is_sub2api: z.boolean().optional().default(false),
     // newapi 协议：用户指定的分组名（日志校准不可用时的兜底；null=清除）
     newapi_group: z
       .string()
@@ -802,6 +803,7 @@ export const UpdateProviderSchema = z
       .optional(),
     // 上游探测协议：sub2api=探测端点；newapi=倍率表+日志校准落组
     rate_upstream_type: z.enum(["sub2api", "newapi"]).optional(),
+    is_sub2api: z.boolean().optional(),
     // newapi 协议：用户指定的分组名（日志校准不可用时的兜底；null=清除）
     newapi_group: z.string().trim().max(64, "上游分组名不能超过64个字符").nullable().optional(),
     group_tag: z.string().max(255, "分组标签不能超过255个字符").nullable().optional(),

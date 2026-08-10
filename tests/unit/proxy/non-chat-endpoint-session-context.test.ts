@@ -233,6 +233,7 @@ function createProxySession(pathname: string) {
     cacheTtlResolved: null,
     context1mApplied: false,
     specialSettings: [],
+    explicitCompactionVersion: pathname === V1_ENDPOINT_PATHS.RESPONSES_COMPACT ? "v1" : null,
     endpointPolicy: resolveEndpointPolicy(pathname),
     isHeaderModified: () => false,
     setHighConcurrencyModeEnabled: vi.fn(),
@@ -316,20 +317,24 @@ describe("non-chat endpoint session context", () => {
       const response = await pipeline.run(session);
 
       expect(response).toBeNull();
-      expect(callOrder).toEqual([
+      const expected = [
         "auth",
         "client",
         "model",
         "version",
         "probe",
         "session",
+        ...(endpoint === V1_ENDPOINT_PATHS.RESPONSES_COMPACT ? ["rateLimit"] : []),
         "provider",
         "messageContext",
-      ]);
+      ];
+      expect(callOrder).toEqual(expected);
       expect(callOrder).not.toContain("sensitive");
       expect(callOrder).not.toContain("warmup");
       expect(callOrder).not.toContain("requestFilter");
-      expect(callOrder).not.toContain("rateLimit");
+      if (endpoint !== V1_ENDPOINT_PATHS.RESPONSES_COMPACT) {
+        expect(callOrder).not.toContain("rateLimit");
+      }
       expect(callOrder).not.toContain("providerRequestFilter");
       expect(session.sessionId).toBe("session_assigned");
       expect(session.requestSequence).toBe(2);
@@ -371,7 +376,7 @@ describe("non-chat endpoint session context", () => {
     expect(rawCompactSession.shouldReuseProvider()).toBe(false);
   });
 
-  test("disabled runtime flag falls back to raw passthrough pipeline", async () => {
+  test("explicit compaction keeps billing context when cross-provider fallback is disabled", async () => {
     const { GuardPipelineBuilder } = await import("@/app/v1/_lib/proxy/guard-pipeline");
 
     const session = createProxySession(V1_ENDPOINT_PATHS.RESPONSES_COMPACT);
@@ -380,9 +385,17 @@ describe("non-chat endpoint session context", () => {
     const pipeline = GuardPipelineBuilder.fromSession(session);
     await pipeline.run(session);
 
-    expect(callOrder).toEqual(["auth", "client", "model", "version", "probe", "provider"]);
-    expect(callOrder).not.toContain("session");
-    expect(callOrder).not.toContain("messageContext");
+    expect(callOrder).toEqual([
+      "auth",
+      "client",
+      "model",
+      "version",
+      "probe",
+      "session",
+      "rateLimit",
+      "provider",
+      "messageContext",
+    ]);
   });
 
   test("raw-safe session context skips codex completion and claude metadata mutation", async () => {

@@ -42,6 +42,8 @@
   "remote_compaction_invalid_response": "上游压缩响应不符合要求",
   "remote_compaction_response_too_large": "上游压缩响应超过允许大小",
   "remote_compaction_timeout": "上游压缩请求超时",
+  "remote_compaction_v2_requires_stream": "远端压缩 v2 要求 stream=true",
+  "remote_compaction_retry_budget_exhausted": "压缩重试因消费限额已达到而停止",
   "billing_persistence_unavailable": "无法记录压缩请求费用",
   "billing_pricing_unavailable": "无法计算压缩请求费用",
   "NOT_FOUND": "资源不存在",

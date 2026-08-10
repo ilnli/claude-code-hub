@@ -685,6 +685,7 @@ function sanitizeProvider(
     upstreamRateMultiplier: provider.upstreamRateMultiplier,
     upstreamRateSyncedAt: provider.upstreamRateSyncedAt?.toISOString() ?? null,
     rateUpstreamType: provider.rateUpstreamType,
+    isSub2Api: provider.isSub2Api === true,
     newapiGroup: provider.newapiGroup,
     newapiDetectedGroup: provider.newapiDetectedGroup,
     groupTag: provider.groupTag,
