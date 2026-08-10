@@ -59,6 +59,11 @@ function collectEmittedAuditActionTypes(): string[] {
         actions.add(action[1]);
       }
     }
+    for (const match of content.matchAll(/\bconst upstreamSiteAuditAction\s*=\s*([\s\S]*?);/g)) {
+      for (const action of match[1].matchAll(/"(upstream_site\.[^"]+)"/g)) {
+        actions.add(action[1]);
+      }
+    }
     for (const match of content.matchAll(
       /createAuditLogAsync\(\s*\{[\s\S]*?actionType:\s*"([^"]+)"/g
     )) {

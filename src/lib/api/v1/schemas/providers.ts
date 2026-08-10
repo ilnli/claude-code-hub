@@ -66,6 +66,7 @@ export const ProviderSummarySchema = z
     groupTag: NullableStringSchema.describe("Provider group tag."),
     providerType: ProviderTypeSchema,
     providerVendorId: z.number().int().nullable().describe("Provider vendor id."),
+    upstreamSiteId: z.number().int().nullable().describe("Upstream site id."),
     preserveClientIp: z.boolean().describe("Whether client IP is preserved upstream."),
     disableSessionReuse: z.boolean().describe("Whether sticky session reuse is disabled."),
     modelMismatchAlertExempt: z

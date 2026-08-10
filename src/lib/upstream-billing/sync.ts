@@ -1,6 +1,7 @@
 import { logger } from "@/lib/logger";
 import { probeUpstreamBilling } from "@/lib/upstream-billing/client";
 import { fetchNewapiTokenGroup } from "@/lib/upstream-billing/newapi-client";
+import { resolveNewapiProbeRequestContext } from "@/lib/upstream-billing/newapi-probe-context";
 import { getNewapiRatioTable } from "@/lib/upstream-billing/newapi-table-cache";
 import { applyMarkup, isValidUpstreamRate } from "@/lib/upstream-billing/rate-resolver";
 import { restoreProviderCostMultiplier, updateUpstreamBillingProbeResult } from "@/repository";
@@ -167,63 +168,37 @@ async function buildFailureOutcome(
 
 /**
  * new-api 协议同步：
- * 1. 取站点级倍率表（进程内缓存，多 provider 同站点每轮只拉一次）；
- * 2. 用 sk- 拉 /api/log/token 求众数分组做校准——校准失败/无日志不阻塞，
+ * 1. 用 sk- 拉 /api/log/token 求众数分组做校准——校准失败/无日志不阻塞，
  *    回落到用户配置的 newapiGroup；
+ * 2. 站点 PAT 价格表优先，匿名价格表次之；PAT 错误不阻塞匿名回退；
  * 3. 分组仍为空 -> group_unknown（普通失败，3 次宽限后回退默认倍率）；
- * 4. 分组不在匿名倍率表或倍率越界 -> group_not_in_table（配置问题，
+ * 4. 分组不在可用价格表或倍率越界 -> group_not_in_table（配置问题，
  *    立即还原默认倍率，调度器按 8x 退避）。
  */
 async function syncProviderUpstreamRateNewApi(
   provider: Provider,
   options: UpstreamRateSyncOptions
 ): Promise<UpstreamRateSyncOutcome> {
-  let tableResult: Awaited<ReturnType<typeof getNewapiRatioTable>>;
+  let context: Awaited<ReturnType<typeof resolveNewapiProbeRequestContext>>;
   try {
-    tableResult = await getNewapiRatioTable(provider);
+    context = await resolveNewapiProbeRequestContext(provider);
   } catch (error) {
-    tableResult = {
-      ok: false,
+    return buildFailureOutcome(provider, options, {
       reason: "network",
       error: error instanceof Error ? error.message : String(error),
-    };
+    });
   }
-
-  if (!tableResult.ok) {
-    if (tableResult.reason === "unsupported") {
-      // pricing 模块关闭/非 new-api 站点：与 sub2api unsupported 同语义，立即还原默认倍率
-      if (provider.rateDefaultMultiplier != null) {
-        const fallbackRate = applyMarkup(
-          provider.rateDefaultMultiplier,
-          provider.rateMarkupType,
-          provider.rateMarkupValue
-        );
-        if (Math.abs(provider.costMultiplier - fallbackRate) > COST_MULTIPLIER_EPSILON) {
-          const wrote = await restoreProviderCostMultiplier(
-            provider.id,
-            fallbackRate,
-            provider.updatedAt
-          );
-          if (!wrote) {
-            return { status: "failed", reason: "provider_changed", wrote: false };
-          }
-          return { status: "unsupported_restored", finalRate: fallbackRate, wrote: true };
-        }
-      }
-      return { status: "unsupported", wrote: false };
-    }
-
+  if (!context) {
     return buildFailureOutcome(provider, options, {
-      reason: tableResult.reason,
-      error: tableResult.error,
-      httpStatus: tableResult.status,
+      reason: "invalid",
+      error: "provider url is not a valid URL",
     });
   }
 
-  // 日志校准：任何失败都只降级不阻塞（表已拿到，配置分组仍可同步）
+  // 日志校准必须继续使用 Provider 自己的 sk，即使价格表已经由站点 PAT 认证。
   let observedGroup: string | null = null;
   try {
-    const groupResult = await fetchNewapiTokenGroup(provider);
+    const groupResult = await fetchNewapiTokenGroup(provider, context);
     if (groupResult.ok) {
       observedGroup = groupResult.group;
     } else {
@@ -250,10 +225,84 @@ async function syncProviderUpstreamRateNewApi(
     });
   }
 
-  const rate = tableResult.table[effectiveGroup];
-  if (rate == null || !isValidUpstreamRate(rate)) {
-    // 组不在匿名倍率表（可能被站点「用户可用分组」过滤或倍率越界）：配置问题，立即还原默认倍率
-    const error = `group "${effectiveGroup}" is not in the upstream anonymous ratio table (or its ratio is out of range); check the group config or the default rate`;
+  let patTable: Awaited<ReturnType<typeof getNewapiRatioTable>> | null = null;
+  if (context.dashboardPat) {
+    try {
+      patTable = await getNewapiRatioTable(provider, {
+        context,
+        authenticated: true,
+      });
+    } catch (error) {
+      logger.warn("[UpstreamBilling] newapi PAT pricing probe failed, using anonymous pricing", {
+        providerId: provider.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  let rate: number | null = null;
+  let pricingSource: "pat" | "anonymous" | null = null;
+  if (patTable?.ok) {
+    const patRate = patTable.table[effectiveGroup];
+    if (patRate != null && isValidUpstreamRate(patRate)) {
+      rate = patRate;
+      pricingSource = "pat";
+    }
+  }
+
+  let anonymousTable: Awaited<ReturnType<typeof getNewapiRatioTable>> | null = null;
+  if (rate == null) {
+    try {
+      anonymousTable = await getNewapiRatioTable(provider, { context });
+    } catch (error) {
+      anonymousTable = {
+        ok: false,
+        reason: "network",
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+    if (anonymousTable.ok) {
+      const anonymousRate = anonymousTable.table[effectiveGroup];
+      if (anonymousRate != null && isValidUpstreamRate(anonymousRate)) {
+        rate = anonymousRate;
+        pricingSource = "anonymous";
+      }
+    }
+  }
+
+  if (rate == null) {
+    if (anonymousTable && !anonymousTable.ok && !patTable?.ok) {
+      if (anonymousTable.reason === "unsupported") {
+        // pricing 模块关闭/非 new-api 站点：与 sub2api unsupported 同语义，立即还原默认倍率
+        if (provider.rateDefaultMultiplier != null) {
+          const fallbackRate = applyMarkup(
+            provider.rateDefaultMultiplier,
+            provider.rateMarkupType,
+            provider.rateMarkupValue
+          );
+          if (Math.abs(provider.costMultiplier - fallbackRate) > COST_MULTIPLIER_EPSILON) {
+            const wrote = await restoreProviderCostMultiplier(
+              provider.id,
+              fallbackRate,
+              provider.updatedAt
+            );
+            if (!wrote) {
+              return { status: "failed", reason: "provider_changed", wrote: false };
+            }
+            return { status: "unsupported_restored", finalRate: fallbackRate, wrote: true };
+          }
+        }
+        return { status: "unsupported", wrote: false };
+      }
+      return buildFailureOutcome(provider, options, {
+        reason: anonymousTable.reason,
+        error: anonymousTable.error,
+        httpStatus: anonymousTable.status,
+      });
+    }
+
+    // A valid table that does not expose this group is a configuration/group visibility issue.
+    const error = `group "${effectiveGroup}" is not in the available upstream ratio tables (or its ratio is out of range); check the group config or the default rate`;
     if (provider.rateDefaultMultiplier != null) {
       const fallbackRate = applyMarkup(
         provider.rateDefaultMultiplier,
@@ -304,5 +353,9 @@ async function syncProviderUpstreamRateNewApi(
   if (!wrote) {
     return { status: "failed", reason: "provider_changed", wrote: false };
   }
+  logger.debug("[UpstreamBilling] newapi pricing source selected", {
+    providerId: provider.id,
+    source: pricingSource,
+  });
   return { status: "synced", upstreamRate: rate, finalRate, wrote: true };
 }

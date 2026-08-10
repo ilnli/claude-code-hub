@@ -183,6 +183,22 @@ export const providerVendors = pgTable('provider_vendors', {
   providerVendorsCreatedAtIdx: index('idx_provider_vendors_created_at').on(table.createdAt),
 }));
 
+// Upstream Sites - 按 provider.url 的规范化 host 聚合，独立于官网域名 Vendor。
+export const upstreamSites = pgTable('upstream_sites', {
+  id: serial('id').primaryKey(),
+  siteKey: varchar('site_key', { length: 255 }).notNull(),
+  probeBaseUrl: text('probe_base_url'),
+  dashboardPat: text('dashboard_pat'),
+  allowInsecureHttp: boolean('allow_insecure_http').notNull().default(false),
+  proxyUrl: text('proxy_url'),
+  proxyFallbackToDirect: boolean('proxy_fallback_to_direct').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  upstreamSitesSiteKeyUnique: uniqueIndex('uniq_upstream_sites_site_key').on(table.siteKey),
+  upstreamSitesCreatedAtIdx: index('idx_upstream_sites_created_at').on(table.createdAt),
+}));
+
 // Provider Groups table
 export const providerGroups = pgTable('provider_groups', {
   id: serial('id').primaryKey(),
@@ -205,6 +221,9 @@ export const providers = pgTable('providers', {
     .references(() => providerVendors.id, {
       onDelete: 'restrict',
     }),
+  upstreamSiteId: integer('upstream_site_id').references(() => upstreamSites.id, {
+    onDelete: 'set null',
+  }),
   isEnabled: boolean('is_enabled').notNull().default(true),
   weight: integer('weight').notNull().default(1),
 
@@ -417,6 +436,9 @@ export const providers = pgTable('providers', {
   providersCreatedAtIdx: index('idx_providers_created_at').on(table.createdAt),
   providersDeletedAtIdx: index('idx_providers_deleted_at').on(table.deletedAt),
   providersVendorTypeIdx: index('idx_providers_vendor_type').on(table.providerVendorId, table.providerType).where(sql`${table.deletedAt} IS NULL`),
+  providersUpstreamSiteIdx: index('idx_providers_upstream_site').on(table.upstreamSiteId).where(
+    sql`${table.deletedAt} IS NULL`
+  ),
   // #779/#781：Dashboard/Probe scheduler 的 enabled vendor/type 去重热路径
   providersEnabledVendorTypeIdx: index('idx_providers_enabled_vendor_type').on(
     table.providerVendorId,
@@ -1730,6 +1752,10 @@ export const providersRelations = relations(providers, ({ many, one }) => ({
     fields: [providers.providerVendorId],
     references: [providerVendors.id],
   }),
+  upstreamSite: one(upstreamSites, {
+    fields: [providers.upstreamSiteId],
+    references: [upstreamSites.id],
+  }),
   messageRequests: many(messageRequest),
   weightAdjustmentMemberships: many(providerWeightAdjustmentRuleMembers),
 }));
@@ -1780,6 +1806,10 @@ export const providerWeightAdjustmentRunDetailsRelations = relations(
 export const providerVendorsRelations = relations(providerVendors, ({ many }) => ({
   providers: many(providers),
   endpoints: many(providerEndpoints),
+}));
+
+export const upstreamSitesRelations = relations(upstreamSites, ({ many }) => ({
+  providers: many(providers),
 }));
 
 export const providerEndpointsRelations = relations(providerEndpoints, ({ many, one }) => ({

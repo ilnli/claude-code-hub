@@ -93,6 +93,14 @@ export const ACTION_MIGRATION_MATRIX = [
     exportPolicy: "all-action-exports",
   },
   {
+    module: "upstream-sites",
+    sourceFile: "upstream-sites.ts",
+    resource: "upstream-sites",
+    endpointFamilies: ["/api/v1/upstream-sites"],
+    access: "admin",
+    exportPolicy: "all-action-exports",
+  },
+  {
     module: "provider-cache-effectiveness",
     sourceFile: "provider-cache-effectiveness.ts",
     resource: "providers",

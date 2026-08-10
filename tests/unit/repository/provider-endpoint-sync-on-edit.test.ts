@@ -130,6 +130,10 @@ async function arrangeUrlEditRedScenario(input: {
     tryDeleteProviderVendorIfEmpty: tryDeleteProviderVendorIfEmptyMock,
     syncProviderEndpointOnProviderEdit: syncProviderEndpointOnProviderEditMock,
   }));
+  vi.doMock("@/repository/upstream-site", () => ({
+    getOrCreateUpstreamSiteIdForUrl: vi.fn(async () => 21),
+    tryDeleteUnconfiguredUpstreamSiteIfEmpty: vi.fn(async () => false),
+  }));
   vi.doMock("@/lib/endpoint-circuit-breaker", () => ({
     resetEndpointCircuit: resetEndpointCircuitMock,
   }));

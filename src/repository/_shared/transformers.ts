@@ -103,6 +103,7 @@ export function toProvider(dbProvider: any): Provider {
   return {
     ...dbProvider,
     providerVendorId: dbProvider?.providerVendorId ?? null,
+    upstreamSiteId: dbProvider?.upstreamSiteId ?? null,
     isEnabled: dbProvider?.isEnabled ?? true,
     weight: dbProvider?.weight ?? 1,
     priority: dbProvider?.priority ?? 0,

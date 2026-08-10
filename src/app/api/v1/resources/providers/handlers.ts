@@ -690,6 +690,7 @@ function sanitizeProvider(
     groupTag: provider.groupTag,
     providerType: provider.providerType as ProviderSummaryResponse["providerType"],
     providerVendorId: provider.providerVendorId,
+    upstreamSiteId: provider.upstreamSiteId,
     preserveClientIp: provider.preserveClientIp,
     disableSessionReuse: provider.disableSessionReuse,
     modelMismatchAlertExempt: provider.modelMismatchAlertExempt,

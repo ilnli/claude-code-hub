@@ -49,6 +49,16 @@
       "delete": "删除供应商",
       "key_reveal": "查看供应商密钥"
     },
+    "upstream_site": {
+      "update": "更新上游站点",
+      "delete": "删除上游站点",
+      "pat": {
+        "set": "设置上游站点 PAT",
+        "clear": "清除上游站点 PAT",
+        "replace": "替换上游站点 PAT",
+        "test": "测试上游站点 PAT"
+      }
+    },
     "provider_weight_adjustment": {
       "interval": {
         "update": "更新供应商权重调整周期"

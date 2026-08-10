@@ -10,6 +10,7 @@ let restoreProviderCostMultiplierMock: ReturnType<typeof vi.fn>;
 let probeUpstreamBillingMock: ReturnType<typeof vi.fn>;
 let getNewapiRatioTableMock: ReturnType<typeof vi.fn>;
 let fetchNewapiTokenGroupMock: ReturnType<typeof vi.fn>;
+let resolveNewapiProbeRequestContextMock: ReturnType<typeof vi.fn>;
 let getSettingsMock: ReturnType<typeof vi.fn>;
 let publishInvalidationMock: ReturnType<typeof vi.fn>;
 let sendFailureAlertMock: ReturnType<typeof vi.fn>;
@@ -51,6 +52,11 @@ vi.mock("@/lib/upstream-billing/newapi-table-cache", () => ({
 
 vi.mock("@/lib/upstream-billing/newapi-client", () => ({
   fetchNewapiTokenGroup: (...args: unknown[]) => fetchNewapiTokenGroupMock(...args),
+}));
+
+vi.mock("@/lib/upstream-billing/newapi-probe-context", () => ({
+  resolveNewapiProbeRequestContext: (...args: unknown[]) =>
+    resolveNewapiProbeRequestContextMock(...args),
 }));
 
 vi.mock("@/repository", () => ({
@@ -133,6 +139,16 @@ describe("upstream-billing probe-scheduler", () => {
     probeUpstreamBillingMock = vi.fn();
     getNewapiRatioTableMock = vi.fn();
     fetchNewapiTokenGroupMock = vi.fn();
+    resolveNewapiProbeRequestContextMock = vi.fn(async (provider: Provider) => ({
+      baseUrl: "https://upstream.example.com",
+      cacheKey: "legacy:upstream.example.com",
+      siteId: null,
+      proxyConfig: {
+        proxyUrl: provider.proxyUrl,
+        proxyFallbackToDirect: provider.proxyFallbackToDirect,
+      },
+      dashboardPat: null,
+    }));
     getSettingsMock = vi.fn().mockResolvedValue({ enabled: true, intervalMinutes: 30 });
     publishInvalidationMock = vi.fn().mockResolvedValue(undefined);
     sendFailureAlertMock = vi.fn().mockResolvedValue(undefined);

@@ -36,6 +36,10 @@ import {
   tryDeleteProviderVendorIfEmpty,
 } from "./provider-endpoints";
 import { detachProviderFromWeightAdjustmentRule } from "./provider-weight-adjustment";
+import {
+  getOrCreateUpstreamSiteIdForUrl,
+  tryDeleteUnconfiguredUpstreamSiteIfEmpty,
+} from "./upstream-site";
 
 type ProviderTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -61,6 +65,7 @@ function normalizeProviderRuntimeFields<
 interface ProviderRestoreCandidate {
   id: number;
   providerVendorId: number | null;
+  upstreamSiteId: number | null;
   providerType: Provider["providerType"];
   url: string;
   deletedAt: Date | null;
@@ -164,6 +169,7 @@ async function restoreProviderInTransaction(
     .select({
       id: providers.id,
       providerVendorId: providers.providerVendorId,
+      upstreamSiteId: providers.upstreamSiteId,
       providerType: providers.providerType,
       url: providers.url,
       deletedAt: providers.deletedAt,
@@ -180,9 +186,11 @@ async function restoreProviderInTransaction(
     return false;
   }
 
+  const upstreamSiteId = await getOrCreateUpstreamSiteIdForUrl(candidate.url, { tx });
+
   const restored = await tx
     .update(providers)
-    .set({ deletedAt: null, updatedAt: now })
+    .set({ deletedAt: null, upstreamSiteId, updatedAt: now })
     .where(
       and(
         eq(providers.id, providerId),
@@ -297,12 +305,17 @@ export async function createProvider(providerData: CreateProviderData): Promise<
       },
       { tx }
     );
+    const upstreamSiteId = await getOrCreateUpstreamSiteIdForUrl(providerData.url, { tx });
+    if (upstreamSiteId == null) {
+      throw new Error("Provider URL must use HTTP or HTTPS and include a valid host");
+    }
 
     const [provider] = await tx
       .insert(providers)
       .values({
         ...dbData,
         providerVendorId,
+        upstreamSiteId,
       })
       .returning({
         id: providers.id,
@@ -310,6 +323,7 @@ export async function createProvider(providerData: CreateProviderData): Promise<
         url: providers.url,
         key: providers.key,
         providerVendorId: providers.providerVendorId,
+        upstreamSiteId: providers.upstreamSiteId,
         isEnabled: providers.isEnabled,
         weight: providers.weight,
         priority: providers.priority,
@@ -408,6 +422,7 @@ export async function findProviderList(
       url: providers.url,
       key: providers.key,
       providerVendorId: providers.providerVendorId,
+      upstreamSiteId: providers.upstreamSiteId,
       isEnabled: providers.isEnabled,
       weight: providers.weight,
       priority: providers.priority,
@@ -838,6 +853,7 @@ export async function updateProvider(
 
   const updateResult = await db.transaction(async (tx) => {
     let previousVendorId: number | null = null;
+    let previousUpstreamSiteId: number | null = null;
     let previousUrl: string | null = null;
     let previousProviderType: Provider["providerType"] | null = null;
     let previousIsEnabled: boolean | null = null;
@@ -851,6 +867,7 @@ export async function updateProvider(
           faviconUrl: providers.faviconUrl,
           name: providers.name,
           providerVendorId: providers.providerVendorId,
+          upstreamSiteId: providers.upstreamSiteId,
           providerType: providers.providerType,
           isEnabled: providers.isEnabled,
         })
@@ -860,6 +877,7 @@ export async function updateProvider(
 
       if (current) {
         previousVendorId = current.providerVendorId;
+        previousUpstreamSiteId = current.upstreamSiteId;
         previousUrl = current.url;
         previousProviderType = current.providerType;
         previousIsEnabled = current.isEnabled;
@@ -876,6 +894,14 @@ export async function updateProvider(
           );
           dbData.providerVendorId = providerVendorId;
         }
+
+        if (providerData.url !== undefined) {
+          const upstreamSiteId = await getOrCreateUpstreamSiteIdForUrl(providerData.url, { tx });
+          if (upstreamSiteId == null) {
+            throw new Error("Provider URL must use HTTP or HTTPS and include a valid host");
+          }
+          dbData.upstreamSiteId = upstreamSiteId;
+        }
       }
     }
 
@@ -889,6 +915,7 @@ export async function updateProvider(
         url: providers.url,
         key: providers.key,
         providerVendorId: providers.providerVendorId,
+        upstreamSiteId: providers.upstreamSiteId,
         isEnabled: providers.isEnabled,
         weight: providers.weight,
         priority: providers.priority,
@@ -1011,6 +1038,10 @@ export async function updateProvider(
         previousVendorId && transformed.providerVendorId !== previousVendorId
           ? previousVendorId
           : null,
+      previousUpstreamSiteIdToCleanup:
+        previousUpstreamSiteId && transformed.upstreamSiteId !== previousUpstreamSiteId
+          ? previousUpstreamSiteId
+          : null,
       endpointCircuitResetId,
     };
   });
@@ -1038,6 +1069,18 @@ export async function updateProvider(
       logger.warn("updateProvider:vendor_cleanup_failed", {
         providerId: updateResult.provider.id,
         previousVendorId: updateResult.previousVendorIdToCleanup,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  if (updateResult.previousUpstreamSiteIdToCleanup) {
+    try {
+      await tryDeleteUnconfiguredUpstreamSiteIfEmpty(updateResult.previousUpstreamSiteIdToCleanup);
+    } catch (error) {
+      logger.warn("updateProvider:upstream_site_cleanup_failed", {
+        providerId: updateResult.provider.id,
+        upstreamSiteId: updateResult.previousUpstreamSiteIdToCleanup,
         error: error instanceof Error ? error.message : String(error),
       });
     }
@@ -1094,6 +1137,7 @@ export async function deleteProvider(id: number): Promise<boolean> {
     const [current] = await tx
       .select({
         providerVendorId: providers.providerVendorId,
+        upstreamSiteId: providers.upstreamSiteId,
         providerType: providers.providerType,
         url: providers.url,
       })
@@ -1151,10 +1195,22 @@ export async function deleteProvider(id: number): Promise<boolean> {
       }
     }
 
-    return true;
+    return { upstreamSiteId: current.upstreamSiteId };
   });
 
-  return deleted;
+  if (!deleted) return false;
+  if (deleted.upstreamSiteId != null) {
+    try {
+      await tryDeleteUnconfiguredUpstreamSiteIfEmpty(deleted.upstreamSiteId);
+    } catch (error) {
+      logger.warn("deleteProvider:upstream_site_cleanup_failed", {
+        providerId: id,
+        upstreamSiteId: deleted.upstreamSiteId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+  return true;
 }
 
 /**
@@ -2270,7 +2326,7 @@ export async function deleteProvidersBatch(ids: number[]): Promise<number> {
   const uniqueIds = [...new Set(ids)];
   const now = new Date();
 
-  const deletedCount = await db.transaction(async (tx) => {
+  const deleteResult = await db.transaction(async (tx) => {
     const result = await tx
       .update(providers)
       .set({ deletedAt: now, updatedAt: now })
@@ -2278,12 +2334,13 @@ export async function deleteProvidersBatch(ids: number[]): Promise<number> {
       .returning({
         id: providers.id,
         providerVendorId: providers.providerVendorId,
+        upstreamSiteId: providers.upstreamSiteId,
         providerType: providers.providerType,
         url: providers.url,
       });
 
     if (result.length === 0) {
-      return 0;
+      return { count: 0, upstreamSiteIds: [] as number[] };
     }
 
     const endpointKeys = new Map<
@@ -2310,7 +2367,14 @@ export async function deleteProvidersBatch(ids: number[]): Promise<number> {
 
     const endpoints = Array.from(endpointKeys.values());
     if (endpoints.length === 0) {
-      return result.length;
+      return {
+        count: result.length,
+        upstreamSiteIds: [
+          ...new Set(
+            result.flatMap((row) => (row.upstreamSiteId == null ? [] : [row.upstreamSiteId]))
+          ),
+        ],
+      };
     }
 
     const chunkSize = 200;
@@ -2348,15 +2412,35 @@ export async function deleteProvidersBatch(ids: number[]): Promise<number> {
         );
     }
 
-    return result.length;
+    return {
+      count: result.length,
+      upstreamSiteIds: [
+        ...new Set(
+          result.flatMap((row) => (row.upstreamSiteId == null ? [] : [row.upstreamSiteId]))
+        ),
+      ],
+    };
   });
+
+  await Promise.all(
+    deleteResult.upstreamSiteIds.map(async (upstreamSiteId) => {
+      try {
+        await tryDeleteUnconfiguredUpstreamSiteIfEmpty(upstreamSiteId);
+      } catch (error) {
+        logger.warn("deleteProvidersBatch:upstream_site_cleanup_failed", {
+          upstreamSiteId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    })
+  );
 
   logger.debug("deleteProvidersBatch:completed", {
     requestedIds: uniqueIds.length,
-    deletedCount,
+    deletedCount: deleteResult.count,
   });
 
-  return deletedCount;
+  return deleteResult.count;
 }
 
 /**

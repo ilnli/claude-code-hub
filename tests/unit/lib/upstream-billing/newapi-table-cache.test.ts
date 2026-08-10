@@ -13,7 +13,10 @@ vi.mock("@/lib/proxy-agent", () => ({
   createProxyAgentForProvider: vi.fn(() => null),
 }));
 
-import { getNewapiRatioTable } from "@/lib/upstream-billing/newapi-table-cache";
+import {
+  getNewapiRatioTable,
+  invalidateNewapiRatioTableCacheForSite,
+} from "@/lib/upstream-billing/newapi-table-cache";
 
 function makeProvider(overrides: Partial<Provider> = {}): Provider {
   return {
@@ -124,6 +127,48 @@ describe("getNewapiRatioTable 缓存", () => {
 
     expect(resultA).toEqual({ ok: true, table: { default: 1 } });
     expect(resultB).toEqual({ ok: true, table: { default: 9 } });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("同一站点的 PAT 与匿名结果使用独立缓存", async () => {
+    const context = {
+      baseUrl: "https://cache-scopes.example.com",
+      cacheKey: `site:501:${Date.now()}`,
+      siteId: 501,
+      proxyConfig: { id: 501, proxyUrl: null, proxyFallbackToDirect: false },
+      dashboardPat: "pat-secret",
+    };
+    fetchMock
+      .mockResolvedValueOnce(makePricingResponse({ vip: 0.5 }))
+      .mockResolvedValueOnce(makePricingResponse({ default: 1 }));
+
+    const pat = await getNewapiRatioTable(makeProvider(), { context, authenticated: true });
+    const anonymous = await getNewapiRatioTable(makeProvider(), { context });
+
+    expect(pat).toEqual({ ok: true, table: { vip: 0.5 } });
+    expect(anonymous).toEqual({ ok: true, table: { default: 1 } });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0]?.[1]?.headers).toEqual({ Authorization: "Bearer pat-secret" });
+    expect(fetchMock.mock.calls[1]?.[1]?.headers).toEqual({});
+  });
+
+  it("站点配置保存后可失效该站点的缓存", async () => {
+    const context = {
+      baseUrl: "https://invalidate.example.com",
+      cacheKey: `site:777:${Date.now()}`,
+      siteId: 777,
+      proxyConfig: { id: 777, proxyUrl: null, proxyFallbackToDirect: false },
+      dashboardPat: null,
+    };
+    fetchMock
+      .mockResolvedValueOnce(makePricingResponse({ default: 1 }))
+      .mockResolvedValueOnce(makePricingResponse({ default: 2 }));
+
+    await getNewapiRatioTable(makeProvider(), { context });
+    invalidateNewapiRatioTableCacheForSite(777);
+    const refreshed = await getNewapiRatioTable(makeProvider(), { context });
+
+    expect(refreshed).toEqual({ ok: true, table: { default: 2 } });
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 

@@ -1,5 +1,6 @@
 import {
   fetchNewapiRatioTable,
+  type NewapiProbeRequestContext,
   type NewapiRatioTableResult,
 } from "@/lib/upstream-billing/newapi-client";
 import { buildNewapiBaseUrl } from "@/lib/upstream-billing/newapi-url";
@@ -9,7 +10,7 @@ import type { Provider } from "@/types/provider";
  * new-api 分组倍率表的进程内缓存（按站点根地址）。
  *
  * 背景：同一 new-api 站点可能接入多个 provider（多把 sk-），/api/pricing 的
- * group_ratio 是站点级数据、与 key 无关，逐 provider 拉取是重复请求。
+ * group_ratio 是站点级数据；匿名与 PAT 结果分别缓存，避免跨认证范围混用。
  *
  * 设计：
  * - TTL 60s：覆盖一轮探测 cycle 内的全部 worker（同站点只拉一次），下一轮必过期，
@@ -49,13 +50,21 @@ function getInflight(): Map<string, Promise<NewapiRatioTableResult>> {
 
 export async function getNewapiRatioTable(
   provider: Provider,
-  options: { forceRefresh?: boolean } = {}
+  options: {
+    forceRefresh?: boolean;
+    context?: NewapiProbeRequestContext;
+    authenticated?: boolean;
+  } = {}
 ): Promise<NewapiRatioTableResult> {
   let cacheKey: string;
-  try {
-    cacheKey = buildNewapiBaseUrl(provider.url);
-  } catch {
-    return { ok: false, reason: "invalid", error: "provider url is not a valid URL" };
+  if (options.context) {
+    cacheKey = `${options.context.cacheKey}:${options.authenticated ? "pat" : "anonymous"}`;
+  } else {
+    try {
+      cacheKey = `legacy:${buildNewapiBaseUrl(provider.url)}:anonymous`;
+    } catch {
+      return { ok: false, reason: "invalid", error: "provider url is not a valid URL" };
+    }
   }
 
   const now = Date.now();
@@ -71,7 +80,10 @@ export async function getNewapiRatioTable(
     }
   }
 
-  const request = fetchNewapiRatioTable(provider)
+  const request = fetchNewapiRatioTable(provider, {
+    context: options.context,
+    authenticated: options.authenticated,
+  })
     .then((result) => {
       if (result.ok) {
         getCache().set(cacheKey, {
@@ -90,4 +102,14 @@ export async function getNewapiRatioTable(
 
   getInflight().set(cacheKey, request);
   return request;
+}
+
+export function invalidateNewapiRatioTableCacheForSite(siteId: number): void {
+  const prefix = `site:${siteId}:`;
+  for (const key of getCache().keys()) {
+    if (key.startsWith(prefix)) getCache().delete(key);
+  }
+  for (const key of getInflight().keys()) {
+    if (key.startsWith(prefix)) getInflight().delete(key);
+  }
 }

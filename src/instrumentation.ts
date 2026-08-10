@@ -540,6 +540,18 @@ export async function register() {
             });
           }
 
+          try {
+            const { backfillUpstreamSitesFromProviders } = await import(
+              "@/repository/upstream-site"
+            );
+            const result = await backfillUpstreamSitesFromProviders();
+            logger.info("[Instrumentation] Upstream sites backfill completed", result);
+          } catch (error) {
+            logger.warn("[Instrumentation] Failed to backfill upstream sites", {
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+
           // 回填 provider_endpoints（从 providers.url/类型 生成端点池，幂等）
           try {
             const { backfillProviderEndpointsFromProviders } = await import(
@@ -775,6 +787,16 @@ export async function register() {
           });
         } catch (error) {
           logger.warn("[Instrumentation] Failed to backfill provider vendors", {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+
+        try {
+          const { backfillUpstreamSitesFromProviders } = await import("@/repository/upstream-site");
+          const result = await backfillUpstreamSitesFromProviders();
+          logger.info("[Instrumentation] Upstream sites backfill completed", result);
+        } catch (error) {
+          logger.warn("[Instrumentation] Failed to backfill upstream sites", {
             error: error instanceof Error ? error.message : String(error),
           });
         }

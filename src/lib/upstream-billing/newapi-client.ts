@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { logger } from "@/lib/logger";
-import { createProxyAgentForProvider } from "@/lib/proxy-agent";
+import { createProxyAgentForProvider, type ProviderProxyConfig } from "@/lib/proxy-agent";
 import { buildNewapiBaseUrl } from "@/lib/upstream-billing/newapi-url";
 import type { Provider } from "@/types/provider";
 
@@ -53,9 +53,16 @@ const tokenLogsResponseSchema = z
   })
   .loose();
 
+const dashboardIdentityResponseSchema = z
+  .object({
+    success: z.literal(true),
+    data: z.object({ id: z.number() }).loose(),
+  })
+  .loose();
+
 export type NewapiProbeFailureReason =
   | "unsupported" // 端点不存在（404）或 pricing 模块关闭/需登录（403）
-  | "auth" // sk- 被拒绝（仅 /api/log/token，HTTP 401/403）
+  | "auth" // Provider sk 或 Dashboard PAT 被拒绝（HTTP 401/403）
   | "rate_limited" // 触发 CriticalRateLimit（HTTP 429）
   | "http" // 其他非 2xx
   | "invalid" // 响应不是合法 JSON 或缺少必需字段
@@ -69,6 +76,44 @@ export type NewapiRatioTableResult =
 export type NewapiTokenGroupResult =
   | { ok: true; group: string | null }
   | { ok: false; reason: NewapiProbeFailureReason; error?: string; status?: number };
+
+/**
+ * Request destination resolved by the site-owned probe configuration. The cache key must not
+ * include any credential material.
+ */
+export interface NewapiProbeRequestContext {
+  baseUrl: string;
+  cacheKey: string;
+  siteId: number | null;
+  proxyConfig: ProviderProxyConfig;
+  dashboardPat: string | null;
+}
+
+export type NewapiPatTestResult =
+  | { ok: true; groupCount: number }
+  | { ok: false; reason: NewapiProbeFailureReason; error?: string; status?: number };
+
+interface NewapiRatioTableOptions {
+  context?: NewapiProbeRequestContext;
+  authenticated?: boolean;
+}
+
+function resolveRequestTarget(
+  provider: Provider,
+  context?: NewapiProbeRequestContext
+): { baseUrl: string; proxyConfig: ProviderProxyConfig } | null {
+  if (context) {
+    return {
+      baseUrl: context.baseUrl.replace(/\/$/, ""),
+      proxyConfig: context.proxyConfig,
+    };
+  }
+  try {
+    return { baseUrl: buildNewapiBaseUrl(provider.url), proxyConfig: provider };
+  } catch {
+    return null;
+  }
+}
 
 // 尽力而为地释放未消费的响应体，避免 undici 连接被挂起直到 GC
 async function releaseResponseBody(response: Response): Promise<void> {
@@ -88,7 +133,7 @@ interface UndiciFetchOptions extends RequestInit {
  * 代理配置错误、代理请求失败、407 时按 proxyFallbackToDirect 决定是否回退直连。
  */
 async function fetchWithProxyFallback(
-  provider: Provider,
+  requestOwner: ProviderProxyConfig,
   url: string,
   headers: Record<string, string>
 ): Promise<
@@ -105,7 +150,7 @@ async function fetchWithProxyFallback(
     const err = error as Error & { name?: string };
     const isTimeout = err.name === "TimeoutError" || err.name === "AbortError";
     logger.warn("[NewapiProbe] request failed", {
-      providerId: provider.id,
+      providerId: requestOwner.id,
       url,
       error: err.message,
       timeout: isTimeout,
@@ -119,13 +164,13 @@ async function fetchWithProxyFallback(
 
   let proxy: ReturnType<typeof createProxyAgentForProvider> = null;
   try {
-    proxy = createProxyAgentForProvider(provider, url);
+    proxy = createProxyAgentForProvider(requestOwner, url);
   } catch (error) {
-    if (!provider.proxyFallbackToDirect) {
+    if (!requestOwner.proxyFallbackToDirect) {
       return toRequestFailure(error);
     }
     logger.warn("[NewapiProbe] proxy setup failed, falling back to direct", {
-      providerId: provider.id,
+      providerId: requestOwner.id,
       error: error instanceof Error ? error.message : String(error),
     });
   }
@@ -138,7 +183,7 @@ async function fetchWithProxyFallback(
       return toRequestFailure(error);
     }
     logger.warn("[NewapiProbe] proxy request failed, falling back to direct", {
-      providerId: provider.id,
+      providerId: requestOwner.id,
       error: error instanceof Error ? error.message : String(error),
     });
     try {
@@ -150,7 +195,7 @@ async function fetchWithProxyFallback(
 
   if (response.status === 407 && proxy?.fallbackToDirect) {
     logger.warn("[NewapiProbe] proxy authentication failed, falling back to direct", {
-      providerId: provider.id,
+      providerId: requestOwner.id,
     });
     await releaseResponseBody(response);
     try {
@@ -164,19 +209,29 @@ async function fetchWithProxyFallback(
 }
 
 /**
- * 拉取 new-api 站点的分组倍率表（匿名 GET /api/pricing）。
+ * 拉取 new-api 站点的分组倍率表（匿名或 Dashboard PAT GET /api/pricing）。
  * 调用方负责缓存（见 newapi-table-cache.ts），本函数每次都会发请求。
  */
-export async function fetchNewapiRatioTable(provider: Provider): Promise<NewapiRatioTableResult> {
-  let url: string;
-  try {
-    url = `${buildNewapiBaseUrl(provider.url)}/api/pricing`;
-  } catch {
+export async function fetchNewapiRatioTable(
+  provider: Provider,
+  options: NewapiRatioTableOptions = {}
+): Promise<NewapiRatioTableResult> {
+  const target = resolveRequestTarget(provider, options.context);
+  if (!target) {
     return { ok: false, reason: "invalid", error: "provider url is not a valid URL" };
   }
+  const url = `${target.baseUrl}/api/pricing`;
 
-  // 匿名端点：不带任何凭证
-  const fetched = await fetchWithProxyFallback(provider, url, {});
+  const dashboardPat = options.authenticated ? options.context?.dashboardPat?.trim() : null;
+  if (options.authenticated && !dashboardPat) {
+    return { ok: false, reason: "auth", error: "site PAT is not configured" };
+  }
+
+  const fetched = await fetchWithProxyFallback(
+    target.proxyConfig,
+    url,
+    dashboardPat ? { Authorization: `Bearer ${dashboardPat}` } : {}
+  );
   if (!fetched.ok) {
     return fetched;
   }
@@ -185,6 +240,9 @@ export async function fetchNewapiRatioTable(provider: Provider): Promise<NewapiR
   if (!response.ok) {
     const status = response.status;
     await releaseResponseBody(response);
+    if (status === 401 || (status === 403 && dashboardPat)) {
+      return { ok: false, reason: "auth", status };
+    }
     // pricing 模块关闭/需登录（403）与端点不存在（404）都意味着无法匿名取表
     if (status === 403 || status === 404) {
       return { ok: false, reason: "unsupported", status };
@@ -257,16 +315,18 @@ export function resolveModeGroupFromLogs(
  * 用 sk- 探测该 key 的实际落组分组（GET /api/log/token 求众数）。
  * ok && group===null 表示无可用日志（新 key 冷启动或站点关闭了消费日志），不是失败。
  */
-export async function fetchNewapiTokenGroup(provider: Provider): Promise<NewapiTokenGroupResult> {
-  let url: string;
-  try {
-    url = `${buildNewapiBaseUrl(provider.url)}/api/log/token`;
-  } catch {
+export async function fetchNewapiTokenGroup(
+  provider: Provider,
+  context?: NewapiProbeRequestContext
+): Promise<NewapiTokenGroupResult> {
+  const target = resolveRequestTarget(provider, context);
+  if (!target) {
     return { ok: false, reason: "invalid", error: "provider url is not a valid URL" };
   }
+  const url = `${target.baseUrl}/api/log/token`;
 
   // 该端点走 TokenAuthReadOnly，恒用 Bearer sk-（与 providerType 无关）
-  const fetched = await fetchWithProxyFallback(provider, url, {
+  const fetched = await fetchWithProxyFallback(target.proxyConfig, url, {
     Authorization: `Bearer ${provider.key}`,
   });
   if (!fetched.ok) {
@@ -307,4 +367,49 @@ export async function fetchNewapiTokenGroup(provider: Provider): Promise<NewapiT
 
   const logs = parsed.data.data ?? [];
   return { ok: true, group: resolveModeGroupFromLogs(logs) };
+}
+
+/** Validate a dashboard PAT against the user identity and authenticated pricing endpoints. */
+export async function testNewapiDashboardPat(
+  provider: Provider,
+  context: NewapiProbeRequestContext
+): Promise<NewapiPatTestResult> {
+  const dashboardPat = context.dashboardPat?.trim();
+  if (!dashboardPat) {
+    return { ok: false, reason: "auth", error: "site PAT is not configured" };
+  }
+  const target = resolveRequestTarget(provider, context);
+  if (!target) {
+    return { ok: false, reason: "invalid", error: "probe target is not a valid URL" };
+  }
+
+  const identityUrl = `${target.baseUrl}/api/user/self`;
+  const fetched = await fetchWithProxyFallback(target.proxyConfig, identityUrl, {
+    Authorization: `Bearer ${dashboardPat}`,
+  });
+  if (!fetched.ok) return fetched;
+
+  const { response } = fetched;
+  if (!response.ok) {
+    const status = response.status;
+    await releaseResponseBody(response);
+    if (status === 401 || status === 403) return { ok: false, reason: "auth", status };
+    if (status === 404) return { ok: false, reason: "unsupported", status };
+    if (status === 429) return { ok: false, reason: "rate_limited", status };
+    return { ok: false, reason: "http", status, error: `HTTP ${status}` };
+  }
+
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    return { ok: false, reason: "invalid", error: "identity response is not valid JSON" };
+  }
+  if (!dashboardIdentityResponseSchema.safeParse(body).success) {
+    return { ok: false, reason: "invalid", error: "identity response is invalid" };
+  }
+
+  const pricing = await fetchNewapiRatioTable(provider, { context, authenticated: true });
+  if (!pricing.ok) return pricing;
+  return { ok: true, groupCount: Object.keys(pricing.table).length };
 }

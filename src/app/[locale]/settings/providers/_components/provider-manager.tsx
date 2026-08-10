@@ -3,6 +3,7 @@ import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import {
   AlertTriangle,
   Filter,
+  Globe2,
   Layers,
   LayoutGrid,
   LayoutList,
@@ -49,6 +50,7 @@ import { ProviderList } from "./provider-list";
 import { ProviderSortDropdown, type SortKey } from "./provider-sort-dropdown";
 import { ProviderTypeFilter } from "./provider-type-filter";
 import { ProviderVendorView } from "./provider-vendor-view";
+import { UpstreamSitesView } from "./upstream-sites-view";
 
 /** Per-endpoint circuit breaker state, keyed by provider ID */
 export type EndpointCircuitInfoMap = Record<
@@ -96,7 +98,7 @@ export function ProviderManager({
   const [typeFilter, setTypeFilter] = useState<ProviderType | "all">("all");
   const [sortBy, setSortBy] = useState<SortKey>("priority");
   const [searchTerm, setSearchTerm] = useState("");
-  const [viewMode, setViewMode] = useState<"list" | "vendor" | "groups">("list");
+  const [viewMode, setViewMode] = useState<"list" | "vendor" | "groups" | "sites">("list");
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
 
   // Status and group filters
@@ -381,192 +383,87 @@ export function ProviderManager({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <ProviderBatchToolbar
-          isMultiSelectMode={isMultiSelectMode}
-          allSelected={allSelected}
-          selectedCount={selectedProviderIds.size}
-          totalCount={filteredProviders.length}
-          onEnterMode={handleEnterMultiSelectMode}
-          onExitMode={handleExitMultiSelectMode}
-          onSelectAll={handleSelectAll}
-          onInvertSelection={handleInvertSelection}
-          onOpenBatchEdit={handleOpenBatchEdit}
-          providers={filteredProviders}
-          onSelectByType={handleSelectByType}
-          onSelectByGroup={handleSelectByGroup}
-        />
-        {addDialogSlot ? <div className="ml-auto">{addDialogSlot}</div> : null}
+        {viewMode !== "sites" ? (
+          <ProviderBatchToolbar
+            isMultiSelectMode={isMultiSelectMode}
+            allSelected={allSelected}
+            selectedCount={selectedProviderIds.size}
+            totalCount={filteredProviders.length}
+            onEnterMode={handleEnterMultiSelectMode}
+            onExitMode={handleExitMultiSelectMode}
+            onSelectAll={handleSelectAll}
+            onInvertSelection={handleInvertSelection}
+            onOpenBatchEdit={handleOpenBatchEdit}
+            providers={filteredProviders}
+            onSelectByType={handleSelectByType}
+            onSelectByGroup={handleSelectByGroup}
+          />
+        ) : null}
+        {addDialogSlot && viewMode !== "sites" ? (
+          <div className="ml-auto">{addDialogSlot}</div>
+        ) : null}
+      </div>
+      <div className="flex gap-1 overflow-x-auto" role="tablist">
+        <Button
+          type="button"
+          variant={viewMode === "list" ? "secondary" : "ghost"}
+          size="sm"
+          className="h-8 shrink-0 gap-1.5 text-xs"
+          onClick={() => setViewMode("list")}
+          role="tab"
+          aria-selected={viewMode === "list"}
+          title={tStrings("viewModeList")}
+        >
+          <LayoutList className="h-3.5 w-3.5" />
+          {tStrings("viewModeList")}
+        </Button>
+        <Button
+          type="button"
+          variant={viewMode === "vendor" ? "secondary" : "ghost"}
+          size="sm"
+          className="h-8 shrink-0 gap-1.5 text-xs"
+          onClick={() => setViewMode("vendor")}
+          role="tab"
+          aria-selected={viewMode === "vendor"}
+          title={tStrings("viewModeVendor")}
+        >
+          <LayoutGrid className="h-3.5 w-3.5" />
+          {tStrings("viewModeVendor")}
+        </Button>
+        <Button
+          type="button"
+          variant={viewMode === "groups" ? "secondary" : "ghost"}
+          size="sm"
+          className="h-8 shrink-0 gap-1.5 text-xs"
+          onClick={() => setViewMode("groups")}
+          role="tab"
+          aria-selected={viewMode === "groups"}
+          title={tStrings("viewModeGroups")}
+        >
+          <Layers className="h-3.5 w-3.5" />
+          {tStrings("viewModeGroups")}
+        </Button>
+        {isAdmin ? (
+          <Button
+            type="button"
+            variant={viewMode === "sites" ? "secondary" : "ghost"}
+            size="sm"
+            className="h-8 shrink-0 gap-1.5 text-xs"
+            onClick={() => setViewMode("sites")}
+            role="tab"
+            aria-selected={viewMode === "sites"}
+            title={tStrings("viewModeSites")}
+          >
+            <Globe2 className="h-3.5 w-3.5" />
+            {tStrings("viewModeSites")}
+          </Button>
+        ) : null}
       </div>
       {/* Filter section */}
-      <div className="flex flex-col gap-3">
-        {/* Mobile: search + filter toggle button */}
-        <div className="flex items-center gap-2 md:hidden">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder={t("placeholder")}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9"
-              disabled={loading}
-            />
-          </div>
-          <Button
-            variant="outline"
-            size="default"
-            className="flex-shrink-0"
-            onClick={() => setMobileFilterOpen((prev) => !prev)}
-          >
-            <Filter className="mr-1.5 h-4 w-4" />
-            {activeFilterCount > 0
-              ? tFilter("mobileFilterCount", { count: activeFilterCount })
-              : tFilter("mobileFilter")}
-          </Button>
-        </div>
-
-        {/* Mobile: collapsible filter panel */}
-        <Collapsible open={mobileFilterOpen} onOpenChange={setMobileFilterOpen}>
-          <CollapsibleContent className="md:hidden">
-            <div className="flex flex-col gap-3 p-3 border rounded-lg bg-muted/30">
-              <ProviderTypeFilter value={typeFilter} onChange={setTypeFilter} disabled={loading} />
-              <Select
-                value={statusFilter}
-                onValueChange={(value) => setStatusFilter(value as "all" | "active" | "inactive")}
-                disabled={loading}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{tFilter("status.all")}</SelectItem>
-                  <SelectItem value="active">{tFilter("status.active")}</SelectItem>
-                  <SelectItem value="inactive">{tFilter("status.inactive")}</SelectItem>
-                </SelectContent>
-              </Select>
-              <ProviderSortDropdown value={sortBy} onChange={setSortBy} disabled={loading} />
-              {allGroups.length > 0 && (
-                <div className="flex flex-wrap gap-2 items-center">
-                  <span className="text-sm text-muted-foreground">{tFilter("groups.label")}</span>
-                  <Button
-                    variant={groupFilter.length === 0 ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setGroupFilter([])}
-                    disabled={loading}
-                    className="h-7"
-                  >
-                    {tFilter("groups.all")}
-                  </Button>
-                  {allGroups.map((group) => (
-                    <Button
-                      key={group}
-                      variant={groupFilter.includes(group) ? "default" : "outline"}
-                      size="sm"
-                      onClick={() =>
-                        setGroupFilter((prev) =>
-                          prev.includes(group) ? prev.filter((g) => g !== group) : [...prev, group]
-                        )
-                      }
-                      disabled={loading}
-                      className="h-7"
-                    >
-                      {group}
-                    </Button>
-                  ))}
-                </div>
-              )}
-              {circuitBrokenCount > 0 && (
-                <div className="flex items-center gap-2">
-                  <AlertTriangle
-                    className={`h-4 w-4 ${circuitBrokenFilter ? "text-destructive" : "text-muted-foreground"}`}
-                  />
-                  <Label
-                    htmlFor="circuit-broken-filter-mobile"
-                    className={`text-sm cursor-pointer select-none ${circuitBrokenFilter ? "text-destructive font-medium" : "text-muted-foreground"}`}
-                  >
-                    {tFilter("circuitBroken")} ({circuitBrokenCount})
-                  </Label>
-                  <Switch
-                    id="circuit-broken-filter-mobile"
-                    checked={circuitBrokenFilter}
-                    onCheckedChange={setCircuitBrokenFilter}
-                    disabled={loading}
-                  />
-                </div>
-              )}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setTypeFilter("all");
-                  setStatusFilter("all");
-                  setGroupFilter([]);
-                  setCircuitBrokenFilter(false);
-                  setSortBy("priority");
-                }}
-                className="self-end"
-              >
-                {tFilter("resetFilters")}
-              </Button>
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
-
-        {/* Desktop: original filter layout */}
-        <div className="hidden md:flex flex-col gap-3">
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-            {/* View Mode Toggle */}
-            <div className="flex items-center border rounded-md bg-muted/50 p-1">
-              <Button
-                variant={viewMode === "list" ? "secondary" : "ghost"}
-                size="sm"
-                className="h-7 px-2 gap-1.5 text-xs"
-                onClick={() => setViewMode("list")}
-                title={tStrings("viewModeList")}
-              >
-                <LayoutList className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">{tStrings("viewModeList")}</span>
-              </Button>
-              <Button
-                variant={viewMode === "vendor" ? "secondary" : "ghost"}
-                size="sm"
-                className="h-7 px-2 gap-1.5 text-xs"
-                onClick={() => setViewMode("vendor")}
-                title={tStrings("viewModeVendor")}
-              >
-                <LayoutGrid className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">{tStrings("viewModeVendor")}</span>
-              </Button>
-              <Button
-                variant={viewMode === "groups" ? "secondary" : "ghost"}
-                size="sm"
-                className="h-7 px-2 gap-1.5 text-xs"
-                onClick={() => setViewMode("groups")}
-                title={tStrings("viewModeGroups")}
-              >
-                <Layers className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">{tStrings("viewModeGroups")}</span>
-              </Button>
-            </div>
-
-            <ProviderTypeFilter value={typeFilter} onChange={setTypeFilter} disabled={loading} />
-
-            <Select
-              value={statusFilter}
-              onValueChange={(value) => setStatusFilter(value as "all" | "active" | "inactive")}
-              disabled={loading}
-            >
-              <SelectTrigger className="w-full sm:w-[140px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{tFilter("status.all")}</SelectItem>
-                <SelectItem value="active">{tFilter("status.active")}</SelectItem>
-                <SelectItem value="inactive">{tFilter("status.inactive")}</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <ProviderSortDropdown value={sortBy} onChange={setSortBy} disabled={loading} />
+      {viewMode !== "sites" ? (
+        <div className="flex flex-col gap-3">
+          {/* Mobile: search + filter toggle button */}
+          <div className="flex items-center gap-2 md:hidden">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -578,89 +475,230 @@ export function ProviderManager({
                 disabled={loading}
               />
             </div>
+            <Button
+              variant="outline"
+              size="default"
+              className="flex-shrink-0"
+              onClick={() => setMobileFilterOpen((prev) => !prev)}
+            >
+              <Filter className="mr-1.5 h-4 w-4" />
+              {activeFilterCount > 0
+                ? tFilter("mobileFilterCount", { count: activeFilterCount })
+                : tFilter("mobileFilter")}
+            </Button>
           </div>
 
-          {/* Group filter */}
-          {allGroups.length > 0 && (
-            <div className="flex flex-wrap gap-2 items-center">
-              <span className="text-sm text-muted-foreground">{tFilter("groups.label")}</span>
-              <Button
-                variant={groupFilter.length === 0 ? "default" : "outline"}
-                size="sm"
-                onClick={() => setGroupFilter([])}
-                disabled={loading}
-                className="h-7"
-              >
-                {tFilter("groups.all")}
-              </Button>
-              {allGroups.map((group) => (
+          {/* Mobile: collapsible filter panel */}
+          <Collapsible open={mobileFilterOpen} onOpenChange={setMobileFilterOpen}>
+            <CollapsibleContent className="md:hidden">
+              <div className="flex flex-col gap-3 p-3 border rounded-lg bg-muted/30">
+                <ProviderTypeFilter
+                  value={typeFilter}
+                  onChange={setTypeFilter}
+                  disabled={loading}
+                />
+                <Select
+                  value={statusFilter}
+                  onValueChange={(value) => setStatusFilter(value as "all" | "active" | "inactive")}
+                  disabled={loading}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{tFilter("status.all")}</SelectItem>
+                    <SelectItem value="active">{tFilter("status.active")}</SelectItem>
+                    <SelectItem value="inactive">{tFilter("status.inactive")}</SelectItem>
+                  </SelectContent>
+                </Select>
+                <ProviderSortDropdown value={sortBy} onChange={setSortBy} disabled={loading} />
+                {allGroups.length > 0 && (
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <span className="text-sm text-muted-foreground">{tFilter("groups.label")}</span>
+                    <Button
+                      variant={groupFilter.length === 0 ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setGroupFilter([])}
+                      disabled={loading}
+                      className="h-7"
+                    >
+                      {tFilter("groups.all")}
+                    </Button>
+                    {allGroups.map((group) => (
+                      <Button
+                        key={group}
+                        variant={groupFilter.includes(group) ? "default" : "outline"}
+                        size="sm"
+                        onClick={() =>
+                          setGroupFilter((prev) =>
+                            prev.includes(group)
+                              ? prev.filter((g) => g !== group)
+                              : [...prev, group]
+                          )
+                        }
+                        disabled={loading}
+                        className="h-7"
+                      >
+                        {group}
+                      </Button>
+                    ))}
+                  </div>
+                )}
+                {circuitBrokenCount > 0 && (
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle
+                      className={`h-4 w-4 ${circuitBrokenFilter ? "text-destructive" : "text-muted-foreground"}`}
+                    />
+                    <Label
+                      htmlFor="circuit-broken-filter-mobile"
+                      className={`text-sm cursor-pointer select-none ${circuitBrokenFilter ? "text-destructive font-medium" : "text-muted-foreground"}`}
+                    >
+                      {tFilter("circuitBroken")} ({circuitBrokenCount})
+                    </Label>
+                    <Switch
+                      id="circuit-broken-filter-mobile"
+                      checked={circuitBrokenFilter}
+                      onCheckedChange={setCircuitBrokenFilter}
+                      disabled={loading}
+                    />
+                  </div>
+                )}
                 <Button
-                  key={group}
-                  variant={groupFilter.includes(group) ? "default" : "outline"}
+                  variant="ghost"
                   size="sm"
                   onClick={() => {
-                    setGroupFilter((prev) =>
-                      prev.includes(group) ? prev.filter((g) => g !== group) : [...prev, group]
-                    );
+                    setTypeFilter("all");
+                    setStatusFilter("all");
+                    setGroupFilter([]);
+                    setCircuitBrokenFilter(false);
+                    setSortBy("priority");
                   }}
+                  className="self-end"
+                >
+                  {tFilter("resetFilters")}
+                </Button>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+
+          {/* Desktop: original filter layout */}
+          <div className="hidden md:flex flex-col gap-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+              <ProviderTypeFilter value={typeFilter} onChange={setTypeFilter} disabled={loading} />
+
+              <Select
+                value={statusFilter}
+                onValueChange={(value) => setStatusFilter(value as "all" | "active" | "inactive")}
+                disabled={loading}
+              >
+                <SelectTrigger className="w-full sm:w-[140px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{tFilter("status.all")}</SelectItem>
+                  <SelectItem value="active">{tFilter("status.active")}</SelectItem>
+                  <SelectItem value="inactive">{tFilter("status.inactive")}</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <ProviderSortDropdown value={sortBy} onChange={setSortBy} disabled={loading} />
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder={t("placeholder")}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-9"
+                  disabled={loading}
+                />
+              </div>
+            </div>
+
+            {/* Group filter */}
+            {allGroups.length > 0 && (
+              <div className="flex flex-wrap gap-2 items-center">
+                <span className="text-sm text-muted-foreground">{tFilter("groups.label")}</span>
+                <Button
+                  variant={groupFilter.length === 0 ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setGroupFilter([])}
                   disabled={loading}
                   className="h-7"
                 >
-                  {group}
+                  {tFilter("groups.all")}
                 </Button>
-              ))}
-            </div>
-          )}
+                {allGroups.map((group) => (
+                  <Button
+                    key={group}
+                    variant={groupFilter.includes(group) ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setGroupFilter((prev) =>
+                        prev.includes(group) ? prev.filter((g) => g !== group) : [...prev, group]
+                      );
+                    }}
+                    disabled={loading}
+                    className="h-7"
+                  >
+                    {group}
+                  </Button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Search result count + Circuit Breaker filter (both mobile and desktop) */}
+          <div className="flex items-center justify-between">
+            {debouncedSearchTerm ? (
+              <p className="text-sm text-muted-foreground">
+                {loading
+                  ? tCommon("loading")
+                  : filteredProviders.length > 0
+                    ? t("found", { count: filteredProviders.length })
+                    : t("notFound")}
+              </p>
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                {loading
+                  ? tCommon("loading")
+                  : t("showing", { filtered: filteredProviders.length, total: providers.length })}
+              </div>
+            )}
+
+            {/* Circuit Breaker toggle - only show if there are broken providers */}
+            {circuitBrokenCount > 0 && (
+              <div className="hidden md:flex items-center gap-2">
+                <AlertTriangle
+                  className={`h-4 w-4 ${circuitBrokenFilter ? "text-destructive" : "text-muted-foreground"}`}
+                />
+                <Label
+                  htmlFor="circuit-broken-filter"
+                  className={`text-sm cursor-pointer select-none ${circuitBrokenFilter ? "text-destructive font-medium" : "text-muted-foreground"}`}
+                >
+                  {tFilter("circuitBroken")}
+                </Label>
+                <Switch
+                  id="circuit-broken-filter"
+                  checked={circuitBrokenFilter}
+                  onCheckedChange={setCircuitBrokenFilter}
+                  disabled={loading}
+                />
+                <span
+                  className={`text-sm tabular-nums ${circuitBrokenFilter ? "text-destructive font-medium" : "text-muted-foreground"}`}
+                >
+                  ({circuitBrokenCount})
+                </span>
+              </div>
+            )}
+          </div>
         </div>
+      ) : null}
 
-        {/* Search result count + Circuit Breaker filter (both mobile and desktop) */}
-        <div className="flex items-center justify-between">
-          {debouncedSearchTerm ? (
-            <p className="text-sm text-muted-foreground">
-              {loading
-                ? tCommon("loading")
-                : filteredProviders.length > 0
-                  ? t("found", { count: filteredProviders.length })
-                  : t("notFound")}
-            </p>
-          ) : (
-            <div className="text-sm text-muted-foreground">
-              {loading
-                ? tCommon("loading")
-                : t("showing", { filtered: filteredProviders.length, total: providers.length })}
-            </div>
-          )}
-
-          {/* Circuit Breaker toggle - only show if there are broken providers */}
-          {circuitBrokenCount > 0 && (
-            <div className="hidden md:flex items-center gap-2">
-              <AlertTriangle
-                className={`h-4 w-4 ${circuitBrokenFilter ? "text-destructive" : "text-muted-foreground"}`}
-              />
-              <Label
-                htmlFor="circuit-broken-filter"
-                className={`text-sm cursor-pointer select-none ${circuitBrokenFilter ? "text-destructive font-medium" : "text-muted-foreground"}`}
-              >
-                {tFilter("circuitBroken")}
-              </Label>
-              <Switch
-                id="circuit-broken-filter"
-                checked={circuitBrokenFilter}
-                onCheckedChange={setCircuitBrokenFilter}
-                disabled={loading}
-              />
-              <span
-                className={`text-sm tabular-nums ${circuitBrokenFilter ? "text-destructive font-medium" : "text-muted-foreground"}`}
-              >
-                ({circuitBrokenCount})
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Provider list / vendor view / groups tab */}
-      {viewMode === "groups" ? (
+      {/* Provider list / vendor view / groups / upstream sites */}
+      {viewMode === "sites" ? (
+        <UpstreamSitesView />
+      ) : viewMode === "groups" ? (
         <ProviderGroupTab
           providers={providers}
           isAdmin={isAdmin}
@@ -708,7 +746,7 @@ export function ProviderManager({
       <ProviderBatchActions
         selectedCount={selectedProviderIds.size}
         selectedProviderIds={[...selectedProviderIds]}
-        isVisible={isMultiSelectMode}
+        isVisible={isMultiSelectMode && viewMode !== "sites"}
         onAction={handleBatchAction}
         onClose={handleExitMultiSelectMode}
       />

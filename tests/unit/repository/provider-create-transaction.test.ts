@@ -128,6 +128,10 @@ describe("provider repository - createProvider transactional endpoint seeding", 
       syncProviderEndpointOnProviderEdit: vi.fn(),
       tryDeleteProviderVendorIfEmpty: vi.fn(),
     }));
+    vi.doMock("@/repository/upstream-site", () => ({
+      getOrCreateUpstreamSiteIdForUrl: vi.fn(async () => 21),
+      tryDeleteUnconfiguredUpstreamSiteIfEmpty: vi.fn(async () => false),
+    }));
 
     const { createProvider } = await import("@/repository/provider");
     const provider = await createProvider(
@@ -180,6 +184,10 @@ describe("provider repository - createProvider transactional endpoint seeding", 
       ensureProviderEndpointExistsForUrl: ensureProviderEndpointExistsForUrlMock,
       syncProviderEndpointOnProviderEdit: vi.fn(),
       tryDeleteProviderVendorIfEmpty: vi.fn(),
+    }));
+    vi.doMock("@/repository/upstream-site", () => ({
+      getOrCreateUpstreamSiteIdForUrl: vi.fn(async () => 21),
+      tryDeleteUnconfiguredUpstreamSiteIfEmpty: vi.fn(async () => false),
     }));
 
     const { createProvider } = await import("@/repository/provider");

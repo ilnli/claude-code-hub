@@ -323,6 +323,8 @@ export interface Provider {
   key: string;
   // 供应商聚合实体（按官网域名归一）
   providerVendorId: number | null;
+  // 上游站点（按 provider.url 的规范化 host 归一）
+  upstreamSiteId: number | null;
   // 是否启用
   isEnabled: boolean;
   // 权重（0-100）
@@ -487,6 +489,8 @@ export interface ProviderDisplay {
   providerType: ProviderType;
   // 供应商聚合实体（按官网域名归一）
   providerVendorId: number | null;
+  // 上游站点（按 provider.url 的规范化 host 归一）
+  upstreamSiteId: number | null;
   // 是否透传客户端 IP
   preserveClientIp: boolean;
   // 是否跳过当前供应商的 sticky session 复用
@@ -787,6 +791,21 @@ export interface ProviderVendor {
   displayName: string | null;
   websiteUrl: string | null;
   faviconUrl: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface UpstreamSite {
+  id: number;
+  siteKey: string;
+  probeBaseUrl: string | null;
+  patConfigured: boolean;
+  allowInsecureHttp: boolean;
+  proxyUrl: string | null;
+  proxyFallbackToDirect: boolean;
+  providerCount: number;
+  newapiProviderCount: number;
+  probeTargetCandidates: string[];
   createdAt: Date;
   updatedAt: Date;
 }

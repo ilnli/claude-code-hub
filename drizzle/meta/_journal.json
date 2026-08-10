@@ -897,6 +897,13 @@
       "when": 1786288928081,
       "tag": "0127_smart_retro_girl",
       "breakpoints": true
+    },
+    {
+      "idx": 128,
+      "version": "7",
+      "when": 1786329529283,
+      "tag": "0128_charming_goliath",
+      "breakpoints": true
     }
   ]
 }

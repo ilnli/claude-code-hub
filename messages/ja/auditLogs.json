@@ -49,6 +49,16 @@
       "delete": "プロバイダー削除",
       "key_reveal": "プロバイダーキー表示"
     },
+    "upstream_site": {
+      "update": "アップストリームサイトを更新",
+      "delete": "アップストリームサイトを削除",
+      "pat": {
+        "set": "アップストリームサイト PAT を設定",
+        "clear": "アップストリームサイト PAT をクリア",
+        "replace": "アップストリームサイト PAT を置換",
+        "test": "アップストリームサイト PAT をテスト"
+      }
+    },
     "provider_weight_adjustment": {
       "interval": {
         "update": "プロバイダーウェイト調整間隔を更新"

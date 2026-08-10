@@ -1,0 +1,170 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+let findUpstreamSitesMock: ReturnType<typeof vi.fn>;
+let findProbeConfigMock: ReturnType<typeof vi.fn>;
+let updateConfigMock: ReturnType<typeof vi.fn>;
+let deleteSiteMock: ReturnType<typeof vi.fn>;
+let testPatMock: ReturnType<typeof vi.fn>;
+let invalidateCacheMock: ReturnType<typeof vi.fn>;
+let emitAuditMock: ReturnType<typeof vi.fn>;
+
+vi.mock("@/lib/auth", () => ({
+  getSession: vi.fn(async () => ({ user: { role: "admin" } })),
+}));
+
+vi.mock("@/lib/logger", () => ({
+  logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
+}));
+
+vi.mock("@/lib/audit/emit", () => ({
+  emitActionAudit: (...args: unknown[]) => emitAuditMock(...args),
+}));
+
+vi.mock("@/lib/proxy-agent", () => ({
+  isValidProxyUrl: vi.fn(() => true),
+}));
+
+vi.mock("@/lib/upstream-billing/newapi-client", () => ({
+  testNewapiDashboardPat: (...args: unknown[]) => testPatMock(...args),
+}));
+
+vi.mock("@/lib/upstream-billing/newapi-table-cache", () => ({
+  invalidateNewapiRatioTableCacheForSite: (...args: unknown[]) => invalidateCacheMock(...args),
+}));
+
+vi.mock("@/repository/upstream-site", () => ({
+  findUpstreamSites: (...args: unknown[]) => findUpstreamSitesMock(...args),
+  findUpstreamSiteProbeConfigById: (...args: unknown[]) => findProbeConfigMock(...args),
+  updateUpstreamSiteConfig: (...args: unknown[]) => updateConfigMock(...args),
+  deleteEmptyUpstreamSite: (...args: unknown[]) => deleteSiteMock(...args),
+}));
+
+import {
+  getUpstreamSites,
+  removeUpstreamSite,
+  saveUpstreamSiteConfig,
+  testUpstreamSitePat,
+} from "@/actions/upstream-sites";
+
+const now = new Date("2026-08-10T00:00:00.000Z");
+
+function makeProbeConfig() {
+  return {
+    id: 4,
+    siteKey: "example.com",
+    probeBaseUrl: "https://example.com/new-api",
+    dashboardPat: "stored-pat",
+    allowInsecureHttp: false,
+    proxyUrl: "http://user:pass@proxy.example.com:8080",
+    proxyFallbackToDirect: true,
+    updatedAt: now,
+  };
+}
+
+function makePublicSite() {
+  return {
+    id: 4,
+    siteKey: "example.com",
+    probeBaseUrl: "https://example.com/new-api",
+    patConfigured: true,
+    allowInsecureHttp: false,
+    proxyUrl: "http://user:pass@proxy.example.com:8080",
+    proxyFallbackToDirect: true,
+    providerCount: 2,
+    newapiProviderCount: 1,
+    probeTargetCandidates: ["https://example.com"],
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+describe("upstream site actions", () => {
+  beforeEach(() => {
+    findUpstreamSitesMock = vi.fn().mockResolvedValue([makePublicSite()]);
+    findProbeConfigMock = vi.fn().mockResolvedValue(makeProbeConfig());
+    updateConfigMock = vi.fn().mockResolvedValue(makePublicSite());
+    deleteSiteMock = vi.fn().mockResolvedValue("deleted");
+    testPatMock = vi.fn().mockResolvedValue({ ok: true, groupCount: 3 });
+    invalidateCacheMock = vi.fn();
+    emitAuditMock = vi.fn();
+  });
+
+  it("never returns PAT and redacts proxy credentials", async () => {
+    const result = await getUpstreamSites();
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.sites[0]).not.toHaveProperty("dashboardPat");
+    expect(result.data.sites[0]?.proxyUrl).toContain("REDACTED");
+    expect(JSON.stringify(result)).not.toContain("stored-pat");
+  });
+
+  it("omitted PAT preserves the stored value and a redacted proxy echo preserves credentials", async () => {
+    const result = await saveUpstreamSiteConfig({
+      siteId: 4,
+      probeBaseUrl: "https://example.com/new-api",
+      proxyUrl: "http://REDACTED:REDACTED@proxy.example.com:8080/",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(updateConfigMock).toHaveBeenCalledWith(
+      4,
+      expect.objectContaining({
+        dashboardPat: "stored-pat",
+        proxyUrl: "http://user:pass@proxy.example.com:8080",
+      })
+    );
+    expect(invalidateCacheMock).toHaveBeenCalledWith(4);
+  });
+
+  it("null explicitly clears the PAT", async () => {
+    const result = await saveUpstreamSiteConfig({ siteId: 4, dashboardPat: null });
+
+    expect(result.ok).toBe(true);
+    expect(updateConfigMock).toHaveBeenCalledWith(
+      4,
+      expect.objectContaining({ dashboardPat: null })
+    );
+    expect(emitAuditMock).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "upstream_site.pat.clear", success: true })
+    );
+  });
+
+  it("rejects a target on another host", async () => {
+    const result = await saveUpstreamSiteConfig({
+      siteId: 4,
+      probeBaseUrl: "https://other.example.com/new-api",
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      errorCode: "upstream_site.target_host_mismatch",
+    });
+    expect(updateConfigMock).not.toHaveBeenCalled();
+  });
+
+  it("tests an unsaved draft without writing site configuration", async () => {
+    const result = await testUpstreamSitePat({
+      siteId: 4,
+      dashboardPat: "draft-pat",
+      probeBaseUrl: "https://example.com/draft/v1",
+    });
+
+    expect(result).toEqual({ ok: true, data: { groupCount: 3 } });
+    expect(testPatMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        baseUrl: "https://example.com/draft",
+        dashboardPat: "draft-pat",
+      })
+    );
+    expect(updateConfigMock).not.toHaveBeenCalled();
+  });
+
+  it("does not delete a site that still has active providers", async () => {
+    deleteSiteMock.mockResolvedValue("in_use");
+    const result = await removeUpstreamSite(4);
+
+    expect(result).toMatchObject({ ok: false, errorCode: "upstream_site.in_use" });
+  });
+});

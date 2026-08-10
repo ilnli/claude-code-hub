@@ -49,6 +49,16 @@
       "delete": "Delete provider",
       "key_reveal": "Reveal provider key"
     },
+    "upstream_site": {
+      "update": "Update upstream site",
+      "delete": "Delete upstream site",
+      "pat": {
+        "set": "Set upstream site PAT",
+        "clear": "Clear upstream site PAT",
+        "replace": "Replace upstream site PAT",
+        "test": "Test upstream site PAT"
+      }
+    },
     "provider_weight_adjustment": {
       "interval": {
         "update": "Update provider weight adjustment interval"

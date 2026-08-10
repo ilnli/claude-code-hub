@@ -81,6 +81,18 @@ export {
 } from "./statistics";
 // System settings related exports
 export { getSystemSettings, updateSystemSettings } from "./system-config";
+export type { UpdateUpstreamSiteConfig, UpstreamSiteProbeConfig } from "./upstream-site";
+export {
+  backfillUpstreamSitesFromProviders,
+  deleteEmptyUpstreamSite,
+  findUpstreamSiteById,
+  findUpstreamSiteProbeConfigById,
+  findUpstreamSiteProbeConfigForProvider,
+  findUpstreamSites,
+  getOrCreateUpstreamSiteIdForUrl,
+  tryDeleteUnconfiguredUpstreamSiteIfEmpty,
+  updateUpstreamSiteConfig,
+} from "./upstream-site";
 // Usage ledger related exports
 export {
   countLedgerRequestsInTimeRange,

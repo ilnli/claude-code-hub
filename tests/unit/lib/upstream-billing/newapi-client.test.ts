@@ -18,6 +18,7 @@ import {
   fetchNewapiRatioTable,
   fetchNewapiTokenGroup,
   resolveModeGroupFromLogs,
+  testNewapiDashboardPat,
 } from "@/lib/upstream-billing/newapi-client";
 
 function makeProvider(overrides: Partial<Provider> = {}): Provider {
@@ -45,6 +46,21 @@ function makeResponse(init: {
     json: async () => init.body,
     body: init.stream ?? null,
   } as Response;
+}
+
+function makeSiteContext() {
+  return {
+    baseUrl: "https://newapi.example.com/management",
+    cacheKey: "site:99:1",
+    siteId: 99,
+    proxyConfig: {
+      id: 99,
+      name: "newapi.example.com",
+      proxyUrl: "http://proxy.example.com:8080",
+      proxyFallbackToDirect: true,
+    },
+    dashboardPat: "dashboard-pat",
+  };
 }
 
 describe("fetchNewapiRatioTable", () => {
@@ -79,6 +95,37 @@ describe("fetchNewapiRatioTable", () => {
     fetchMock.mockResolvedValue(makeResponse({ ok: false, status: 403 }));
     const result = await fetchNewapiRatioTable(makeProvider());
     expect(result).toMatchObject({ ok: false, reason: "unsupported", status: 403 });
+  });
+
+  it("PAT 模式使用站点目标、站点代理和 Bearer PAT", async () => {
+    fetchMock.mockResolvedValue(
+      makeResponse({ ok: true, status: 200, body: { group_ratio: { vip: 0.7 } } })
+    );
+    const context = makeSiteContext();
+
+    const result = await fetchNewapiRatioTable(makeProvider(), {
+      context,
+      authenticated: true,
+    });
+
+    expect(result).toEqual({ ok: true, table: { vip: 0.7 } });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://newapi.example.com/management/api/pricing",
+      expect.objectContaining({ headers: { Authorization: "Bearer dashboard-pat" } })
+    );
+    expect(createProxyAgentForProvider).toHaveBeenCalledWith(
+      context.proxyConfig,
+      expect.any(String)
+    );
+  });
+
+  it("PAT 模式的 403 归类为鉴权失败", async () => {
+    fetchMock.mockResolvedValue(makeResponse({ ok: false, status: 403 }));
+    const result = await fetchNewapiRatioTable(makeProvider(), {
+      context: makeSiteContext(),
+      authenticated: true,
+    });
+    expect(result).toMatchObject({ ok: false, reason: "auth", status: 403 });
   });
 
   it("404：非 new-api 站点 -> unsupported", async () => {
@@ -203,6 +250,49 @@ describe("fetchNewapiTokenGroup", () => {
     fetchMock.mockResolvedValue(makeResponse({ ok: false, status: 404 }));
     const result = await fetchNewapiTokenGroup(makeProvider());
     expect(result).toMatchObject({ ok: false, reason: "unsupported", status: 404 });
+  });
+});
+
+describe("testNewapiDashboardPat", () => {
+  const fetchMock = vi.fn();
+
+  beforeEach(() => {
+    fetchMock.mockReset();
+    vi.stubGlobal("fetch", fetchMock);
+    vi.mocked(createProxyAgentForProvider).mockReturnValue(null);
+  });
+
+  it("先验证身份，再验证认证价格表", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        makeResponse({ ok: true, status: 200, body: { success: true, data: { id: 8 } } })
+      )
+      .mockResolvedValueOnce(
+        makeResponse({ ok: true, status: 200, body: { group_ratio: { default: 1, vip: 0.8 } } })
+      );
+
+    const result = await testNewapiDashboardPat(makeProvider(), makeSiteContext());
+
+    expect(result).toEqual({ ok: true, groupCount: 2 });
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      "https://newapi.example.com/management/api/user/self",
+      "https://newapi.example.com/management/api/pricing",
+    ]);
+    expect(fetchMock.mock.calls[0]?.[1]?.headers).toEqual({
+      Authorization: "Bearer dashboard-pat",
+    });
+    expect(fetchMock.mock.calls[1]?.[1]?.headers).toEqual({
+      Authorization: "Bearer dashboard-pat",
+    });
+  });
+
+  it("无 PAT 时不发送请求", async () => {
+    const result = await testNewapiDashboardPat(makeProvider(), {
+      ...makeSiteContext(),
+      dashboardPat: null,
+    });
+    expect(result).toMatchObject({ ok: false, reason: "auth" });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 

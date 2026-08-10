@@ -62,6 +62,10 @@ async function setupProviderRepository(options: {
     syncProviderEndpointOnProviderEdit: vi.fn(),
     tryDeleteProviderVendorIfEmpty: vi.fn(),
   }));
+  vi.doMock("@/repository/upstream-site", () => ({
+    getOrCreateUpstreamSiteIdForUrl: vi.fn(async () => null),
+    tryDeleteUnconfiguredUpstreamSiteIfEmpty: vi.fn(async () => false),
+  }));
 
   const repository = await import("../../../src/repository/provider");
 

@@ -16,6 +16,10 @@ export const v1Keys = {
     list: () => ["v1", "provider-groups", "list"] as const,
     detail: (id: number) => ["v1", "provider-groups", "detail", id] as const,
   },
+  upstreamSites: {
+    all: ["v1", "upstream-sites"] as const,
+    list: () => ["v1", "upstream-sites", "list"] as const,
+  },
   webhookTargets: {
     all: ["v1", "webhook-targets"] as const,
     list: () => ["v1", "webhook-targets", "list"] as const,

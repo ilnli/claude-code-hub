@@ -12,6 +12,34 @@ _Avoid_: Provider Vendor, vendor
 A vendor entity that groups Providers by official website domain.
 _Avoid_: Provider, API credential
 
+**Upstream Site**:
+An upstream host identity that groups Providers by the normalized host of each Provider's configured
+upstream URL; scheme and path do not affect identity, `www.` is ignored, subdomains and non-default
+ports remain distinct, and runtime Provider Endpoint selection does not change identity. Every
+Provider with a valid endpoint belongs to one Site independently of feature enablement; the Site is
+independent of Provider Vendor, represents one new-api management plane, and leaves a legacy
+Provider unassigned and unable to run new-api probes until its invalid endpoint is repaired.
+_Avoid_: Provider Vendor, Provider Endpoint, website domain
+
+**Site Billing Probe Credential**:
+A single current new-api Dashboard PAT owned by one Upstream Site for discovering upstream
+billing-group rates. It is shared by all of the Site's Providers, regardless of Provider Type, but
+does not replace each Provider's API credential when identifying that Provider's effective billing
+group and does not represent model-price synchronization.
+_Avoid_: Site Pricing Credential, Provider PAT, Endpoint PAT, protocol credential
+
+**Site Billing Probe Target**:
+The single management-plane base URL selected for all of an Upstream Site's billing-rate discovery
+requests. It is configured independently, may retain a deployment path prefix, and must match the
+Site's normalized host and non-default port.
+_Avoid_: Provider URL, Provider Endpoint, website URL
+
+**Upstream Billing Rate Resolution**:
+The ordered selection of a Provider's valid upstream billing-group rate: prefer the rate visible
+through the Site Billing Probe Credential, then the anonymously visible rate, and finally the
+Provider's default rate. A missing or invalid higher-priority rate does not block the next source.
+_Avoid_: PAT-only probing, anonymous-only probing, model-price resolution
+
 **Provider Type**:
 The API protocol or format implemented by a Provider, such as Claude, Codex, Gemini, or
 OpenAI-compatible.
@@ -148,6 +176,29 @@ _Avoid_: Adjustment Run, global traffic forecast
 A system notification that opens a fault episode when an Adjustment Run fails, is due but cannot
 execute, or succeeds with an operational warning, and closes it after recovery.
 _Avoid_: Adjustment Run history, application log
+
+## Compaction Language
+
+**Explicit Compaction Request**:
+A request whose immediate expected result is a canonical compacted context, including a Standalone
+Compaction Request or a Codex Remote Compaction v2 Request.
+_Avoid_: Server-side Compaction-Enabled Request, ordinary Responses request
+
+**Standalone Compaction Request**:
+An explicit, stateless compaction operation that accepts a complete context window and returns the
+canonical compacted context window for a subsequent Responses request. CCH labels this wire form as
+Remote Compaction v1 only when contrasting it with Codex Remote Compaction v2.
+_Avoid_: Official Compaction API v1, Server-side Compaction
+
+**Server-side Compaction-Enabled Request**:
+A Responses generation request that permits threshold-triggered compaction during inference; it may
+complete without executing compaction when the threshold is not crossed.
+_Avoid_: Explicit Compaction Request, Codex Remote Compaction v2 Request
+
+**Codex Remote Compaction v2 Request**:
+An explicit compaction operation issued through the Responses route with an exact top-level
+`compaction_trigger` input item rather than through the public standalone endpoint.
+_Avoid_: Server-side Compaction-Enabled Request, public Compaction API v2
 
 ## Client Version Language
 

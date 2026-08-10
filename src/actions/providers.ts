@@ -352,6 +352,7 @@ export async function getProviders(): Promise<ProviderDisplay[]> {
         groupTag: provider.groupTag,
         providerType: provider.providerType,
         providerVendorId: provider.providerVendorId,
+        upstreamSiteId: provider.upstreamSiteId,
         preserveClientIp: provider.preserveClientIp,
         disableSessionReuse: provider.disableSessionReuse,
         modelMismatchAlertExempt: provider.modelMismatchAlertExempt,
