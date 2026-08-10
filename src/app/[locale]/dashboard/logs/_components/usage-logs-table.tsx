@@ -308,26 +308,35 @@ export function UsageLogsTable({
                       )}
                     </TableCell>
                     <TableCell className="font-mono text-xs w-[220px] max-w-[220px]">
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div className="min-w-0 cursor-help">
-                              <ModelDisplayWithRedirect
-                                originalModel={log.originalModel}
-                                currentModel={log.model}
-                                actualResponseModel={log.actualResponseModel}
-                                billingModelSource={billingModelSource}
-                                onRedirectClick={() =>
-                                  setDialogState({ logId: log.id, scrollToRedirect: true })
-                                }
-                              />
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="text-xs">{log.originalModel || log.model || "-"}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                      <div className="flex min-w-0 flex-col items-start gap-1">
+                        {log.compactionVersion ? (
+                          <Badge variant="outline" className="px-1 py-0 text-[10px] font-sans">
+                            {t("logs.table.remoteCompaction", {
+                              version: log.compactionVersion,
+                            })}
+                          </Badge>
+                        ) : null}
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="min-w-0 cursor-help">
+                                <ModelDisplayWithRedirect
+                                  originalModel={log.originalModel}
+                                  currentModel={log.model}
+                                  actualResponseModel={log.actualResponseModel}
+                                  billingModelSource={billingModelSource}
+                                  onRedirectClick={() =>
+                                    setDialogState({ logId: log.id, scrollToRedirect: true })
+                                  }
+                                />
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="text-xs">{log.originalModel || log.model || "-"}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
                     </TableCell>
                     {hideReasoningEffortColumn ? null : (
                       <TableCell className="relative z-20 w-[84px] max-w-[84px] overflow-visible font-mono text-xs">

@@ -49,6 +49,12 @@ export const DETAIL_COLUMNS: DetailColumn[] = [
   { header: "Model", kind: "text", get: (log) => log.model ?? "" },
   { header: "Original Model", kind: "text", get: (log) => log.originalModel ?? "" },
   { header: "Endpoint", kind: "text", get: (log) => log.endpoint ?? "" },
+  {
+    header: "Remote Compaction Version",
+    kind: "text",
+    get: (log) => log.compactionVersion ?? "",
+  },
+  { header: "Billing State", kind: "text", get: (log) => log.billingState },
   { header: "Status Code", kind: "number", numFmt: INT_NUM_FMT, get: (log) => log.statusCode },
   {
     header: "Input Tokens",

@@ -200,6 +200,216 @@ An explicit compaction operation issued through the Responses route with an exac
 `compaction_trigger` input item rather than through the public standalone endpoint.
 _Avoid_: Server-side Compaction-Enabled Request, public Compaction API v2
 
+**Compaction Request Version**:
+The user-visible classification of an Explicit Compaction Request based on its original client wire
+form: v1 for standalone compaction and v2 for Codex Remote Compaction v2.
+_Avoid_: Managed endpoint, inferred endpoint label
+
+**Compaction Version Attribution**:
+The assignment of a Compaction Request Version from persisted request evidence: new records store the
+version explicitly, while historical records may infer it only from conclusive wire evidence and
+otherwise remain version-unknown.
+_Avoid_: Database backfill guess, managed-endpoint-only inference
+
+**Compaction Version Retention**:
+The preservation of Compaction Request Version in detailed request history, long-lived usage records,
+and attempt billing evidence independently of retained request content.
+_Avoid_: Request-body-dependent version history, short-lived version label
+
+**Compaction Request Record**:
+A normal user request record augmented with its Compaction Request Version; status, error, and
+routing-attempt visibility follow the same rules as other request records.
+_Avoid_: Separate compaction audit record, compaction-only log format
+
+**Compaction Logical Request**:
+The single user operation and request record represented by an Explicit Compaction Request,
+regardless of same-Provider retries or Provider Switches. Billable usage from every upstream attempt
+is aggregated into this record rather than represented as additional user requests, and remains
+chargeable even when the logical request ultimately fails.
+_Avoid_: Per-attempt user request, final-attempt-only billing
+
+**Compaction Attempt Usage**:
+Usage reported by any upstream attempt for a Compaction Logical Request, including an attempt whose
+response violates the Compaction Response Contract; every such report contributes to user billing.
+An attempt without reported usage is not estimated and contributes no charge.
+_Avoid_: Successful-attempt-only usage, proxy-absorbed retry cost
+
+**Compaction Attempt Charge**:
+The charge calculated independently for one Compaction Attempt Usage report using that attempt's
+actual Provider, model, pricing snapshot, multipliers, and cache-token details before aggregation into
+the Compaction Logical Request.
+_Avoid_: Final-Provider repricing, aggregate-token repricing
+
+**Pending Compaction Pricing**:
+Committed Compaction Attempt Usage whose charge cannot yet be calculated from an available pricing
+source; it blocks further routing and client delivery until billing reconciliation can resolve it
+from pricing effective at the attempt time. A resolved charge is sealed against later price changes.
+_Avoid_: Zero-cost fallback, discarded usage
+
+**Compaction Attempt Ledger**:
+The immutable, idempotent billing evidence for each real upstream attempt within a Compaction Logical
+Request, retained separately from the request's aggregated usage record and keyed by request and
+attempt identity. Its initial ownership is limited to Explicit Compaction Requests rather than
+replacing existing Hedge or ordinary-request billing.
+_Avoid_: Request-row JSON billing array, per-attempt user request
+
+**Compaction Cost Attribution**:
+The allocation of Compaction Attempt Charges to the requesting User and Key and to each attempt's
+actual Provider for spend limits and statistics, while request count and success remain properties of
+the single Compaction Logical Request.
+_Avoid_: Final-Provider-only cost, per-attempt user call count
+
+**Compaction Accounting Projection**:
+The reporting split in which logical usage records provide User, Key, global cost, and request-count
+totals, while compaction attempt records provide actual Provider cost, token, and attempt totals
+without contributing a second time to user cost.
+_Avoid_: Double-counted attempt cost, final-Provider aggregate attribution
+
+**Provisional Compaction Usage**:
+The in-progress logical usage aggregate recomputed from committed Compaction Attempt Ledger entries
+after each billed attempt so spend limits can observe durable cost before routing continues.
+_Avoid_: Untracked in-memory total, additive-only ledger update
+
+**Sealed Compaction Usage**:
+The final immutable logical usage aggregate for a completed, failed, or aborted Compaction Logical
+Request; stale provisional usage is reconciled and sealed from its attempt ledger evidence.
+_Avoid_: Permanently mutable usage ledger, discarded failed-request cost
+
+**Compaction Attempt Billing Commitment**:
+The durability boundary requiring reported Compaction Attempt Usage to be persisted idempotently
+before another upstream attempt begins or a successful response becomes client-visible. A persistence
+failure terminates routing rather than creating additional untracked cost or delivering unbilled
+compaction state.
+_Avoid_: Best-effort attempt billing, post-retry billing
+
+**Compaction Spend Recheck**:
+The re-evaluation of User, Key, and actual Provider spend limits after each Compaction Attempt Charge
+is committed and before another upstream attempt begins.
+_Avoid_: Request-start-only spend check, post-routing limit enforcement
+
+**Compaction Response Contract**:
+The version-aware minimum semantics required for a client-consumable compaction result: successful
+completion with exactly one compaction output item containing non-empty opaque encrypted content.
+_Avoid_: Full upstream response schema, metadata completeness check
+
+**Compaction Contract Violation**:
+An upstream result that cannot satisfy the Compaction Response Contract, including missing,
+duplicate, empty, malformed, failed, or protocol-contradictory compaction output.
+_Avoid_: Valid empty response, client request error
+
+**Compaction Capability Gap**:
+A Provider Capability Gap established by explicit core evidence that compaction is unsupported or
+when an Explicit Compaction Request still violates the Compaction Response Contract after its
+permitted cache-preserving retry. It does not affect the Provider's general health or ordinary
+conversation traffic.
+_Avoid_: Provider outage, general circuit failure
+
+**Compaction Capability Memory**:
+A temporary, version-specific memory of a Compaction Capability Gap used to avoid repeatedly routing
+new Explicit Compaction Requests to a recently incompatible Provider. Its identity is the Provider
+and Compaction Request Version, independent of Provider Endpoint and model; its duration matches the
+Provider's circuit-open duration, or thirty minutes when no duration is configured. Capability-relevant
+Provider changes and administrative health reset clear it before expiry.
+_Avoid_: General circuit state, permanent Provider disablement
+
+**Compaction Capability Probe**:
+The single Explicit Compaction Request allowed to re-evaluate a Provider after its Compaction
+Capability Memory expires. Success restores availability; a repeated contract violation renews the
+full memory duration, and concurrent probes for the same Provider and version are not allowed. While
+the probe is active, other requests skip that Provider and report Provider Capability Exhaustion when
+no alternative is eligible.
+_Avoid_: Parallel half-open probes, permanent capability verdict
+
+**Compaction Capability Status**:
+The administrator-visible state of a Provider's version-specific Compaction Capability Memory,
+including its evidence, expiry, active probe, and manual-clear control, without exposing the state to
+ordinary users outside their own routing records.
+_Avoid_: General Provider health, user-visible global Provider state
+
+**Compaction Cache-Preserving Retry**:
+A single immediate retry of a failed Explicit Compaction Request on the same Provider and Provider
+Endpoint, preserving the model, request content, and cache parameters before Provider Switch. The
+two-attempt limit is fixed and available only to the initially selected Provider; Providers selected
+after a switch receive one attempt each.
+_Avoid_: Provider Switch, unbounded compaction retry
+
+**Validated Compaction Commitment**:
+The Response Commitment rule for an Explicit Compaction Request: no upstream content becomes
+client-visible until the complete JSON or event stream satisfies the Compaction Response Contract.
+_Avoid_: First upstream byte commitment, partial compaction delivery
+
+**Validated Raw Compaction Response**:
+An upstream compaction response delivered with its original protocol content and event order after
+validation, without conversion between compaction versions or injection of proxy-specific fields.
+_Avoid_: Re-serialized compaction payload, v2-to-v1 conversion
+
+**Compaction Upstream Transport**:
+The HTTP JSON or SSE transport used between CCH and a Provider for Explicit Compaction Requests so
+validation, billing commitment, and serial routing complete before client delivery.
+_Avoid_: Responses upstream WebSocket, transport-dependent validation bypass
+
+**Compaction Fallback Policy**:
+The routing policy in which Compaction Response Contract validation and the initial cache-preserving
+retry always apply, while Provider Switch remains governed by the existing non-conversation endpoint
+fallback setting.
+_Avoid_: Validation bypass, fallback-controlled validation
+
+**Serial Compaction Routing**:
+The routing mode in which an Explicit Compaction Request uses one upstream attempt at a time,
+including its cache-preserving retry and later Provider Switches, without Hedge or Discovery races.
+_Avoid_: Concurrent Provider race, parallel compaction attempts
+
+**Cache-Affine Compaction Start**:
+The initial Provider selection for an Explicit Compaction Request, preserving ordinary cache affinity
+unless the Provider has a matching version-specific Compaction Capability Gap.
+_Avoid_: Fallback-first routing, pricing-pending pre-exclusion
+
+**Compaction Fallback Candidate**:
+An otherwise eligible Provider that has not yet been attempted within the current Compaction Logical
+Request and may be selected after the initial Provider cannot complete it.
+_Avoid_: Previously failed Provider, globally untried Provider
+
+**Compaction Routing Budget**:
+The total wall-clock allowance for all serial attempts within one Compaction Logical Request; when it
+is exhausted, no new retry or Provider Switch begins even if the general Provider-switch limit remains.
+_Avoid_: Per-attempt timeout sum, unbounded Provider traversal
+
+**Compaction Error Routing**:
+The routing rule that applies ordinary error classification, retry, switching, and health accounting
+to non-contract failures, while reserving the fixed cache-preserving retry and capability treatment
+for Compaction Contract Violations.
+_Avoid_: All-compaction-errors capability gap, separate transport retry system
+
+**Compaction Validation Enforcement**:
+The default requirement that every Explicit Compaction Request satisfy the Compaction Response
+Contract before client delivery. An emergency operational bypass may disable enforcement but must
+remain visible as bypassed rather than validated.
+_Avoid_: Shadow success, silent validation bypass
+
+**Compaction Client Error**:
+The safe client-facing failure for an Explicit Compaction Request: an invalid final upstream result
+is a 502 compaction-response error, while Compaction Capability Exhaustion uses the existing 503
+Provider capability unavailable contract.
+_Avoid_: Raw upstream response, encrypted-content disclosure
+
+**Compaction Client Abort**:
+The termination of a Compaction Logical Request when its client disconnects before commitment;
+future retries and switches stop, already reported usage remains billable, and no incomplete attempt
+establishes a Compaction Capability Gap.
+_Avoid_: Background compaction continuation, aborted capability verdict
+
+**Compaction Validation Evidence**:
+Sanitized structural facts explaining a compaction validation outcome, such as version, transport,
+failure code, item counts and types, response size, duration, and routing decisions, without opaque
+encrypted content or conversational payloads.
+_Avoid_: Full upstream response, message content, reasoning content
+
+**Canonical Compaction Output**:
+The single logical compaction item established across a completed response, with duplicate stream
+representations reconciled by item identity or output position and contradictory representations
+rejected.
+_Avoid_: Raw event count, first compaction-looking frame
+
 ## Client Version Language
 
 **Client Type**:

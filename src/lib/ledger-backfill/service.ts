@@ -67,6 +67,8 @@ export async function backfillUsageLedger(
             mr.original_model,
             mr.actual_response_model,
             mr.endpoint,
+            mr.compaction_version,
+            mr.billing_state,
             mr.api_type,
             mr.session_id,
             mr.session_identity,
@@ -111,8 +113,7 @@ export async function backfillUsageLedger(
             AND (
               mr.endpoint IS NULL
               OR LOWER(REGEXP_REPLACE(mr.endpoint, '/+$', '')) NOT IN (
-                '/v1/messages/count_tokens',
-                '/v1/responses/compact'
+                '/v1/messages/count_tokens'
               )
             )
             AND (
@@ -125,6 +126,8 @@ export async function backfillUsageLedger(
               OR ul.affinity_fingerprint_chain IS DISTINCT FROM mr.affinity_fingerprint_chain
               OR ul.is_replay IS DISTINCT FROM mr.is_replay
               OR ul.replay_source_request_id IS DISTINCT FROM mr.replay_source_request_id
+              OR ul.compaction_version IS DISTINCT FROM mr.compaction_version
+              OR ul.billing_state IS DISTINCT FROM mr.billing_state
               OR (mr.is_replay AND ul.cost_usd IS DISTINCT FROM 0)
               OR ul.group_cost_multiplier IS DISTINCT FROM mr.group_cost_multiplier
               OR ul.client_ip IS DISTINCT FROM mr.client_ip
@@ -135,7 +138,8 @@ export async function backfillUsageLedger(
         inserted_rows AS (
           INSERT INTO usage_ledger (
             request_id, user_id, key, provider_id, final_provider_id,
-            model, original_model, actual_response_model, endpoint, api_type, session_id,
+            model, original_model, actual_response_model, endpoint, compaction_version,
+            billing_state, api_type, session_id,
             session_identity, session_identity_kind, affinity_scope_tag,
             affinity_fingerprint, affinity_fingerprint_chain, is_replay, replay_source_request_id,
             status_code, is_success, success_rate_outcome, blocked_by,
@@ -156,6 +160,8 @@ export async function backfillUsageLedger(
             batch.original_model,
             batch.actual_response_model,
             batch.endpoint,
+            batch.compaction_version,
+            batch.billing_state,
             batch.api_type,
             batch.session_id,
             batch.session_identity,
@@ -196,6 +202,8 @@ export async function backfillUsageLedger(
             original_model = EXCLUDED.original_model,
             actual_response_model = EXCLUDED.actual_response_model,
             endpoint = EXCLUDED.endpoint,
+            compaction_version = EXCLUDED.compaction_version,
+            billing_state = EXCLUDED.billing_state,
             api_type = EXCLUDED.api_type,
             session_id = EXCLUDED.session_id,
             session_identity = EXCLUDED.session_identity,

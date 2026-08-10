@@ -12,6 +12,7 @@ import { ProxyStatusTracker } from "@/lib/proxy-status-tracker";
 import { ERROR_CODES, getErrorMessageServer } from "@/lib/utils/error-messages";
 import { sanitizeErrorTextForDetail } from "@/lib/utils/upstream-error-detection";
 import { updateMessageRequestDetailsDurably } from "@/repository/message";
+import { sealExplicitCompactionBilling } from "@/repository/usage-attempt-ledger";
 import type { SystemSettings } from "@/types/system-config";
 import { deriveClientSafeUpstreamErrorMessage } from "./client-error-message";
 import { attachSessionIdToErrorMessage, attachSessionIdToErrorResponse } from "./error-session-id";
@@ -29,6 +30,14 @@ import {
   type RoutingErrorClassification,
 } from "./routing-error-classifier";
 import type { ProxySession } from "./session";
+
+const EXPLICIT_COMPACTION_PUBLIC_ERROR_CODES = new Set([
+  "remote_compaction_invalid_response",
+  "remote_compaction_response_too_large",
+  "remote_compaction_timeout",
+  "billing_persistence_unavailable",
+  "billing_pricing_unavailable",
+]);
 
 /** 覆写状态码最小值 */
 const OVERRIDE_STATUS_CODE_MIN = 400;
@@ -242,6 +251,10 @@ export class ProxyErrorHandler {
     let cachedSettings: SystemSettings | null = null;
     const databaseError = findSafeDatabaseError(error);
     const routingClassification = getRoutingErrorClassification(error);
+    const explicitCompactionErrorCode =
+      error instanceof ProxyError && EXPLICIT_COMPACTION_PUBLIC_ERROR_CODES.has(error.message)
+        ? error.message
+        : undefined;
 
     const getSettings = async (): Promise<SystemSettings | null> => {
       if (settingsResolved) return cachedSettings;
@@ -312,6 +325,18 @@ export class ProxyErrorHandler {
       logErrorMessage = "代理请求发生未知错误";
     }
 
+    if (explicitCompactionErrorCode) {
+      try {
+        const { getLocale } = await import("next-intl/server");
+        clientErrorMessage = await getErrorMessageServer(
+          await getLocale(),
+          explicitCompactionErrorCode
+        );
+      } catch {
+        clientErrorMessage = "An error occurred";
+      }
+    }
+
     if (databaseError) {
       // Drizzle wraps the admission cause with SQL text and bound parameters.
       // Never let that wrapper cross the public, log, or observability boundary.
@@ -350,7 +375,13 @@ export class ProxyErrorHandler {
           requestId
         );
       }
-      return ProxyResponses.buildError(responseStatusCode, message, undefined, details, requestId);
+      return ProxyResponses.buildError(
+        responseStatusCode,
+        message,
+        explicitCompactionErrorCode,
+        details,
+        requestId
+      );
     };
 
     // 后备方案：如果状态码仍是 500，尝试从 provider chain 中提取最后一次实际请求的状态码
@@ -771,6 +802,9 @@ export class ProxyErrorHandler {
       context1mApplied: session.getContext1mApplied(),
       swapCacheTtlApplied: session.provider?.swapCacheTtlBilling ?? false,
     });
+    if (session.isExplicitCompactionRequest?.() === true) {
+      await sealExplicitCompactionBilling(session.messageContext.id);
+    }
 
     // 记录请求结束
     ProxyErrorHandler.endRequestTracking(session);

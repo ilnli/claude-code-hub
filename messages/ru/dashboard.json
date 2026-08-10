@@ -172,6 +172,7 @@
       "blocked": "Заблокировано",
       "replay": "Replay",
       "nonBilling": "Не тарифицируется",
+      "remoteCompaction": "Удаленное сжатие {version}",
       "skipped": "Пропущено",
       "specialSettings": "Особые",
       "anthropicEffort": "Effort: {effort}",

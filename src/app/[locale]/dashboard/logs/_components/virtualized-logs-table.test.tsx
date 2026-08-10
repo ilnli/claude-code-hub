@@ -153,6 +153,8 @@ function makeLog(overrides: Partial<UsageLogRow>): UsageLogRow {
     originalModel: null,
     actualResponseModel: null,
     endpoint: "/v1/messages",
+    compactionVersion: null,
+    billingState: "sealed",
     statusCode: 200,
     inputTokens: 1,
     outputTokens: 1,

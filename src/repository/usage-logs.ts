@@ -228,6 +228,8 @@ export interface UsageLogRow {
   originalModel: string | null; // 原始模型（重定向前）
   actualResponseModel: string | null; // 上游响应实际返回的模型名(audit)
   endpoint: string | null;
+  compactionVersion: "v1" | "v2" | null;
+  billingState: "in_progress" | "sealed" | "pricing_pending";
   statusCode: number | null;
   inputTokens: number | null;
   outputTokens: number | null;
@@ -388,6 +390,8 @@ export async function findUsageLogsBatch(
       originalModel: messageRequest.originalModel,
       actualResponseModel: messageRequest.actualResponseModel,
       endpoint: messageRequest.endpoint,
+      compactionVersion: messageRequest.compactionVersion,
+      billingState: messageRequest.billingState,
       statusCode: messageRequest.statusCode,
       inputTokens: messageRequest.inputTokens,
       outputTokens: messageRequest.outputTokens,
@@ -601,6 +605,8 @@ export async function findUsageLogsBatch(
       originalModel: usageLedger.originalModel,
       actualResponseModel: usageLedger.actualResponseModel,
       endpoint: usageLedger.endpoint,
+      compactionVersion: usageLedger.compactionVersion,
+      billingState: usageLedger.billingState,
       statusCode: usageLedger.statusCode,
       inputTokens: usageLedger.inputTokens,
       outputTokens: usageLedger.outputTokens,
@@ -668,6 +674,8 @@ export async function findUsageLogsBatch(
       originalModel: row.originalModel,
       actualResponseModel: row.actualResponseModel,
       endpoint: row.endpoint,
+      compactionVersion: row.compactionVersion,
+      billingState: row.billingState,
       statusCode: row.statusCode,
       inputTokens: row.inputTokens,
       outputTokens: row.outputTokens,
@@ -751,6 +759,8 @@ interface UsageLogSlimRow {
   originalModel: string | null;
   actualResponseModel: string | null;
   endpoint: string | null;
+  compactionVersion: "v1" | "v2" | null;
+  billingState: "in_progress" | "sealed" | "pricing_pending";
   statusCode: number | null;
   inputTokens: number | null;
   outputTokens: number | null;
@@ -896,6 +906,8 @@ function mapUsageLogSlimRow(row: {
   originalModel: string | null;
   actualResponseModel: string | null;
   endpoint: string | null;
+  compactionVersion: "v1" | "v2" | null;
+  billingState: "in_progress" | "sealed" | "pricing_pending";
   statusCode: number | null;
   inputTokens: number | null;
   outputTokens: number | null;
@@ -1086,6 +1098,8 @@ async function selectKeyScopedMessageSlimRows(
       originalModel: messageRequest.originalModel,
       actualResponseModel: messageRequest.actualResponseModel,
       endpoint: messageRequest.endpoint,
+      compactionVersion: messageRequest.compactionVersion,
+      billingState: messageRequest.billingState,
       statusCode: messageRequest.statusCode,
       inputTokens: messageRequest.inputTokens,
       outputTokens: messageRequest.outputTokens,
@@ -1136,6 +1150,8 @@ async function selectKeyScopedLedgerSlimRows(
       originalModel: usageLedger.originalModel,
       actualResponseModel: usageLedger.actualResponseModel,
       endpoint: usageLedger.endpoint,
+      compactionVersion: usageLedger.compactionVersion,
+      billingState: usageLedger.billingState,
       statusCode: usageLedger.statusCode,
       inputTokens: usageLedger.inputTokens,
       outputTokens: usageLedger.outputTokens,
@@ -1263,6 +1279,8 @@ function mapUsageLogRowFromMessageResult(row: {
   originalModel: string | null;
   actualResponseModel: string | null;
   endpoint: string | null;
+  compactionVersion: "v1" | "v2" | null;
+  billingState: "in_progress" | "sealed" | "pricing_pending";
   statusCode: number | null;
   inputTokens: number | null;
   outputTokens: number | null;
@@ -1356,6 +1374,8 @@ function mapUsageLogRowFromLedgerResult(row: {
   originalModel: string | null;
   actualResponseModel: string | null;
   endpoint: string | null;
+  compactionVersion: "v1" | "v2" | null;
+  billingState: "in_progress" | "sealed" | "pricing_pending";
   statusCode: number | null;
   inputTokens: number | null;
   outputTokens: number | null;
@@ -1406,6 +1426,8 @@ function mapUsageLogRowFromLedgerResult(row: {
     originalModel: row.originalModel,
     actualResponseModel: row.actualResponseModel,
     endpoint: row.endpoint,
+    compactionVersion: row.compactionVersion,
+    billingState: row.billingState,
     statusCode: row.statusCode,
     inputTokens: row.inputTokens,
     outputTokens: row.outputTokens,
@@ -1472,6 +1494,8 @@ export async function findReadonlyUsageLogsBatchForKey(
         originalModel: messageRequest.originalModel,
         actualResponseModel: messageRequest.actualResponseModel,
         endpoint: messageRequest.endpoint,
+        compactionVersion: messageRequest.compactionVersion,
+        billingState: messageRequest.billingState,
         statusCode: messageRequest.statusCode,
         inputTokens: messageRequest.inputTokens,
         outputTokens: messageRequest.outputTokens,
@@ -1530,6 +1554,8 @@ export async function findReadonlyUsageLogsBatchForKey(
             originalModel: usageLedger.originalModel,
             actualResponseModel: usageLedger.actualResponseModel,
             endpoint: usageLedger.endpoint,
+            compactionVersion: usageLedger.compactionVersion,
+            billingState: usageLedger.billingState,
             statusCode: usageLedger.statusCode,
             inputTokens: usageLedger.inputTokens,
             outputTokens: usageLedger.outputTokens,
@@ -1748,6 +1774,8 @@ export async function findUsageLogsWithDetails(
       originalModel: messageRequest.originalModel, // 原始模型（重定向前）
       actualResponseModel: messageRequest.actualResponseModel, // 实际响应模型（audit）
       endpoint: messageRequest.endpoint,
+      compactionVersion: messageRequest.compactionVersion,
+      billingState: messageRequest.billingState,
       statusCode: messageRequest.statusCode,
       inputTokens: messageRequest.inputTokens,
       outputTokens: messageRequest.outputTokens,

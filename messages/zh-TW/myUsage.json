@@ -61,6 +61,7 @@
     "noLogs": "暫無日誌",
     "unknownModel": "未知的模型",
     "billingModel": "計費：{model}",
+    "remoteCompaction": "遠端壓縮 {version}",
     "anthropicEffort": "Effort: {effort}"
   },
   "expiration": {

@@ -179,6 +179,26 @@ export const EnvSchema = z.object({
   FETCH_HEADERS_TIMEOUT: z.coerce.number().default(600_000), // 响应头接收超时（默认 600 秒）
   FETCH_CONNECT_TIMEOUT: z.coerce.number().default(30000), // TCP 连接建立超时（默认 30 秒）
 
+  REMOTE_COMPACTION_VALIDATION_ENABLED: z.string().default("true").transform(booleanTransform),
+  REMOTE_COMPACTION_VALIDATION_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .min(60_000)
+    .max(1_800_000)
+    .default(600_000),
+  REMOTE_COMPACTION_MAX_RESPONSE_BYTES: z.coerce
+    .number()
+    .int()
+    .min(1024 * 1024)
+    .max(64 * 1024 * 1024)
+    .default(16 * 1024 * 1024),
+  REMOTE_COMPACTION_TOTAL_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .min(60_000)
+    .max(7_200_000)
+    .default(1_800_000),
+
   // 竞速输家计费：后台 drain 竞速输家响应体以拿回 token 用量时的最大等待时长（毫秒）。
   // 超时后主动断开该输家连接，仅用已收到的内容尝试计费（通常计不出 -> 跳过）。
   HEDGE_LOSER_DRAIN_TIMEOUT_MS: z.coerce.number().int().min(1000).default(120_000),

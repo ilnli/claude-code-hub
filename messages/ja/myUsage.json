@@ -61,6 +61,7 @@
     "noLogs": "ログがありません",
     "unknownModel": "不明なモデル",
     "billingModel": "課金: {model}",
+    "remoteCompaction": "リモート圧縮 {version}",
     "anthropicEffort": "Effort: {effort}"
   },
   "expiration": {

@@ -247,6 +247,8 @@ export interface MyUsageLogEntry {
   statusCode: number | null;
   duration: number | null;
   endpoint: string | null;
+  compactionVersion: "v1" | "v2" | null;
+  billingState: "in_progress" | "sealed" | "pricing_pending";
   cacheCreationInputTokens: number | null;
   cacheReadInputTokens: number | null;
   cacheCreation5mInputTokens: number | null;
@@ -660,6 +662,8 @@ function mapMyUsageLogEntries(
       statusCode: log.statusCode,
       duration: log.durationMs,
       endpoint: log.endpoint,
+      compactionVersion: log.compactionVersion,
+      billingState: log.billingState,
       cacheCreationInputTokens: log.cacheCreationInputTokens ?? null,
       cacheReadInputTokens: log.cacheReadInputTokens ?? null,
       cacheCreation5mInputTokens: log.cacheCreation5mInputTokens ?? null,

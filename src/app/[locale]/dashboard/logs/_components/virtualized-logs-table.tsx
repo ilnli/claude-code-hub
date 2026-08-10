@@ -1067,6 +1067,16 @@ export function VirtualizedLogsTable({
 
                     {/* Model */}
                     <div className="flex-[1.3] min-w-[100px] font-mono text-xs px-1.5">
+                      {log.compactionVersion ? (
+                        <Badge
+                          variant="outline"
+                          className="mb-1 max-w-full px-1 py-0 text-[10px] font-sans"
+                        >
+                          {t("logs.table.remoteCompaction", {
+                            version: log.compactionVersion,
+                          })}
+                        </Badge>
+                      ) : null}
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>

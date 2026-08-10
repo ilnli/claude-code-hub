@@ -2581,30 +2581,46 @@ export async function getProviderStatistics(): Promise<ProviderStatisticsRow[]> 
              ((DATE_TRUNC('day', CURRENT_TIMESTAMP AT TIME ZONE ${timezone}) + INTERVAL '1 day') AT TIME ZONE ${timezone}) AS tomorrow_start,
              ((DATE_TRUNC('day', CURRENT_TIMESTAMP AT TIME ZONE ${timezone}) - INTERVAL '7 days') AT TIME ZONE ${timezone}) AS last7_start
          ),
-         provider_stats AS (
-           -- 先按最终供应商聚合，再与 providers 做 LEFT JOIN，避免 providers × 今日请求 的笛卡尔积
+         provider_usage AS (
            SELECT
-            final_provider_id,
+             final_provider_id AS provider_id,
+             cost_usd,
+             created_at,
+             model,
+             id
+           FROM usage_ledger
+           WHERE blocked_by IS NULL
+             AND is_replay = false
+             AND compaction_version IS NULL
+           UNION ALL
+           SELECT
+             provider_id,
+             cost_usd,
+             attempted_at AS created_at,
+             model,
+             id
+           FROM usage_attempt_ledger
+         ),
+         provider_stats AS (
+           -- 普通请求按最终供应商聚合；显式压缩按真实上游尝试聚合。
+           SELECT
+            provider_id,
             COALESCE(SUM(cost_usd), 0) AS today_cost,
             COUNT(*)::integer AS today_calls
-          FROM usage_ledger
-          WHERE blocked_by IS NULL
-            AND is_replay = false
-            AND created_at >= (SELECT today_start FROM bounds)
+          FROM provider_usage
+          WHERE created_at >= (SELECT today_start FROM bounds)
             AND created_at < (SELECT tomorrow_start FROM bounds)
-          GROUP BY final_provider_id
+          GROUP BY provider_id
         ),
         latest_call AS (
-          SELECT DISTINCT ON (final_provider_id)
-            final_provider_id,
+          SELECT DISTINCT ON (provider_id)
+            provider_id,
             created_at AS last_call_time,
             model AS last_call_model
-          FROM usage_ledger
-          WHERE blocked_by IS NULL
-            AND is_replay = false
-            AND created_at >= (SELECT last7_start FROM bounds)
+          FROM provider_usage
+          WHERE created_at >= (SELECT last7_start FROM bounds)
           -- 性能优化：添加 7 天时间范围限制（避免扫描历史数据）
-          ORDER BY final_provider_id, created_at DESC, id DESC
+          ORDER BY provider_id, created_at DESC, id DESC
         )
         SELECT
           p.id,
@@ -2613,8 +2629,8 @@ export async function getProviderStatistics(): Promise<ProviderStatisticsRow[]> 
           lc.last_call_time,
           lc.last_call_model
         FROM providers p
-        LEFT JOIN provider_stats ps ON p.id = ps.final_provider_id
-        LEFT JOIN latest_call lc ON p.id = lc.final_provider_id
+        LEFT JOIN provider_stats ps ON p.id = ps.provider_id
+        LEFT JOIN latest_call lc ON p.id = lc.provider_id
         WHERE p.deleted_at IS NULL
         ORDER BY p.id ASC
       `;

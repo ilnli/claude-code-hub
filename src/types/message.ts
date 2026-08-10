@@ -36,6 +36,9 @@ export interface ProviderChainItem {
     | "resource_not_found" // 资源不存在（404），触发故障转移但不计入熔断器
     | "endpoint_capability_gap" // 当前 Endpoint 不支持该请求；换 Endpoint，不计入健康
     | "provider_capability_gap" // 当前 Provider 不支持该请求；换 Provider，不计入健康
+    | "compaction_contract_violation" // 显式压缩返回不满足响应契约
+    | "compaction_capability_gap" // 当前 Provider 不支持指定压缩版本
+    | "compaction_response_too_large" // 显式压缩响应超过校验上限
     | "retry_with_official_instructions" // Codex instructions 自动重试（官方）
     | "retry_with_cached_instructions" // Codex instructions 智能重试（缓存）
     | "client_error_non_retryable" // 不可重试的客户端错误（Prompt 超限、内容过滤、PDF 限制、Thinking 格式）
@@ -339,6 +342,10 @@ export interface MessageRequest {
   // 请求的 API endpoint（例如：/v1/messages），从 URL.pathname 提取
   endpoint?: string;
 
+  // 显式远端压缩协议版本；null/undefined 表示普通请求或历史未知
+  compactionVersion?: "v1" | "v2" | null;
+  billingState?: "in_progress" | "sealed" | "pricing_pending";
+
   // Messages 数量（用于短请求检测和分析）
   messagesCount?: number;
 
@@ -426,6 +433,9 @@ export interface CreateMessageRequestData {
 
   // 请求的 API endpoint（例如：/v1/messages），从 URL.pathname 提取
   endpoint?: string;
+
+  compaction_version?: "v1" | "v2" | null;
+  billing_state?: "in_progress" | "sealed" | "pricing_pending";
 
   // Messages 数量（用于短请求检测和分析）
   messages_count?: number;

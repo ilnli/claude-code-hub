@@ -233,6 +233,11 @@ export function UsageLogsTable({
                     </div>
                     <div className="flex-[2.2] min-w-[240px] px-2">
                       <div className="space-y-1">
+                        {log.compactionVersion ? (
+                          <Badge variant="outline" className="px-1 py-0 text-[10px]">
+                            {t("remoteCompaction", { version: log.compactionVersion })}
+                          </Badge>
+                        ) : null}
                         <div className="flex items-center gap-1.5 text-sm">
                           {log.model ? <ModelVendorIcon modelId={log.model} /> : null}
                           {log.model ? (

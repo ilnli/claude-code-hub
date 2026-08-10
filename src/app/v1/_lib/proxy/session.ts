@@ -1,6 +1,9 @@
 import type { Context } from "hono";
 import { isCountTokensEndpointPath, V1_ENDPOINT_PATHS } from "@/app/v1/_lib/proxy/endpoint-paths";
-import { isRemoteCompactionV2Request } from "@/app/v1/_lib/proxy/remote-compaction";
+import {
+  classifyExplicitCompactionRequest,
+  type ExplicitCompactionVersion,
+} from "@/app/v1/_lib/proxy/remote-compaction";
 import { logger } from "@/lib/logger";
 import {
   deleteLiveChain,
@@ -194,6 +197,8 @@ export class ProxySession {
 
   private readonly managedEndpoint: string;
   private readonly endpointPolicy: EndpointPolicy;
+  private readonly explicitCompactionVersion: ExplicitCompactionVersion | null;
+  private explicitCompactionAttemptOrdinal = 0;
 
   // 模型重定向追踪：保存原始模型名（重定向前）
   private originalModelName: string | null = null;
@@ -315,8 +320,33 @@ export class ProxySession {
     this.messageContext = null;
     this.sessionId = null;
     this.providerChain = [];
+    let requestPathname = "/";
+    try {
+      requestPathname = init.requestUrl.pathname;
+    } catch {
+      // Keep malformed test/adaptor URLs on the default endpoint policy.
+    }
+    this.explicitCompactionVersion = classifyExplicitCompactionRequest(
+      requestPathname,
+      init.request.message
+    );
     this.managedEndpoint = resolveSessionManagedEndpoint(init.requestUrl, init.request.message);
     this.endpointPolicy = resolveEndpointPolicy(this.managedEndpoint);
+  }
+
+  getExplicitCompactionVersion(): ExplicitCompactionVersion | null {
+    return this.explicitCompactionVersion === "v1" || this.explicitCompactionVersion === "v2"
+      ? this.explicitCompactionVersion
+      : null;
+  }
+
+  isExplicitCompactionRequest(): boolean {
+    return this.getExplicitCompactionVersion() !== null;
+  }
+
+  nextExplicitCompactionAttemptOrdinal(): number {
+    this.explicitCompactionAttemptOrdinal = (this.explicitCompactionAttemptOrdinal ?? 0) + 1;
+    return this.explicitCompactionAttemptOrdinal;
   }
 
   static async fromContext(c: Context): Promise<ProxySession> {
@@ -793,6 +823,9 @@ export class ProxySession {
         | "resource_not_found" // 上游 404 错误（不计入熔断器，仅切换供应商）
         | "endpoint_capability_gap" // 当前 Endpoint 不支持该请求；换 Endpoint，不计入健康
         | "provider_capability_gap" // 当前 Provider 不支持该请求；换 Provider，不计入健康
+        | "compaction_contract_violation" // 显式压缩返回不满足响应契约
+        | "compaction_capability_gap" // 当前 Provider 不支持指定压缩版本
+        | "compaction_response_too_large" // 显式压缩响应超过校验上限
         | "retry_with_official_instructions" // Codex instructions 自动重试（官方）
         | "retry_with_cached_instructions" // Codex instructions 智能重试（缓存）
         | "client_error_non_retryable" // 不可重试的客户端错误（Prompt 超限、内容过滤、PDF 限制、Thinking 格式）
@@ -1562,6 +1595,28 @@ export class ProxySession {
   }
 }
 
+/** Compatibility helpers for lightweight session doubles used by adapters and tests. */
+type ExplicitCompactionSessionLike = {
+  getExplicitCompactionVersion?: () => ExplicitCompactionVersion | null;
+  isExplicitCompactionRequest?: () => boolean;
+};
+
+export function getExplicitCompactionVersionFromSession(
+  session: ExplicitCompactionSessionLike
+): ExplicitCompactionVersion | null {
+  const version = session.getExplicitCompactionVersion?.();
+  if (version === "v1" || version === "v2") return version;
+  return null;
+}
+
+export function isExplicitCompactionSession(session: ExplicitCompactionSessionLike): boolean {
+  return (
+    session.getExplicitCompactionVersion?.() === "v1" ||
+    session.getExplicitCompactionVersion?.() === "v2" ||
+    session.isExplicitCompactionRequest?.() === true
+  );
+}
+
 function formatHeadersForLog(headers: Headers): string {
   const collected: string[] = [];
   headers.forEach((value, key) => {
@@ -1594,7 +1649,7 @@ function resolveSessionManagedEndpoint(
   try {
     const pathname = requestUrl.pathname;
     if (typeof pathname === "string" && pathname.length > 0) {
-      return isRemoteCompactionV2Request(pathname, requestMessage)
+      return classifyExplicitCompactionRequest(pathname, requestMessage) === "v2"
         ? V1_ENDPOINT_PATHS.RESPONSES_COMPACT
         : pathname;
     }

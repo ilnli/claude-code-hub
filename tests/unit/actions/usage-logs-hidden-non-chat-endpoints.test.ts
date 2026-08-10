@@ -35,11 +35,8 @@ function sqlToString(sqlObj: SQL): string {
 }
 
 describe("usage logs hidden non-chat endpoints", () => {
-  it("default usage log queries hide target raw endpoints", () => {
-    expect(DEFAULT_HIDDEN_USAGE_LOG_ENDPOINTS).toEqual([
-      "/v1/messages/count_tokens",
-      "/v1/responses/compact",
-    ]);
+  it("default usage log queries hide only count_tokens", () => {
+    expect(DEFAULT_HIDDEN_USAGE_LOG_ENDPOINTS).toEqual(["/v1/messages/count_tokens"]);
     expect(shouldHideUsageLogEndpointsByDefault(undefined)).toBe(true);
     expect(shouldHideUsageLogEndpointsByDefault("")).toBe(true);
   });
@@ -73,16 +70,10 @@ describe("usage logs hidden non-chat endpoints", () => {
 
     expect(messageDefaultSql).toContain("not in");
     expect(messageDefaultSql).toContain("regexp_replace");
-    expect(messageDefaultQuery.params).toEqual([
-      "/v1/messages/count_tokens",
-      "/v1/responses/compact",
-    ]);
+    expect(messageDefaultQuery.params).toEqual(["/v1/messages/count_tokens"]);
     expect(ledgerDefaultSql).toContain("not in");
     expect(ledgerDefaultSql).toContain("regexp_replace");
-    expect(ledgerDefaultQuery.params).toEqual([
-      "/v1/messages/count_tokens",
-      "/v1/responses/compact",
-    ]);
+    expect(ledgerDefaultQuery.params).toEqual(["/v1/messages/count_tokens"]);
   });
 
   it("explicit endpoint filter disables default hidden predicate and adds exact endpoint condition", () => {
@@ -104,7 +95,7 @@ describe("usage logs hidden non-chat endpoints", () => {
     expect(
       sqlToQuery(buildDefaultHiddenUsageLogEndpointCondition(messageRequest.endpoint, null) as SQL)
         .params
-    ).toEqual(["/v1/messages/count_tokens", "/v1/responses/compact"]);
+    ).toEqual(["/v1/messages/count_tokens"]);
     expect(usageLogsSource).toContain("hiddenLedgerEndpointCondition");
     expect(usageLogsSource).toContain("hiddenKeyLedgerEndpointCondition");
     expect(usageLogsSource).toContain("hiddenStatsLedgerEndpointCondition");

@@ -14,6 +14,7 @@ import {
   PROVIDER_ENDPOINT_CONFLICT_CODE,
 } from "@/lib/provider-endpoint-error-codes";
 import { probeProviderEndpointAndRecordByEndpoint } from "@/lib/provider-endpoints/probe";
+import { clearCompactionCapabilityGap } from "@/lib/redis/compaction-capability";
 import { SessionManager } from "@/lib/session-manager";
 import { ERROR_CODES } from "@/lib/utils/error-messages";
 import { extractZodErrorCode, formatZodError } from "@/lib/utils/zod-i18n";
@@ -533,6 +534,11 @@ export async function editProviderEndpoint(
         affectedProviderIds,
         "editProviderEndpoint"
       );
+      if (shouldResetCircuit) {
+        await Promise.all(
+          affectedProviderIds.map((providerId) => clearCompactionCapabilityGap(providerId))
+        );
+      }
     }
 
     try {

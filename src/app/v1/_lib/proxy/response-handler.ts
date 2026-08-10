@@ -1297,7 +1297,10 @@ function buildCostCalculationOptions(
 }
 
 function isNonBillingUsageEndpoint(session: ProxySession): boolean {
-  return isNonBillingEndpoint(session.getManagedEndpoint());
+  return (
+    session.isExplicitCompactionRequest?.() === true ||
+    isNonBillingEndpoint(session.getManagedEndpoint?.())
+  );
 }
 
 function hasBillableInputCostPerRequest(priceData: { input_cost_per_request?: unknown }): boolean {
@@ -3372,15 +3375,19 @@ export class ProxyResponseHandler {
           }
           const terminalDetails: MessageRequestTerminalDetails = {
             statusCode: statusCode,
-            inputTokens: usageMetrics?.input_tokens,
-            outputTokens: usageMetrics?.output_tokens,
+            ...(session.isExplicitCompactionRequest?.() === true
+              ? {}
+              : {
+                  inputTokens: usageMetrics?.input_tokens,
+                  outputTokens: usageMetrics?.output_tokens,
+                  cacheCreationInputTokens: usageMetrics?.cache_creation_input_tokens,
+                  cacheReadInputTokens: usageMetrics?.cache_read_input_tokens,
+                  cacheCreation5mInputTokens: usageMetrics?.cache_creation_5m_input_tokens,
+                  cacheCreation1hInputTokens: usageMetrics?.cache_creation_1h_input_tokens,
+                  cacheTtlApplied: usageMetrics?.cache_ttl ?? null,
+                }),
             ttftMs: session.ttftMs ?? duration,
             firstByteMs: session.firstByteMs ?? duration,
-            cacheCreationInputTokens: usageMetrics?.cache_creation_input_tokens,
-            cacheReadInputTokens: usageMetrics?.cache_read_input_tokens,
-            cacheCreation5mInputTokens: usageMetrics?.cache_creation_5m_input_tokens,
-            cacheCreation1hInputTokens: usageMetrics?.cache_creation_1h_input_tokens,
-            cacheTtlApplied: usageMetrics?.cache_ttl ?? null,
             providerChain: session.getProviderChain(),
             routingTrace: session.finalizeRoutingTrace(statusCode),
             ...(terminalErrorMessage ? { errorMessage: terminalErrorMessage } : {}),
@@ -4807,15 +4814,19 @@ export class ProxyResponseHandler {
             {
               statusCode: effectiveStatusCode,
               durationMs: duration,
-              inputTokens: usageForCost?.input_tokens,
-              outputTokens: usageForCost?.output_tokens,
+              ...(session.isExplicitCompactionRequest?.() === true
+                ? {}
+                : {
+                    inputTokens: usageForCost?.input_tokens,
+                    outputTokens: usageForCost?.output_tokens,
+                    cacheCreationInputTokens: usageForCost?.cache_creation_input_tokens,
+                    cacheReadInputTokens: usageForCost?.cache_read_input_tokens,
+                    cacheCreation5mInputTokens: usageForCost?.cache_creation_5m_input_tokens,
+                    cacheCreation1hInputTokens: usageForCost?.cache_creation_1h_input_tokens,
+                    cacheTtlApplied: usageForCost?.cache_ttl ?? null,
+                  }),
               ttftMs: session.ttftMs,
               firstByteMs: session.firstByteMs,
-              cacheCreationInputTokens: usageForCost?.cache_creation_input_tokens,
-              cacheReadInputTokens: usageForCost?.cache_read_input_tokens,
-              cacheCreation5mInputTokens: usageForCost?.cache_creation_5m_input_tokens,
-              cacheCreation1hInputTokens: usageForCost?.cache_creation_1h_input_tokens,
-              cacheTtlApplied: usageForCost?.cache_ttl ?? null,
               providerChain: session.getProviderChain(),
               routingTrace: session.finalizeRoutingTrace(effectiveStatusCode),
               ...(streamErrorMessage ? { errorMessage: streamErrorMessage } : {}),
@@ -6564,15 +6575,19 @@ export async function finalizeRequestStats(
   const terminalDetails = {
     statusCode: statusCode,
     durationMs: duration,
-    inputTokens: normalizedUsage.input_tokens,
-    outputTokens: normalizedUsage.output_tokens,
+    ...(session.isExplicitCompactionRequest?.() === true
+      ? {}
+      : {
+          inputTokens: normalizedUsage.input_tokens,
+          outputTokens: normalizedUsage.output_tokens,
+          cacheCreationInputTokens: normalizedUsage.cache_creation_input_tokens,
+          cacheReadInputTokens: normalizedUsage.cache_read_input_tokens,
+          cacheCreation5mInputTokens: normalizedUsage.cache_creation_5m_input_tokens,
+          cacheCreation1hInputTokens: normalizedUsage.cache_creation_1h_input_tokens,
+          cacheTtlApplied: normalizedUsage.cache_ttl ?? null,
+        }),
     ttftMs: session.ttftMs ?? duration,
     firstByteMs: session.firstByteMs ?? duration,
-    cacheCreationInputTokens: normalizedUsage.cache_creation_input_tokens,
-    cacheReadInputTokens: normalizedUsage.cache_read_input_tokens,
-    cacheCreation5mInputTokens: normalizedUsage.cache_creation_5m_input_tokens,
-    cacheCreation1hInputTokens: normalizedUsage.cache_creation_1h_input_tokens,
-    cacheTtlApplied: normalizedUsage.cache_ttl ?? null,
     providerChain: session.getProviderChain(),
     routingTrace: session.finalizeRoutingTrace(statusCode),
     ...(errorMessage ? { errorMessage } : {}),

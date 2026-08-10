@@ -25,7 +25,10 @@ vi.mock("next-intl/server", () => ({
 
 import { V1_ENDPOINT_PATHS } from "@/app/v1/_lib/proxy/endpoint-paths";
 import { resolveEndpointPolicy } from "@/app/v1/_lib/proxy/endpoint-policy";
-import { isRemoteCompactionV2Request } from "@/app/v1/_lib/proxy/remote-compaction";
+import {
+  classifyExplicitCompactionRequest,
+  isRemoteCompactionV2Request,
+} from "@/app/v1/_lib/proxy/remote-compaction";
 import { normalizeResponseInput } from "@/app/v1/_lib/proxy/response-input-rectifier";
 import { ProxySession } from "@/app/v1/_lib/proxy/session";
 import { isNonBillingEndpoint } from "@/lib/utils/performance-formatter";
@@ -53,6 +56,13 @@ function makeContext(url: string, body: string): Context {
 }
 
 describe("remote compaction v2 request classification", () => {
+  it("classifies direct compact requests as CCH v1", () => {
+    expect(classifyExplicitCompactionRequest("/v1/responses/compact", { model: "gpt-5" })).toBe(
+      "v1"
+    );
+    expect(classifyExplicitCompactionRequest("/v1/responses/compact/", {})).toBe("v1");
+  });
+
   it("recognizes an exact compaction_trigger item on the Responses endpoint", () => {
     expect(
       isRemoteCompactionV2Request(V1_ENDPOINT_PATHS.RESPONSES, {
@@ -67,6 +77,11 @@ describe("remote compaction v2 request classification", () => {
         input: { type: "compaction_trigger" },
       })
     ).toBe(true);
+    expect(
+      classifyExplicitCompactionRequest(V1_ENDPOINT_PATHS.RESPONSES, {
+        input: { type: "compaction_trigger" },
+      })
+    ).toBe("v2");
   });
 
   it.each([
@@ -96,7 +111,7 @@ describe("remote compaction v2 request classification", () => {
     expect(session.getEndpointPolicy()).toBe(
       resolveEndpointPolicy(V1_ENDPOINT_PATHS.RESPONSES_COMPACT)
     );
-    expect(isNonBillingEndpoint(session.getManagedEndpoint())).toBe(true);
+    expect(isNonBillingEndpoint(session.getManagedEndpoint())).toBe(false);
     expect(new TextDecoder().decode(session.request.buffer)).toBe(body);
   });
 

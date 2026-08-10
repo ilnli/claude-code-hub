@@ -320,6 +320,8 @@ export async function createMessageRequest(
     userAgent: data.user_agent, // User-Agent
     clientIp: data.client_ip, // 客户端 IP（IPv4/IPv6）
     endpoint: data.endpoint, // 请求端点（可为空）
+    compactionVersion: data.compaction_version,
+    billingState: data.billing_state,
     messagesCount: data.messages_count, // Messages 数量
     specialSettings: data.special_settings ?? undefined, // 特殊设置（审计/展示）
     cacheTtlApplied: data.cache_ttl_applied,
@@ -352,6 +354,8 @@ export async function createMessageRequest(
     userAgent: messageRequest.userAgent, // 新增
     clientIp: messageRequest.clientIp, // 客户端 IP
     endpoint: messageRequest.endpoint, // 新增：返回端点
+    compactionVersion: messageRequest.compactionVersion,
+    billingState: messageRequest.billingState,
     messagesCount: messageRequest.messagesCount, // 新增
     cacheTtlApplied: messageRequest.cacheTtlApplied,
     cacheCreationInputTokens: messageRequest.cacheCreationInputTokens,

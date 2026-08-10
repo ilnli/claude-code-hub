@@ -77,6 +77,8 @@ function makeLog(overrides: Partial<MyUsageLogEntry> = {}): MyUsageLogEntry {
     statusCode: 200,
     duration: 50,
     endpoint: "/v1/messages",
+    compactionVersion: null,
+    billingState: "sealed",
     cacheCreationInputTokens: 0,
     cacheReadInputTokens: 0,
     cacheCreation5mInputTokens: 0,
@@ -129,5 +131,17 @@ describe("my-usage usage logs table", () => {
     expect(html).toContain("<button");
     expect(html).toContain("bg-transparent");
     expect(html).toContain("gpt-4.1");
+  });
+
+  test("labels an explicit v1 compaction request", () => {
+    const html = renderToStaticMarkup(
+      <UsageLogsTable
+        logs={[makeLog({ compactionVersion: "v1" })]}
+        hasNextPage={false}
+        isFetchingNextPage={false}
+      />
+    );
+
+    expect(html).toContain("remoteCompaction");
   });
 });

@@ -62,11 +62,11 @@ function cell(sheetXml: string, ref: string): string | null {
   return match[0];
 }
 
-const COST_COL = columnRef(14); // O
 const TIME_COL = columnRef(0); // A
 const MODEL_COL = columnRef(4); // E
-const STATUS_COL = columnRef(7); // H
 const HEADER = buildDetailHeaders("UTC");
+const COST_COL = columnRef(HEADER.indexOf("Cost (USD)"));
+const STATUS_COL = columnRef(HEADER.indexOf("Status Code"));
 const PREFIX_ID_COL = columnRef(HEADER.indexOf("Prefix ID"));
 const SESSION_ID_COL = columnRef(HEADER.indexOf("Session ID"));
 

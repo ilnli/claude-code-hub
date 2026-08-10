@@ -1,7 +1,4 @@
-export const NON_BILLING_ENDPOINTS = [
-  "/v1/messages/count_tokens",
-  "/v1/responses/compact",
-] as const;
+export const NON_BILLING_ENDPOINTS = ["/v1/messages/count_tokens"] as const;
 
 export const NON_BILLING_ENDPOINT = NON_BILLING_ENDPOINTS[0];
 

@@ -34,6 +34,11 @@ import {
 } from "@/lib/provider-endpoints/endpoint-selector";
 import { getGlobalAgentPool, getProxyAgentForProvider } from "@/lib/proxy-agent";
 import { RateLimitService } from "@/lib/rate-limit/service";
+import {
+  clearCompactionCapabilityGap,
+  getCompactionCapabilityDecision,
+  rememberCompactionCapabilityGap,
+} from "@/lib/redis/compaction-capability";
 import type { SessionBindingSnapshot } from "@/lib/redis/session-binding";
 import { SessionManager } from "@/lib/session-manager";
 import {
@@ -45,6 +50,7 @@ import {
   recordVendorTypeAllEndpointsTimeout,
 } from "@/lib/vendor-type-circuit-breaker";
 import { updateMessageRequestDetails } from "@/repository/message";
+import { sealExplicitCompactionBilling } from "@/repository/usage-attempt-ledger";
 import type { CacheTtlPreference, CacheTtlResolved } from "@/types/cache";
 import type { ProviderChainItem } from "@/types/message";
 import type { Provider } from "@/types/provider";
@@ -90,6 +96,14 @@ import {
   ProxyError,
   sanitizeUrl,
 } from "./errors";
+import {
+  commitExplicitCompactionValidationAttempt,
+  ExplicitCompactionBillingError,
+} from "./explicit-compaction-billing";
+import {
+  collectExplicitCompactionResponse,
+  ExplicitCompactionResponseError,
+} from "./explicit-compaction-response";
 import {
   detectGeminiFunctionIdRectifierTrigger,
   type GeminiFunctionIdRectifierResult,
@@ -1431,12 +1445,17 @@ export class ProxyForwarder {
     const env = getEnvConfig();
     const envDefaultMaxAttempts = clampRetryAttempts(env.MAX_RETRY_ATTEMPTS_DEFAULT);
     const rawCrossProviderFallbackEnabled = session.isRawCrossProviderFallbackEnabled();
+    const explicitCompaction = session.isExplicitCompactionRequest?.() === true;
+    const explicitCompactionDeadlineAt = explicitCompaction
+      ? requestStartedAt + env.REMOTE_COMPACTION_TOTAL_TIMEOUT_MS
+      : null;
     const endpointPolicy = ProxyForwarder.getEndpointPolicy(session);
     const shouldSkipRawRetryAndProviderSwitch =
-      !endpointPolicy.allowRetry && !rawCrossProviderFallbackEnabled;
+      !endpointPolicy.allowRetry && !rawCrossProviderFallbackEnabled && !explicitCompaction;
 
     let lastError: Error | null = null;
     let currentProvider = session.provider;
+    const initialProviderId = currentProvider?.id ?? null;
     const failedProviderIds: number[] = []; // 记录已失败的供应商ID
     let totalProvidersAttempted = 0; // 已尝试的供应商数量（用于日志）
     let capabilityGapSeen = false;
@@ -1444,6 +1463,30 @@ export class ProxyForwarder {
 
     // ========== 外层循环：供应商切换（最多 MAX_PROVIDER_SWITCHES 次）==========
     while (totalProvidersAttempted < MAX_PROVIDER_SWITCHES) {
+      const compactionVersion = session.getExplicitCompactionVersion?.() ?? null;
+      if (compactionVersion) {
+        const capabilityDecision = await getCompactionCapabilityDecision(
+          currentProvider.id,
+          compactionVersion
+        );
+        if (capabilityDecision.status === "unavailable") {
+          capabilityGapSeen = true;
+          session.addProviderToChain(currentProvider, {
+            reason: "compaction_capability_gap",
+            errorMessage: "provider_compaction_capability_unavailable",
+          });
+          ProxyForwarder.markProviderFailed(session, failedProviderIds, currentProvider.id);
+          if (!rawCrossProviderFallbackEnabled) break;
+          const alternativeProvider = await ProxyForwarder.selectAlternative(
+            session,
+            failedProviderIds
+          );
+          if (!alternativeProvider) break;
+          currentProvider = alternativeProvider;
+          session.setProvider(currentProvider);
+          continue;
+        }
+      }
       totalProvidersAttempted++;
       let attemptCount = 0; // 当前供应商的尝试次数
 
@@ -1451,9 +1494,10 @@ export class ProxyForwarder {
         currentProvider,
         envDefaultMaxAttempts
       );
-      if (rawCrossProviderFallbackEnabled) {
+      if (rawCrossProviderFallbackEnabled && !explicitCompaction) {
         maxAttemptsPerProvider = 1;
       }
+      let initialCompactionContractRetryUsed = false;
       const reactiveRectifierRetryState: ReactiveRectifierRetryState = {
         thinkingSignatureRetried: false,
         thinkingBudgetRetried: false,
@@ -1637,6 +1681,12 @@ export class ProxyForwarder {
 
       // ========== 内层循环：重试当前供应商（根据配置最多尝试 maxAttemptsPerProvider 次）==========
       while (attemptCount < maxAttemptsPerProvider) {
+        const explicitCompactionRemainingMs = explicitCompactionDeadlineAt
+          ? explicitCompactionDeadlineAt - Date.now()
+          : undefined;
+        if (explicitCompactionRemainingMs !== undefined && explicitCompactionRemainingMs <= 0) {
+          throw new ProxyError("remote_compaction_timeout", 504);
+        }
         attemptCount++;
 
         // Use currentEndpointIndex for endpoint selection (sticky behavior)
@@ -1659,7 +1709,10 @@ export class ProxyForwarder {
             currentProvider,
             activeEndpoint.baseUrl,
             endpointAudit,
-            attemptCount
+            attemptCount,
+            false,
+            undefined,
+            explicitCompactionRemainingMs
           );
 
           // ========== 空响应检测（仅非流式）==========
@@ -2111,6 +2164,95 @@ export class ProxyForwarder {
           return response; // ⭐ 成功：立即返回，结束所有循环
         } catch (error) {
           lastError = error as Error;
+
+          if (lastError instanceof ExplicitCompactionBillingError) {
+            throw new ProxyError(lastError.publicCode, 503);
+          }
+
+          if (
+            lastError instanceof ProxyError &&
+            lastError.message === "remote_compaction_timeout"
+          ) {
+            throw lastError;
+          }
+
+          if (lastError instanceof ExplicitCompactionResponseError) {
+            const validation = lastError.validation;
+            const isInitialProvider = currentProvider.id === initialProviderId;
+            const shouldRetrySameProvider =
+              lastError.publicCode === "remote_compaction_invalid_response" &&
+              isInitialProvider &&
+              !initialCompactionContractRetryUsed;
+            const isCapabilityGap =
+              lastError.publicCode === "remote_compaction_invalid_response" &&
+              !shouldRetrySameProvider;
+
+            session.addProviderToChain(currentProvider, {
+              ...endpointAudit,
+              reason: shouldRetrySameProvider
+                ? "compaction_contract_violation"
+                : isCapabilityGap
+                  ? "compaction_capability_gap"
+                  : "compaction_response_too_large",
+              attemptNumber: attemptCount,
+              statusCode: lastError.publicCode === "remote_compaction_timeout" ? 504 : 502,
+              errorMessage: lastError.publicCode,
+              errorDetails: {
+                system: {
+                  errorType: "ExplicitCompactionValidationError",
+                  errorName: validation.reason ?? validation.outcome,
+                  errorMessage: lastError.publicCode,
+                },
+                request: buildRequestDetails(session),
+              },
+            });
+
+            logger.warn("ProxyForwarder: Explicit compaction response rejected", {
+              providerId: currentProvider.id,
+              providerName: currentProvider.name,
+              compactionVersion: session.getExplicitCompactionVersion?.() ?? null,
+              attemptNumber: attemptCount,
+              totalProvidersAttempted,
+              outcome: validation.outcome,
+              reason: validation.reason,
+              responseBytes: validation.evidence.responseBytes,
+              retrySameProvider: shouldRetrySameProvider,
+            });
+
+            if (shouldRetrySameProvider) {
+              initialCompactionContractRetryUsed = true;
+              maxAttemptsPerProvider += 1;
+              continue;
+            }
+
+            if (lastError.publicCode === "remote_compaction_timeout") {
+              throw new ProxyError("remote_compaction_timeout", 504);
+            }
+
+            if (isCapabilityGap) {
+              capabilityGapSeen = true;
+              const compactionVersion = session.getExplicitCompactionVersion?.() ?? null;
+              if (compactionVersion) {
+                await rememberCompactionCapabilityGap({
+                  providerId: currentProvider.id,
+                  version: compactionVersion,
+                  reason: "invalid_response_contract",
+                  ttlMs: currentProvider.circuitBreakerOpenDuration,
+                });
+              }
+              ProxyForwarder.markProviderFailed(session, failedProviderIds, currentProvider.id);
+              if (!rawCrossProviderFallbackEnabled) {
+                throw new ProxyError("remote_compaction_invalid_response", 502);
+              }
+              break;
+            }
+
+            ProxyForwarder.markProviderFailed(session, failedProviderIds, currentProvider.id);
+            if (!rawCrossProviderFallbackEnabled) {
+              throw new ProxyError(lastError.publicCode, 502);
+            }
+            break;
+          }
 
           // ⭐ 1. 分类错误（供应商错误 vs 系统错误 vs 客户端中断）
           // 使用异步版本确保错误规则已加载
@@ -2792,6 +2934,9 @@ export class ProxyForwarder {
       } // ========== 内层循环结束 ==========
 
       // ========== 供应商切换逻辑 ==========
+      if (explicitCompaction && !rawCrossProviderFallbackEnabled) {
+        break;
+      }
       const alternativeProvider = await ProxyForwarder.selectAlternative(
         session,
         failedProviderIds
@@ -2835,6 +2980,12 @@ export class ProxyForwarder {
     const attemptedProviderIds = new Set(failedProviderIds);
     if (session.provider?.id != null) attemptedProviderIds.add(session.provider.id);
     await ProxyForwarder.clearSessionProviderBindings(session, attemptedProviderIds);
+    if (lastError instanceof ExplicitCompactionResponseError) {
+      throw new ProxyError(
+        lastError.publicCode,
+        lastError.publicCode === "remote_compaction_timeout" ? 504 : 502
+      );
+    }
     if (capabilityGapSeen && !nonCapabilityFailureSeen) {
       throw ProxyForwarder.buildProviderCapabilityUnavailableError(lastError);
     }
@@ -2851,7 +3002,8 @@ export class ProxyForwarder {
     endpointAudit?: { endpointId: number | null; endpointUrl: string },
     attemptNumber?: number,
     deferDetailSnapshotPersistence: boolean = false,
-    externalAbortSignal?: AbortSignal
+    externalAbortSignal?: AbortSignal,
+    explicitCompactionRemainingMs?: number
   ): Promise<Response> {
     if (!provider) {
       throw new Error("Provider is required");
@@ -3454,6 +3606,14 @@ export class ProxyForwarder {
       responseTimeoutType = "non_streaming_total";
     }
 
+    if (explicitCompactionRemainingMs !== undefined) {
+      const remainingMs = Math.max(1, explicitCompactionRemainingMs);
+      if (responseTimeoutMs <= 0 || remainingMs < responseTimeoutMs) {
+        responseTimeoutMs = remainingMs;
+        responseTimeoutType = "explicit_compaction_total";
+      }
+    }
+
     let responseTimeoutId: NodeJS.Timeout | null = null;
     if (responseTimeoutMs > 0) {
       responseTimeoutId = setTimeout(() => {
@@ -3527,6 +3687,10 @@ export class ProxyForwarder {
 
     let response: Response;
     const fetchStartTime = Date.now();
+    const explicitCompactionAttemptOrdinal =
+      session.isExplicitCompactionRequest?.() === true
+        ? session.nextExplicitCompactionAttemptOrdinal()
+        : null;
     try {
       // ⭐ 把 agent 获取 & 配置日志放进 try 块，确保获取后到 fetch 之前任何异常
       // （例如 URL 解析失败）都会走 catch 的统一释放逻辑，避免泄漏 activeRequests。
@@ -3573,7 +3737,7 @@ export class ProxyForwarder {
           endpointId: responsesWsEndpointId,
         });
 
-        if (wsEligibility.eligible) {
+        if (wsEligibility.eligible && session.isExplicitCompactionRequest?.() !== true) {
           // Use the *final* outgoing body so the WS frame matches the HTTP
           // path: it has been through filterPrivateParameters() and any
           // request-filter transformations. Falling back to
@@ -3771,6 +3935,11 @@ export class ProxyForwarder {
           reason:
             "First-byte timeout indicates slow provider response, should count towards circuit breaker",
         });
+
+        if (responseTimeoutType === "explicit_compaction_total") {
+          cleanupCombinedSignal();
+          throw new ProxyError("remote_compaction_timeout", 504);
+        }
 
         // 抛出 ProxyError 并设置特殊状态码 524（Cloudflare: A Timeout Occurred）
         // 这样会被归类为 PROVIDER_ERROR，计入熔断器并直接切换供应商
@@ -4164,6 +4333,77 @@ export class ProxyForwarder {
       }
     }
 
+    const explicitCompactionVersion = session.getExplicitCompactionVersion?.() ?? null;
+
+    // Explicit compaction errors may still carry billable usage. Buffer the
+    // error body before the normal HTTP error path so that usage is committed
+    // without turning an HTTP error into a capability-gap signal.
+    if (!response.ok && explicitCompactionVersion) {
+      try {
+        const validationTimeoutMs = Math.max(
+          1,
+          Math.min(
+            getEnvConfig().REMOTE_COMPACTION_VALIDATION_TIMEOUT_MS,
+            explicitCompactionRemainingMs ?? Number.POSITIVE_INFINITY
+          )
+        );
+        const collected = await collectExplicitCompactionResponse({
+          response,
+          version: explicitCompactionVersion,
+          maxBytes: getEnvConfig().REMOTE_COMPACTION_MAX_RESPONSE_BYTES,
+          timeoutMs: validationTimeoutMs,
+          idleTimeoutMs: provider.streamingIdleTimeoutMs,
+          abortSignal: transportController.signal,
+          responseTimeoutSignal: responseController.signal,
+          onFirstByte: () => {
+            if (responseTimeoutId) clearTimeout(responseTimeoutId);
+          },
+          bypassValidation: true,
+        });
+        if (explicitCompactionAttemptOrdinal === null) {
+          throw new ExplicitCompactionBillingError("billing_persistence_unavailable");
+        }
+        await commitExplicitCompactionValidationAttempt({
+          session,
+          provider,
+          providerEndpointId: endpointAudit?.endpointId ?? null,
+          attemptOrdinal: explicitCompactionAttemptOrdinal,
+          attemptedAt: new Date(fetchStartTime),
+          completedAt: new Date(),
+          validation: { ...collected.validation, outcome: "upstream_error" },
+        });
+        response = collected.response;
+      } catch (error) {
+        let terminalError: unknown = error;
+        if (
+          error instanceof ExplicitCompactionResponseError &&
+          explicitCompactionAttemptOrdinal !== null
+        ) {
+          try {
+            await commitExplicitCompactionValidationAttempt({
+              session,
+              provider,
+              providerEndpointId: endpointAudit?.endpointId ?? null,
+              attemptOrdinal: explicitCompactionAttemptOrdinal,
+              attemptedAt: new Date(fetchStartTime),
+              completedAt: new Date(),
+              validation: error.validation,
+            });
+          } catch (billingError) {
+            terminalError = billingError;
+          }
+        }
+        if (responseTimeoutId) clearTimeout(responseTimeoutId);
+        const releaseKey = proxyConfig?.cacheKey ?? directConnectionCacheKey;
+        const releaseDispatcherId = proxyConfig?.dispatcherId ?? directConnectionDispatcherId;
+        if (releaseKey && releaseDispatcherId) {
+          getGlobalAgentPool().releaseAgent(releaseKey, releaseDispatcherId);
+        }
+        cleanupCombinedSignal();
+        throw terminalError;
+      }
+    }
+
     // 检查 HTTP 错误状态（4xx/5xx 均视为失败，触发重试）
     // 注意：用户要求所有 4xx 都重试，包括 401、403、429 等
     if (!response.ok) {
@@ -4190,6 +4430,103 @@ export class ProxyForwarder {
         }
         // 同上：response-handler 不会跑，polyfill 路径上的源信号 listener 必须在此解绑。
         cleanupCombinedSignal();
+      }
+    }
+
+    if (explicitCompactionVersion) {
+      let firstByteAt: number | null = null;
+      try {
+        const validationEnabled = getEnvConfig().REMOTE_COMPACTION_VALIDATION_ENABLED;
+        const validationTimeoutMs = Math.max(
+          1,
+          Math.min(
+            getEnvConfig().REMOTE_COMPACTION_VALIDATION_TIMEOUT_MS,
+            explicitCompactionRemainingMs ?? Number.POSITIVE_INFINITY
+          )
+        );
+        const collected = await collectExplicitCompactionResponse({
+          response,
+          version: explicitCompactionVersion,
+          maxBytes: getEnvConfig().REMOTE_COMPACTION_MAX_RESPONSE_BYTES,
+          timeoutMs: validationTimeoutMs,
+          idleTimeoutMs: provider.streamingIdleTimeoutMs,
+          abortSignal: transportController.signal,
+          responseTimeoutSignal: responseController.signal,
+          onFirstByte: () => {
+            firstByteAt ??= Date.now();
+            if (responseTimeoutId) clearTimeout(responseTimeoutId);
+          },
+          bypassValidation: !validationEnabled,
+        });
+        if (explicitCompactionAttemptOrdinal === null) {
+          throw new ExplicitCompactionBillingError("billing_persistence_unavailable");
+        }
+        await commitExplicitCompactionValidationAttempt({
+          session,
+          provider,
+          providerEndpointId: endpointAudit?.endpointId ?? null,
+          attemptOrdinal: explicitCompactionAttemptOrdinal,
+          attemptedAt: new Date(fetchStartTime),
+          completedAt: new Date(),
+          validation: collected.validation,
+        });
+        if (!session.messageContext?.id) {
+          throw new ExplicitCompactionBillingError("billing_persistence_unavailable");
+        }
+        try {
+          await sealExplicitCompactionBilling(session.messageContext.id);
+        } catch {
+          throw new ExplicitCompactionBillingError("billing_persistence_unavailable");
+        }
+        response = collected.response;
+        if (responseTimeoutId) clearTimeout(responseTimeoutId);
+        if (firstByteAt !== null) session.recordFirstByte(firstByteAt);
+        session.recordTtft();
+        logger.info("ProxyForwarder: Explicit compaction response committed", {
+          providerId: provider.id,
+          providerName: provider.name,
+          compactionVersion: explicitCompactionVersion,
+          transport: collected.validation.evidence.transport,
+          responseBytes: collected.validation.evidence.responseBytes,
+          validationOutcome: collected.validation.outcome,
+        });
+        if (collected.validation.outcome === "valid") {
+          await clearCompactionCapabilityGap(provider.id, explicitCompactionVersion);
+        } else {
+          logger.warn("ProxyForwarder: Explicit compaction validation bypassed by environment", {
+            providerId: provider.id,
+            providerName: provider.name,
+            compactionVersion: explicitCompactionVersion,
+          });
+        }
+      } catch (error) {
+        let terminalError: unknown = error;
+        if (
+          error instanceof ExplicitCompactionResponseError &&
+          explicitCompactionAttemptOrdinal !== null
+        ) {
+          try {
+            await commitExplicitCompactionValidationAttempt({
+              session,
+              provider,
+              providerEndpointId: endpointAudit?.endpointId ?? null,
+              attemptOrdinal: explicitCompactionAttemptOrdinal,
+              attemptedAt: new Date(fetchStartTime),
+              completedAt: new Date(),
+              validation: error.validation,
+            });
+          } catch (billingError) {
+            terminalError = billingError;
+          }
+        }
+        if (responseTimeoutId) clearTimeout(responseTimeoutId);
+        const releaseKey = proxyConfig?.cacheKey ?? directConnectionCacheKey;
+        const releaseDispatcherId = proxyConfig?.dispatcherId ?? directConnectionDispatcherId;
+        if (releaseKey && releaseDispatcherId) {
+          getGlobalAgentPool().releaseAgent(releaseKey, releaseDispatcherId);
+        }
+        cleanupCombinedSignal();
+        throw terminalError;
       }
     }
 

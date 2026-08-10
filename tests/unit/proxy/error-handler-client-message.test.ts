@@ -188,6 +188,20 @@ describe("ProxyErrorHandler.handle client message", () => {
     expect(responseText).not.toContain("provider-a");
   });
 
+  test("preserves a stable error code for rejected remote compaction responses", async () => {
+    const session = await createSession();
+
+    const response = await ProxyErrorHandler.handle(
+      session,
+      new ProxyError("remote_compaction_invalid_response", 502)
+    );
+    const body = (await response.json()) as { error: { code: string; type: string } };
+
+    expect(response.status).toBe(502);
+    expect(body.error.type).toBe("remote_compaction_invalid_response");
+    expect(body.error.code).toBe("remote_compaction_invalid_response");
+  });
+
   test("returns a fixed 503 without exposing an admission query or parameters", async () => {
     const session = await createSession();
     const canary = "sk-admission-secret-canary";

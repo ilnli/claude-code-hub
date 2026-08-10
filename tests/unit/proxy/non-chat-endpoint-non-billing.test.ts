@@ -38,28 +38,28 @@ const sharedBillingConsumerSources = [
 }));
 
 describe("non-chat endpoint non-billing parity", () => {
-  it("fallback success for target raw endpoints does not create billable ledger usage", () => {
+  it("count_tokens does not create billable ledger usage", () => {
     expect(ledgerConditionsSource).toContain("NON_BILLING_ENDPOINTS");
     expect(ledgerConditionsSource).toContain("LEDGER_BILLING_CONDITION");
     expect(ledgerConditionsSource).toContain("NOT IN");
   });
 
-  it("formatter treats count tokens and compact as non-billing endpoints", () => {
-    expect(NON_BILLING_ENDPOINTS).toEqual(["/v1/messages/count_tokens", "/v1/responses/compact"]);
+  it("formatter treats only count_tokens as non-billing", () => {
+    expect(NON_BILLING_ENDPOINTS).toEqual(["/v1/messages/count_tokens"]);
     expect(isNonBillingEndpoint("/v1/messages/count_tokens")).toBe(true);
     expect(isNonBillingEndpoint("/v1/messages/count_tokens/")).toBe(true);
-    expect(isNonBillingEndpoint("/v1/responses/compact")).toBe(true);
-    expect(isNonBillingEndpoint("/v1/responses/compact/")).toBe(true);
+    expect(isNonBillingEndpoint("/v1/responses/compact")).toBe(false);
+    expect(isNonBillingEndpoint("/v1/responses/compact/")).toBe(false);
     expect(isNonBillingEndpoint("/v1/messages")).toBe(false);
   });
 
-  it("ledger backfill skips count tokens and compact message requests", () => {
+  it("ledger backfill skips count_tokens and keeps compact billable", () => {
     expect(backfillSource).toContain("/v1/messages/count_tokens");
-    expect(backfillSource).toContain("/v1/responses/compact");
+    expect(backfillSource).not.toContain("/v1/responses/compact");
     expect(backfillSource).toContain("REGEXP_REPLACE");
     expect(backfillSource).toContain("actual_response_model");
     expect(triggerSqlSource).toContain("/v1/messages/count_tokens");
-    expect(triggerSqlSource).toContain("/v1/responses/compact");
+    expect(triggerSqlSource).not.toContain("/v1/responses/compact");
     expect(triggerSqlSource).toContain("REGEXP_REPLACE");
     expect(triggerSqlSource).toContain("actual_response_model");
     expect(migrationSource).toContain("CREATE OR REPLACE FUNCTION fn_upsert_usage_ledger()");
@@ -69,7 +69,7 @@ describe("non-chat endpoint non-billing parity", () => {
     expect(migrationSource).toContain("actual_response_model");
   });
 
-  it("overview leaderboard and my-usage consumers exclude target endpoints from billable views", () => {
+  it("overview leaderboard and my-usage consumers share the billing predicate", () => {
     for (const { relativePath, source } of sharedBillingConsumerSources) {
       expect(source, `${relativePath} should continue using shared billing predicate`).toContain(
         "LEDGER_BILLING_CONDITION"

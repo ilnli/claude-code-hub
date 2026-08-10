@@ -172,6 +172,7 @@
       "blocked": "ブロック済み",
       "replay": "Replay",
       "nonBilling": "非課金",
+      "remoteCompaction": "リモート圧縮 {version}",
       "skipped": "スキップ",
       "specialSettings": "特殊設定",
       "anthropicEffort": "Effort: {effort}",

@@ -172,6 +172,7 @@
       "blocked": "已攔截",
       "replay": "Replay",
       "nonBilling": "非計費",
+      "remoteCompaction": "遠端壓縮 {version}",
       "skipped": "已跳過",
       "specialSettings": "特殊設定",
       "anthropicEffort": "Effort: {effort}",

@@ -722,7 +722,7 @@ describe("Lease Budget Decrement after trackCostToRedis", () => {
     expect(RateLimitService.decrementLeaseBudget).not.toHaveBeenCalled();
   });
 
-  it("should skip redis cost tracking and lease decrement for non-billing compact endpoint variants", async () => {
+  it("should skip duplicate response-handler billing for explicit compaction", async () => {
     const session = createSession({
       originalModel,
       redirectedModel: originalModel,
@@ -732,6 +732,7 @@ describe("Lease Budget Decrement after trackCostToRedis", () => {
       providerType: "codex",
       originalFormat: "response",
     });
+    vi.spyOn(session, "isExplicitCompactionRequest").mockReturnValue(true);
 
     const response = createNonStreamResponse(usage);
     await ProxyResponseHandler.dispatch(session, response);
@@ -745,8 +746,6 @@ describe("Lease Budget Decrement after trackCostToRedis", () => {
       5999,
       expect.objectContaining({
         statusCode: 200,
-        inputTokens: usage.input_tokens,
-        outputTokens: usage.output_tokens,
       }),
       expect.objectContaining({ onCommitted: expect.any(Function) })
     );

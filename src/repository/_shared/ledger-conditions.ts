@@ -15,7 +15,8 @@ const NON_BILLING_LEDGER_ENDPOINT_CONDITION = sql`(
 /**
  * 只统计未被阻断的请求。
  * Warmup 行在触发器层面已过滤，不会进入 usage_ledger，
- * 此外 count_tokens / compact 虽写 message_request，但不得进入 billable ledger。
+ * 此外 count_tokens 虽写 message_request，但不得进入 billable ledger。
+ * 显式压缩由逐尝试账本汇总到 message_request 后进入 usage_ledger。
  */
 export const LEDGER_BILLING_CONDITION = sql`(${usageLedger.blockedBy} IS NULL AND ${usageLedger.isReplay} = false AND ${NON_BILLING_LEDGER_ENDPOINT_CONDITION})`;
 

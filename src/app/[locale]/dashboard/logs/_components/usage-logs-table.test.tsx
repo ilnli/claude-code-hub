@@ -81,6 +81,8 @@ function makeLog(overrides: Partial<UsageLogRow>): UsageLogRow {
     originalModel: null,
     actualResponseModel: null,
     endpoint: "/v1/messages",
+    compactionVersion: null,
+    billingState: "sealed",
     statusCode: 200,
     inputTokens: 1,
     outputTokens: 1,
@@ -671,6 +673,21 @@ describe("usage-logs-table multiplier badge", () => {
 });
 
 describe("usage-logs-table pricing resolution", () => {
+  test("labels an explicit v2 compaction request", () => {
+    const html = renderToStaticMarkup(
+      <UsageLogsTable
+        logs={[makeLog({ compactionVersion: "v2" })]}
+        total={1}
+        page={1}
+        pageSize={50}
+        onPageChange={() => {}}
+        isPending={false}
+      />
+    );
+
+    expect(html).toContain("logs.table.remoteCompaction");
+  });
+
   test("renders pricing provider and source details when pricing_resolution special setting exists", () => {
     const html = renderToStaticMarkup(
       <UsageLogsTable

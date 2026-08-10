@@ -55,6 +55,7 @@ import {
   deleteProviderCircuitConfig,
   saveProviderCircuitConfig,
 } from "@/lib/redis/circuit-breaker-config";
+import { clearCompactionCapabilityGap } from "@/lib/redis/compaction-capability";
 import { RedisKVStore } from "@/lib/redis/redis-kv-store";
 import { SessionManager } from "@/lib/session-manager";
 import {
@@ -1010,6 +1011,17 @@ export async function editProvider(
       await SessionManager.terminateStickySessionsForProviders([providerId], "editProvider");
     }
 
+    const shouldClearCompactionCapability =
+      validated.provider_type !== undefined ||
+      validated.url !== undefined ||
+      validated.key !== undefined ||
+      validated.custom_headers !== undefined ||
+      validated.allowed_models !== undefined ||
+      (validated.is_enabled === true && currentProvider.isEnabled === false);
+    if (shouldClearCompactionCapability) {
+      await clearCompactionCapabilityGap(providerId);
+    }
+
     if (
       payload.limit_5h_reset_mode !== undefined &&
       payload.limit_5h_reset_mode !== currentProvider.limit5hResetMode
@@ -1434,6 +1446,7 @@ export async function resetProviderCircuit(providerId: number): Promise<ActionRe
     }
 
     resetCircuit(providerId);
+    await clearCompactionCapabilityGap(providerId);
 
     return { ok: true };
   } catch (error) {

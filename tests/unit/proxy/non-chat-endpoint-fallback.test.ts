@@ -100,6 +100,7 @@ import {
   ProxyError,
 } from "@/app/v1/_lib/proxy/errors";
 import { ProxyForwarder } from "@/app/v1/_lib/proxy/forwarder";
+import { ExplicitCompactionResponseError } from "@/app/v1/_lib/proxy/explicit-compaction-response";
 import { ProxySession } from "@/app/v1/_lib/proxy/session";
 import type { Provider } from "@/types/provider";
 
@@ -226,6 +227,32 @@ function createRawSession(pathname: string): ProxySession {
   return session as ProxySession;
 }
 
+function markExplicitCompaction(session: ProxySession, version: "v1" | "v2" = "v1"): void {
+  Object.assign(session, {
+    explicitCompactionVersion: version,
+    explicitCompactionAttemptOrdinal: 0,
+  });
+}
+
+function invalidCompactionResponse(version: "v1" | "v2" = "v1") {
+  return new ExplicitCompactionResponseError(
+    {
+      outcome: "invalid",
+      reason: "missing_compaction_output",
+      usage: null,
+      evidence: {
+        transport: "json",
+        version,
+        responseBytes: 42,
+        terminalSeen: true,
+        compactionItemCount: 0,
+        sourceCount: 1,
+      },
+    },
+    "remote_compaction_invalid_response"
+  );
+}
+
 describe("non-chat endpoint fallback", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -286,6 +313,73 @@ describe("non-chat endpoint fallback", () => {
       true,
       null
     );
+  });
+
+  test("explicit compaction retries one contract violation on the same provider endpoint", async () => {
+    const session = createRawSession(V1_ENDPOINT_PATHS.RESPONSES_COMPACT);
+    const provider = createProvider(1, {
+      providerType: "codex",
+      maxRetryAttempts: 1,
+    });
+    markExplicitCompaction(session);
+    session.originalFormat = "response";
+    session.setRawCrossProviderFallbackEnabled(false);
+    session.setProvider(provider);
+
+    const doForward = vi.spyOn(
+      ProxyForwarder as unknown as { doForward: (...args: unknown[]) => unknown },
+      "doForward"
+    );
+    doForward
+      .mockRejectedValueOnce(invalidCompactionResponse())
+      .mockRejectedValueOnce(invalidCompactionResponse());
+
+    await expect(ProxyForwarder.send(session)).rejects.toMatchObject({
+      statusCode: 502,
+    });
+
+    expect(doForward).toHaveBeenCalledTimes(2);
+    expect(doForward.mock.calls[0]?.[1]).toMatchObject({ id: provider.id });
+    expect(doForward.mock.calls[1]?.[1]).toMatchObject({ id: provider.id });
+    expect(doForward.mock.calls[0]?.[2]).toBe("https://endpoint-a.example.com");
+    expect(doForward.mock.calls[1]?.[2]).toBe("https://endpoint-a.example.com");
+    expect(mocks.recordFailure).not.toHaveBeenCalled();
+  });
+
+  test("explicit compaction switches after the fixed retry and does not retry fallback contract failures", async () => {
+    const session = createRawSession(V1_ENDPOINT_PATHS.RESPONSES_COMPACT);
+    const providerA = createProvider(1, {
+      providerType: "codex",
+      maxRetryAttempts: 5,
+    });
+    const providerB = createProvider(2, { providerType: "codex", maxRetryAttempts: 5 });
+    const providerC = createProvider(3, { providerType: "codex", maxRetryAttempts: 5 });
+    markExplicitCompaction(session);
+    session.originalFormat = "response";
+    session.setProvider(providerA);
+
+    const doForward = vi.spyOn(
+      ProxyForwarder as unknown as { doForward: (...args: unknown[]) => unknown },
+      "doForward"
+    );
+    const selectAlternative = vi.spyOn(
+      ProxyForwarder as unknown as { selectAlternative: (...args: unknown[]) => unknown },
+      "selectAlternative"
+    );
+    doForward
+      .mockRejectedValueOnce(invalidCompactionResponse())
+      .mockRejectedValueOnce(invalidCompactionResponse())
+      .mockRejectedValueOnce(invalidCompactionResponse())
+      .mockResolvedValueOnce(new Response("valid", { status: 200 }));
+    selectAlternative.mockResolvedValueOnce(providerB).mockResolvedValueOnce(providerC);
+
+    const response = await ProxyForwarder.send(session);
+
+    expect(await response.text()).toBe("valid");
+    expect(doForward).toHaveBeenCalledTimes(4);
+    expect(doForward.mock.calls.map((call) => (call[1] as Provider).id)).toEqual([1, 1, 2, 3]);
+    expect(selectAlternative).toHaveBeenCalledTimes(2);
+    expect(mocks.recordFailure).not.toHaveBeenCalled();
   });
 
   test("disabled setting preserves immediate throw behavior for target raw endpoints", async () => {

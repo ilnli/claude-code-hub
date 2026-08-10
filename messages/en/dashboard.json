@@ -172,6 +172,7 @@
       "blocked": "Blocked",
       "replay": "Replay",
       "nonBilling": "Non-Billing",
+      "remoteCompaction": "Remote compaction {version}",
       "skipped": "Skipped",
       "specialSettings": "Special",
       "anthropicEffort": "Effort: {effort}",

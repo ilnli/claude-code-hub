@@ -1,7 +1,11 @@
 import { extractAnthropicEffortFromRequestBody } from "@/lib/utils/anthropic-effort";
 import { extractCodexReasoningEffortFromRequestBody } from "@/lib/utils/codex-reasoning-effort";
 import { createMessageRequest } from "@/repository/message";
-import type { ProxySession } from "./session";
+import {
+  getExplicitCompactionVersionFromSession,
+  isExplicitCompactionSession,
+  type ProxySession,
+} from "./session";
 
 /** 在供应商确定后创建请求使用记录，并补齐需要随记录持久化的请求审计。 */
 export class ProxyMessageService {
@@ -94,6 +98,8 @@ export class ProxyMessageService {
       original_model: session.getOriginalModel() ?? undefined, // 传入原始模型（用户请求的模型）
       messages_count: session.getMessagesLength(), // 传入 messages 数量
       endpoint, // 传入请求端点（可能为 undefined）
+      compaction_version: getExplicitCompactionVersionFromSession(session),
+      billing_state: isExplicitCompactionSession(session) ? "in_progress" : "sealed",
       special_settings: session.getSpecialSettings(), // 特殊设置（审计/展示）
     });
 

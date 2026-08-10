@@ -761,6 +761,15 @@ export const messageRequest = pgTable('message_request', {
   // 请求端点路径（用于日志筛选及非计费识别），例如：/v1/messages/count_tokens
   endpoint: varchar('endpoint', { length: 256 }),
 
+  // 客户端原始请求识别出的显式压缩协议版本
+  compactionVersion: varchar('compaction_version', { length: 2 }).$type<'v1' | 'v2'>(),
+
+  // 显式压缩逐尝试计费投影状态
+  billingState: varchar('billing_state', { length: 20 })
+    .$type<'in_progress' | 'sealed' | 'pricing_pending'>()
+    .notNull()
+    .default('sealed'),
+
   // 模型重定向：原始模型名称（用户请求的模型，用于前端显示和计费）
   originalModel: varchar('original_model', { length: 128 }),
 
@@ -1552,6 +1561,11 @@ export const usageLedger = pgTable('usage_ledger', {
   originalModel: varchar('original_model', { length: 128 }),
   actualResponseModel: varchar('actual_response_model', { length: 128 }),
   endpoint: varchar('endpoint', { length: 256 }),
+  compactionVersion: varchar('compaction_version', { length: 2 }).$type<'v1' | 'v2'>(),
+  billingState: varchar('billing_state', { length: 20 })
+    .$type<'in_progress' | 'sealed' | 'pricing_pending'>()
+    .notNull()
+    .default('sealed'),
   apiType: varchar('api_type', { length: 20 }),
   sessionId: varchar('session_id', { length: 64 }),
   sessionIdentity: varchar('session_identity', { length: 64 }),
@@ -1640,6 +1654,55 @@ export const usageLedger = pgTable('usage_ledger', {
   usageLedgerKeyCreatedAtDescCoverIdx: index('idx_usage_ledger_key_created_at_desc_cover')
     .on(table.key, sql`${table.createdAt} DESC NULLS LAST`, table.finalProviderId)
     .where(sql`${table.blockedBy} IS NULL AND ${table.isReplay} = false`),
+}));
+
+// Explicit compaction upstream attempts. One row is one real upstream request.
+export const usageAttemptLedger = pgTable('usage_attempt_ledger', {
+  id: serial('id').primaryKey(),
+  requestId: integer('request_id').notNull(),
+  attemptOrdinal: integer('attempt_ordinal').notNull(),
+  providerId: integer('provider_id').notNull(),
+  providerEndpointId: integer('provider_endpoint_id'),
+  model: varchar('model', { length: 128 }),
+  compactionVersion: varchar('compaction_version', { length: 2 })
+    .notNull()
+    .$type<'v1' | 'v2'>(),
+  returnedUsage: boolean('returned_usage').notNull().default(false),
+  usageSource: varchar('usage_source', { length: 32 }),
+  inputTokens: bigint('input_tokens', { mode: 'number' }),
+  outputTokens: bigint('output_tokens', { mode: 'number' }),
+  cacheCreationInputTokens: bigint('cache_creation_input_tokens', { mode: 'number' }),
+  cacheReadInputTokens: bigint('cache_read_input_tokens', { mode: 'number' }),
+  cacheCreation5mInputTokens: bigint('cache_creation_5m_input_tokens', { mode: 'number' }),
+  cacheCreation1hInputTokens: bigint('cache_creation_1h_input_tokens', { mode: 'number' }),
+  reasoningTokens: bigint('reasoning_tokens', { mode: 'number' }),
+  pricingEffectiveAt: timestamp('pricing_effective_at', { withTimezone: true }),
+  priceSource: varchar('price_source', { length: 64 }),
+  priceSnapshot: jsonb('price_snapshot').$type<Record<string, unknown>>(),
+  costMultiplier: numeric('cost_multiplier', { precision: 10, scale: 4 }),
+  groupCostMultiplier: numeric('group_cost_multiplier', { precision: 10, scale: 4 }),
+  costUsd: numeric('cost_usd', { precision: 21, scale: 15 }).notNull().default('0'),
+  pricingState: varchar('pricing_state', { length: 20 })
+    .notNull()
+    .$type<'not_applicable' | 'committed' | 'pricing_pending'>(),
+  validationOutcome: varchar('validation_outcome', { length: 20 }).notNull(),
+  validationReason: varchar('validation_reason', { length: 64 }),
+  responseBytes: integer('response_bytes').notNull().default(0),
+  transport: varchar('transport', { length: 16 }).notNull(),
+  attemptedAt: timestamp('attempted_at', { withTimezone: true }).notNull(),
+  completedAt: timestamp('completed_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  usageAttemptLedgerRequestOrdinalIdx: uniqueIndex('idx_usage_attempt_ledger_request_ordinal')
+    .on(table.requestId, table.attemptOrdinal),
+  usageAttemptLedgerProviderCreatedAtIdx: index('idx_usage_attempt_ledger_provider_created_at')
+    .on(table.providerId, table.createdAt),
+  usageAttemptLedgerRequestIdx: index('idx_usage_attempt_ledger_request')
+    .on(table.requestId),
+  usageAttemptLedgerPricingPendingIdx: index('idx_usage_attempt_ledger_pricing_pending')
+    .on(table.createdAt)
+    .where(sql`${table.pricingState} = 'pricing_pending'`),
 }));
 
 // Audit Log table - 面板登录和后台操作审计日志

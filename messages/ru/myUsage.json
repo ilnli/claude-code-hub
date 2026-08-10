@@ -61,6 +61,7 @@
     "noLogs": "Нет записей",
     "unknownModel": "Неизвестная модель",
     "billingModel": "Биллинг: {model}",
+    "remoteCompaction": "Удаленное сжатие {version}",
     "anthropicEffort": "Effort: {effort}"
   },
   "expiration": {
