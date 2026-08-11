@@ -715,7 +715,7 @@ export interface paths {
         put?: never;
         /**
          * Fetch new-api upstream groups
-         * @description Fetches the anonymous group ratio table from a new-api site (GET /api/pricing) for the upstream group selector. Groups hidden by the site's user-usable-group settings are not included.
+         * @description Fetches the group ratio table from a new-api site (GET /api/pricing) for the upstream group selector. Uses the matching upstream site's PAT and user UID when configured, otherwise requests anonymously.
          */
         post: operations["postProvidersUpstreamGroupsFetch"];
         delete?: never;

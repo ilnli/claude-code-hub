@@ -141,7 +141,7 @@
       "costAutoSync": "跟随上游倍率已开启，成本倍率由探测结果自动回写（当前值即生效值）",
       "probeType": {
         "label": "探测协议",
-        "desc": "sub2api 探测 GET /v1/sub2api/billing；new-api 读取匿名分组倍率表（/api/pricing），并通过 key 的消费日志校准实际落组分组",
+        "desc": "sub2api 探测 GET /v1/sub2api/billing；new-api 读取分组倍率表（/api/pricing，站点配置 PAT 时使用认证请求），并通过 key 的消费日志校准实际落组分组",
         "options": {
           "sub2api": "sub2api",
           "newapi": "new-api"
@@ -154,7 +154,7 @@
         "fetch": "拉取分组",
         "fetchNeedUrl": "请先填写供应商 URL",
         "fetchFailed": "拉取上游分组失败",
-        "fetchEmpty": "上游匿名倍率表未暴露任何分组，可手填组名",
+        "fetchEmpty": "上游倍率表未返回任何分组，可手填组名",
         "hint": "new-api 日志端点按源 IP 限流（默认 20 次/20 分钟）。探测间隔建议 ≥5 分钟；同一站点接入多把 key 时请调大间隔"
       },
       "defaultRate": {

@@ -1,9 +1,11 @@
 "use server";
 
+import { redactUrlCredentials } from "@/lib/api/v1/_shared/redaction";
 import { getSession } from "@/lib/auth";
 import { publishProviderCacheInvalidation } from "@/lib/cache/provider-cache";
 import { logger } from "@/lib/logger";
 import { isValidProxyUrl } from "@/lib/proxy-agent";
+import { resolveNewapiProbeRequestContext } from "@/lib/upstream-billing/newapi-probe-context";
 import { getNewapiRatioTable } from "@/lib/upstream-billing/newapi-table-cache";
 import { syncAndTrackProviderUpstreamRate } from "@/lib/upstream-billing/probe-scheduler";
 import type { UpstreamRateSyncOutcome } from "@/lib/upstream-billing/sync";
@@ -191,11 +193,12 @@ export interface NewapiUpstreamGroupItem {
 }
 
 /**
- * 拉取 new-api 站点的匿名分组倍率表（GET {站点}/api/pricing 的 group_ratio），
+ * 拉取 new-api 站点的分组倍率表（GET {站点}/api/pricing 的 group_ratio），
  * 供 provider 表单的「上游分组」选择器使用。
  *
- * 注意：匿名访问会被上游站点「用户可用分组」配置过滤，看不到的组不会出现在结果中
- * （表单允许手填组名兜底）。倍率表进程内缓存 60s，此动作用 forceRefresh 强制刷新。
+ * 当该 URL 对应的上游站点已配置 PAT 和 UID 时，优先使用站点认证上下文；否则保持
+ * 匿名请求兼容。表单允许手填组名兜底，倍率表进程内缓存 60s，此动作用 forceRefresh
+ * 强制刷新。
  */
 export async function fetchNewapiUpstreamGroups(data: {
   providerUrl: string;
@@ -215,22 +218,41 @@ export async function fetchNewapiUpstreamGroups(data: {
       return { ok: false, error: "代理地址格式无效" };
     }
 
-    // 构造仅含探测所需字段的临时 provider（id=0 仅用于日志标识）
+    // 构造仅含探测所需字段的临时 provider（id=0 仅用于日志标识）。
+    // resolveNewapiProbeRequestContext 会按 provider URL 查找相同站点的 PAT/UID 配置。
     const probeTarget = {
       id: 0,
       name: "upstream-groups-probe",
       url: urlValidation.normalizedUrl,
       key: "",
+      upstreamSiteId: null,
       proxyUrl: data.proxyUrl ?? null,
       proxyFallbackToDirect: data.proxyFallbackToDirect ?? false,
     } as Provider;
 
-    const result = await getNewapiRatioTable(probeTarget, { forceRefresh: true });
+    const context = await resolveNewapiProbeRequestContext(probeTarget);
+    if (!context) {
+      return { ok: false, error: "拉取上游分组失败：供应商地址无效" };
+    }
+    const authenticated = Boolean(context.dashboardPat && context.dashboardUserId != null);
+    const result = await getNewapiRatioTable(probeTarget, {
+      forceRefresh: true,
+      context,
+      authenticated,
+    });
     if (!result.ok) {
+      logger.warn("fetchNewapiUpstreamGroups:failed", {
+        siteId: context.siteId,
+        probeBaseUrl: redactUrlCredentials(context.baseUrl),
+        authentication: authenticated ? "pat" : "anonymous",
+        reason: result.reason,
+        ...(result.status != null ? { status: result.status } : {}),
+        ...(result.error ? { upstreamMessage: result.error } : {}),
+      });
       if (result.reason === "unsupported") {
         return {
           ok: false,
-          error: "上游未开放匿名倍率表（pricing 模块关闭或不是 new-api 站点）",
+          error: "上游未开放倍率表（pricing 模块关闭或不是 new-api 站点）",
         };
       }
       return { ok: false, error: result.error || `拉取上游分组失败（${result.reason}）` };
@@ -240,9 +262,16 @@ export async function fetchNewapiUpstreamGroups(data: {
       .map(([name, ratio]) => ({ name, ratio }))
       .sort((a, b) => a.ratio - b.ratio || a.name.localeCompare(b.name));
 
+    logger.info("fetchNewapiUpstreamGroups:succeeded", {
+      siteId: context.siteId,
+      probeBaseUrl: redactUrlCredentials(context.baseUrl),
+      authentication: authenticated ? "pat" : "anonymous",
+      groupCount: groups.length,
+    });
     return { ok: true, data: { groups } };
   } catch (error) {
     logger.error("fetchNewapiUpstreamGroups failed", {
+      providerUrl: redactUrlCredentials(data.providerUrl),
       error: error instanceof Error ? error.message : String(error),
     });
     return { ok: false, error: "拉取上游分组失败" };

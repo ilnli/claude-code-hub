@@ -6,15 +6,23 @@ let findProviderByIdMock: ReturnType<typeof vi.fn>;
 let syncAndTrackProviderUpstreamRateMock: ReturnType<typeof vi.fn>;
 let publishInvalidationMock: ReturnType<typeof vi.fn>;
 let getNewapiRatioTableMock: ReturnType<typeof vi.fn>;
+let resolveNewapiProbeRequestContextMock: ReturnType<typeof vi.fn>;
 let isValidProxyUrlMock: ReturnType<typeof vi.fn>;
 let validateProviderUrlForConnectivityMock: ReturnType<typeof vi.fn>;
+let loggerWarnMock: ReturnType<typeof vi.fn>;
+let loggerInfoMock: ReturnType<typeof vi.fn>;
 
 vi.mock("@/lib/auth", () => ({
   getSession: () => getSessionMock(),
 }));
 
 vi.mock("@/lib/logger", () => ({
-  logger: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn() },
+  logger: {
+    info: (...args: unknown[]) => loggerInfoMock(...args),
+    warn: (...args: unknown[]) => loggerWarnMock(...args),
+    debug: vi.fn(),
+    error: vi.fn(),
+  },
 }));
 
 vi.mock("@/lib/upstream-billing/probe-scheduler", () => ({
@@ -32,6 +40,11 @@ vi.mock("@/lib/proxy-agent", () => ({
 
 vi.mock("@/lib/upstream-billing/newapi-table-cache", () => ({
   getNewapiRatioTable: (...args: unknown[]) => getNewapiRatioTableMock(...args),
+}));
+
+vi.mock("@/lib/upstream-billing/newapi-probe-context", () => ({
+  resolveNewapiProbeRequestContext: (...args: unknown[]) =>
+    resolveNewapiProbeRequestContextMock(...args),
 }));
 
 vi.mock("@/lib/validation/provider-url", () => ({
@@ -63,6 +76,27 @@ function makeProvider(overrides: Partial<Provider> = {}): Provider {
     rateMarkupValue: 0,
     ...overrides,
   } as Provider;
+}
+
+function makeProbeContext(
+  overrides: Partial<{
+    baseUrl: string;
+    cacheKey: string;
+    siteId: number | null;
+    proxyConfig: Provider;
+    dashboardPat: string | null;
+    dashboardUserId: number | null;
+  }> = {}
+) {
+  return {
+    baseUrl: "https://newapi.example.com",
+    cacheKey: "legacy:https://newapi.example.com",
+    siteId: null,
+    proxyConfig: makeProvider(),
+    dashboardPat: null,
+    dashboardUserId: null,
+    ...overrides,
+  };
 }
 
 describe("syncProviderUpstreamRateNow", () => {
@@ -190,7 +224,10 @@ describe("fetchNewapiUpstreamGroups", () => {
   beforeEach(() => {
     getSessionMock = vi.fn().mockResolvedValue({ user: { role: "admin" } });
     getNewapiRatioTableMock = vi.fn();
+    resolveNewapiProbeRequestContextMock = vi.fn().mockResolvedValue(makeProbeContext());
     isValidProxyUrlMock = vi.fn().mockReturnValue(true);
+    loggerWarnMock = vi.fn();
+    loggerInfoMock = vi.fn();
     validateProviderUrlForConnectivityMock = vi.fn().mockReturnValue({
       valid: true,
       normalizedUrl: "https://newapi.example.com/v1",
@@ -258,11 +295,70 @@ describe("fetchNewapiUpstreamGroups", () => {
       expect.objectContaining({
         id: 0,
         url: "https://newapi.example.com/v1",
+        upstreamSiteId: null,
         proxyUrl: "http://proxy.example.com:8080",
         proxyFallbackToDirect: true,
       }),
-      { forceRefresh: true }
+      {
+        forceRefresh: true,
+        context: expect.objectContaining({
+          baseUrl: "https://newapi.example.com",
+          dashboardPat: null,
+          dashboardUserId: null,
+        }),
+        authenticated: false,
+      }
     );
+    expect(loggerInfoMock).toHaveBeenCalledWith("fetchNewapiUpstreamGroups:succeeded", {
+      siteId: null,
+      probeBaseUrl: "https://newapi.example.com",
+      authentication: "anonymous",
+      groupCount: 3,
+    });
+  });
+
+  it("uses the matching upstream site's PAT and UID context", async () => {
+    const siteContext = makeProbeContext({
+      baseUrl: "https://newapi.example.com/management",
+      cacheKey: "site:12:1234",
+      siteId: 12,
+      dashboardPat: "site-pat-must-not-be-logged",
+      dashboardUserId: 84,
+    });
+    resolveNewapiProbeRequestContextMock.mockResolvedValue(siteContext);
+    getNewapiRatioTableMock.mockResolvedValue({
+      ok: true,
+      table: { internal: 0.5, default: 1 },
+    });
+
+    const result = await fetchNewapiUpstreamGroups({
+      providerUrl: "https://newapi.example.com/v1",
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      data: {
+        groups: [
+          { name: "internal", ratio: 0.5 },
+          { name: "default", ratio: 1 },
+        ],
+      },
+    });
+    expect(resolveNewapiProbeRequestContextMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: "https://newapi.example.com/v1",
+        upstreamSiteId: null,
+      })
+    );
+    expect(getNewapiRatioTableMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        forceRefresh: true,
+        context: siteContext,
+        authenticated: true,
+      })
+    );
+    expect(JSON.stringify(loggerInfoMock.mock.calls)).not.toContain("site-pat-must-not-be-logged");
   });
 
   it("reports unsupported upstream pricing tables", async () => {
@@ -277,5 +373,12 @@ describe("fetchNewapiUpstreamGroups", () => {
     });
 
     expect(result.ok).toBe(false);
+    expect(loggerWarnMock).toHaveBeenCalledWith("fetchNewapiUpstreamGroups:failed", {
+      siteId: null,
+      probeBaseUrl: "https://newapi.example.com",
+      authentication: "anonymous",
+      reason: "unsupported",
+      status: 404,
+    });
   });
 });

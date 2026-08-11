@@ -449,7 +449,7 @@
       "costAutoSync": "Follow upstream rate is enabled. The cost multiplier is automatically written back from probe results (the current value is the effective value)",
       "probeType": {
         "label": "Probe protocol",
-        "desc": "sub2api probes GET /v1/sub2api/billing; new-api reads the anonymous group ratio table (/api/pricing) and calibrates the key's actual billing group via its consume logs",
+        "desc": "sub2api probes GET /v1/sub2api/billing; new-api reads the group ratio table (/api/pricing, authenticated with the site PAT when configured) and calibrates the key's actual billing group via its consume logs",
         "options": {
           "sub2api": "sub2api",
           "newapi": "new-api"
@@ -462,7 +462,7 @@
         "fetch": "Fetch groups",
         "fetchNeedUrl": "Please fill in the provider URL first",
         "fetchFailed": "Failed to fetch upstream groups",
-        "fetchEmpty": "The upstream anonymous ratio table exposes no groups; you can still enter a group name manually",
+        "fetchEmpty": "The upstream ratio table returned no groups; you can still enter a group name manually",
         "hint": "The new-api log endpoint is rate limited per source IP (default 20 requests / 20 min). Recommended probe interval is at least 5 minutes; increase it when many keys point to the same site"
       },
       "defaultRate": {
