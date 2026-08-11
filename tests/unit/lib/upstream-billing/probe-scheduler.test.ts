@@ -148,6 +148,7 @@ describe("upstream-billing probe-scheduler", () => {
         proxyFallbackToDirect: provider.proxyFallbackToDirect,
       },
       dashboardPat: null,
+      dashboardUserId: null,
     }));
     getSettingsMock = vi.fn().mockResolvedValue({ enabled: true, intervalMinutes: 30 });
     publishInvalidationMock = vi.fn().mockResolvedValue(undefined);

@@ -75,7 +75,7 @@ export function UpstreamSitesView() {
       ) : null}
 
       <div className="overflow-x-auto border">
-        <Table className="min-w-[720px]">
+        <Table className="min-w-[840px]">
           <TableHeader>
             <TableRow>
               <TableHead>{t("site")}</TableHead>
@@ -83,6 +83,7 @@ export function UpstreamSitesView() {
               <TableHead>{t("newapiProviders")}</TableHead>
               <TableHead>{t("target")}</TableHead>
               <TableHead>{t("pat")}</TableHead>
+              <TableHead>{t("uid")}</TableHead>
               <TableHead className="w-14">
                 <span className="sr-only">{t("actions")}</span>
               </TableHead>
@@ -91,7 +92,7 @@ export function UpstreamSitesView() {
           <TableBody>
             {sites.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-28 text-center text-muted-foreground">
+                <TableCell colSpan={7} className="h-28 text-center text-muted-foreground">
                   {t("empty")}
                 </TableCell>
               </TableRow>
@@ -108,6 +109,9 @@ export function UpstreamSitesView() {
                     <Badge variant={site.patConfigured ? "default" : "secondary"}>
                       {site.patConfigured ? t("configured") : t("notConfigured")}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="tabular-nums">
+                    {site.dashboardUserId ?? t("notConfigured")}
                   </TableCell>
                   <TableCell>
                     <Button
@@ -149,6 +153,7 @@ function UpstreamSiteDialog({
   const deleteMutation = useDeleteUpstreamSite();
   const [probeBaseUrl, setProbeBaseUrl] = useState("");
   const [dashboardPat, setDashboardPat] = useState("");
+  const [dashboardUserId, setDashboardUserId] = useState("");
   const [clearPat, setClearPat] = useState(false);
   const [allowInsecureHttp, setAllowInsecureHttp] = useState(false);
   const [proxyUrl, setProxyUrl] = useState("");
@@ -157,25 +162,47 @@ function UpstreamSiteDialog({
   useEffect(() => {
     setProbeBaseUrl(site?.probeBaseUrl ?? "");
     setDashboardPat("");
+    setDashboardUserId(site?.dashboardUserId?.toString() ?? "");
     setClearPat(false);
     setAllowInsecureHttp(site?.allowInsecureHttp ?? false);
     setProxyUrl(site?.proxyUrl ?? "");
     setProxyFallbackToDirect(site?.proxyFallbackToDirect ?? false);
   }, [site]);
 
+  const parsedDashboardUserId = useMemo(() => {
+    const value = dashboardUserId.trim();
+    if (!/^\d+$/.test(value)) return null;
+    const parsed = Number(value);
+    return Number.isInteger(parsed) && parsed > 0 && parsed <= 2_147_483_647 ? parsed : null;
+  }, [dashboardUserId]);
+  const hasEffectivePat = Boolean(!clearPat && (site?.patConfigured || dashboardPat.trim()));
+  const credentialsInvalid = hasEffectivePat
+    ? parsedDashboardUserId == null
+    : dashboardUserId.trim().length > 0;
+  const credentialsReady = hasEffectivePat && parsedDashboardUserId != null;
+
   const input = useMemo(
     () => ({
       probeBaseUrl: probeBaseUrl.trim() || null,
       ...(clearPat
-        ? { dashboardPat: null }
+        ? { dashboardPat: null, dashboardUserId: null }
         : dashboardPat.trim()
           ? { dashboardPat: dashboardPat.trim() }
           : {}),
+      dashboardUserId: clearPat ? null : parsedDashboardUserId,
       allowInsecureHttp,
       proxyUrl: proxyUrl.trim() || null,
       proxyFallbackToDirect,
     }),
-    [allowInsecureHttp, clearPat, dashboardPat, probeBaseUrl, proxyFallbackToDirect, proxyUrl]
+    [
+      allowInsecureHttp,
+      clearPat,
+      dashboardPat,
+      parsedDashboardUserId,
+      probeBaseUrl,
+      proxyFallbackToDirect,
+      proxyUrl,
+    ]
   );
 
   if (!site) return null;
@@ -263,7 +290,11 @@ function UpstreamSiteDialog({
                   type="button"
                   variant={clearPat ? "secondary" : "outline"}
                   onClick={() => {
-                    setClearPat((value) => !value);
+                    setClearPat((value) => {
+                      const next = !value;
+                      setDashboardUserId(next ? "" : (site.dashboardUserId?.toString() ?? ""));
+                      return next;
+                    });
                     setDashboardPat("");
                   }}
                   disabled={pending}
@@ -273,6 +304,25 @@ function UpstreamSiteDialog({
                 </Button>
               ) : null}
             </div>
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor={`site-user-id-${site.id}`}>{t("uid")}</Label>
+            <Input
+              id={`site-user-id-${site.id}`}
+              type="number"
+              min={1}
+              max={2_147_483_647}
+              step={1}
+              inputMode="numeric"
+              value={dashboardUserId}
+              onChange={(event) => setDashboardUserId(event.target.value)}
+              disabled={pending || clearPat}
+              required={hasEffectivePat}
+              aria-invalid={credentialsInvalid}
+              placeholder={t("uidPlaceholder")}
+            />
+            <p className="text-xs text-muted-foreground">{t("uidDescription")}</p>
           </div>
 
           <div className="grid gap-2">
@@ -331,7 +381,12 @@ function UpstreamSiteDialog({
           </AlertDialog>
 
           <div className="flex flex-col-reverse gap-2 sm:flex-row">
-            <Button type="button" variant="outline" onClick={handleTest} disabled={pending}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleTest}
+              disabled={pending || !credentialsReady}
+            >
               {testMutation.isPending ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
@@ -339,7 +394,7 @@ function UpstreamSiteDialog({
               )}
               {t("test")}
             </Button>
-            <Button type="button" onClick={handleSave} disabled={pending}>
+            <Button type="button" onClick={handleSave} disabled={pending || credentialsInvalid}>
               {updateMutation.isPending ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (

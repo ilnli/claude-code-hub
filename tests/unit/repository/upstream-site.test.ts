@@ -54,6 +54,7 @@ function makeSite(overrides: Record<string, unknown> = {}) {
     siteKey: "example.com",
     probeBaseUrl: "https://example.com/management",
     dashboardPat: "pat-must-not-leak",
+    dashboardUserId: 42,
     allowInsecureHttp: false,
     proxyUrl: "http://user:pass@proxy.example.com:8080",
     proxyFallbackToDirect: true,
@@ -112,6 +113,7 @@ describe("upstream site repository", () => {
     expect(sites[0]).toMatchObject({
       id: 7,
       patConfigured: true,
+      dashboardUserId: 42,
       providerCount: 1,
       newapiProviderCount: 1,
       probeTargetCandidates: ["https://example.com"],
@@ -134,6 +136,7 @@ describe("upstream site repository", () => {
       makeSite({
         probeBaseUrl: null,
         dashboardPat: null,
+        dashboardUserId: null,
         allowInsecureHttp: false,
         proxyUrl: null,
         proxyFallbackToDirect: false,

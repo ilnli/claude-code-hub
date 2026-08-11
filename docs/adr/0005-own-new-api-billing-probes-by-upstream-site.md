@@ -6,7 +6,7 @@ status: accepted
 
 We will introduce an Upstream Site as a persistent identity derived from the normalized host of a
 Provider's configured upstream URL. It is independent of Provider Vendor and owns one optional
-new-api Dashboard PAT, one management-plane probe target, and one proxy policy shared by all
+new-api Dashboard PAT with its numeric user UID, one management-plane probe target, and one proxy policy shared by all
 Providers assigned to that Site. This keeps billing credentials bound to the host that receives
 them without duplicating PAT configuration across Providers or changing Provider-level billing
 policies.
@@ -34,14 +34,16 @@ policies.
   URLs may remain explicitly unassigned until repaired and cannot run new-api probes.
 - The Site probe target must match the Site's normalized host and is used for both `/api/pricing`
   and `/api/log/token`. One optional Site proxy policy supplies a deterministic network route.
-- A configured target is required before saving a PAT. HTTPS is required by default; an
-  administrator may explicitly allow insecure HTTP for a Site.
+- A configured target and numeric new-api user UID are required before saving a PAT. Authenticated
+  management-plane requests send the UID in the `New-Api-User` header. HTTPS is required by default;
+  an administrator may explicitly allow insecure HTTP for a Site.
 - A Provider resolves a valid group rate in this order: PAT-authenticated pricing, anonymous
   pricing, then its configured default rate. Missing, invalid, or inaccessible PAT results silently
   continue to the anonymous source; successful anonymous fallback does not create a degraded state.
 - The PAT is optional, stored in plaintext consistently with existing Provider keys, treated as a
   write-only management field, never returned or logged, and only replaced or cleared explicitly.
-  Proxy credentials are redacted in management responses.
+  Its non-secret numeric UID is returned for editing and is cleared with the PAT. Proxy credentials
+  are redacted in management responses.
 - PAT testing is an audited, administrator-only, read-only operation. It may use unsaved draft
   settings, validates both identity and the authenticated pricing response, and never writes
   Provider rates.

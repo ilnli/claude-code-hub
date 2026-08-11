@@ -32,6 +32,7 @@ describe("resolveNewapiProbeRequestContext", () => {
       siteKey: "example.com",
       probeBaseUrl: "https://example.com/management",
       dashboardPat: "pat-secret",
+      dashboardUserId: 8,
       allowInsecureHttp: false,
       proxyUrl: "socks5://site-proxy.example.com:1080",
       proxyFallbackToDirect: true,
@@ -44,6 +45,7 @@ describe("resolveNewapiProbeRequestContext", () => {
       baseUrl: "https://example.com/management",
       siteId: 4,
       dashboardPat: "pat-secret",
+      dashboardUserId: 8,
       proxyConfig: {
         id: 4,
         proxyUrl: "socks5://site-proxy.example.com:1080",
@@ -59,6 +61,7 @@ describe("resolveNewapiProbeRequestContext", () => {
       siteKey: "example.com",
       probeBaseUrl: null,
       dashboardPat: null,
+      dashboardUserId: null,
       allowInsecureHttp: false,
       proxyUrl: "socks5://ignored.example.com:1080",
       proxyFallbackToDirect: true,
@@ -72,6 +75,7 @@ describe("resolveNewapiProbeRequestContext", () => {
       baseUrl: "https://example.com/prefix",
       siteId: 4,
       dashboardPat: null,
+      dashboardUserId: null,
       proxyConfig: provider,
     });
   });

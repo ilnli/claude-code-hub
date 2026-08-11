@@ -9,6 +9,7 @@ export const UpstreamSiteSchema = z.object({
   siteKey: z.string(),
   probeBaseUrl: z.string().url().nullable(),
   patConfigured: z.boolean(),
+  dashboardUserId: z.number().int().positive().max(2_147_483_647).nullable(),
   allowInsecureHttp: z.boolean(),
   proxyUrl: z.string().nullable().describe("Proxy URL with credentials redacted."),
   proxyFallbackToDirect: z.boolean(),
@@ -34,6 +35,14 @@ export const UpstreamSiteConfigSchema = z
       .nullable()
       .optional()
       .describe("Write-only new-api dashboard PAT. Omit to preserve it and use null to clear it."),
+    dashboardUserId: z
+      .number()
+      .int()
+      .positive()
+      .max(2_147_483_647)
+      .nullable()
+      .optional()
+      .describe("new-api user UID sent through the New-Api-User header."),
     allowInsecureHttp: z.boolean().optional(),
     proxyUrl: z.string().trim().max(2048).nullable().optional(),
     proxyFallbackToDirect: z.boolean().optional(),

@@ -11,6 +11,7 @@ import type { Provider } from "@/types/provider";
  * - GET {站点根}/api/pricing：匿名可读（pricing 模块开启时），响应顶层 group_ratio 为
  *   组名->分组倍率 映射；匿名访问会被站点「用户可用分组」过滤，看不到的组视为缺失。
  *   模块关闭/需登录返回 403，非 new-api 站点返回 404，均归为 unsupported。
+ *   Dashboard PAT 认证同时要求 New-Api-User 请求头携带该 PAT 所属用户的数字 UID。
  * - GET {站点根}/api/log/token：Authorization: Bearer sk-...，返回该 key 的近期日志
  *   （按 id 倒序），取消费日志（type=2 且 group 非空）前 20 条求众数作为实际落组分组。
  *   站点可关闭消费日志（返回空），此时 group 为 null —— 不是失败。
@@ -87,6 +88,7 @@ export interface NewapiProbeRequestContext {
   siteId: number | null;
   proxyConfig: ProviderProxyConfig;
   dashboardPat: string | null;
+  dashboardUserId: number | null;
 }
 
 export type NewapiPatTestResult =
@@ -96,6 +98,10 @@ export type NewapiPatTestResult =
 interface NewapiRatioTableOptions {
   context?: NewapiProbeRequestContext;
   authenticated?: boolean;
+}
+
+function isValidDashboardUserId(value: number | null | undefined): value is number {
+  return Number.isInteger(value) && value != null && value > 0 && value <= 2_147_483_647;
 }
 
 function resolveRequestTarget(
@@ -226,11 +232,20 @@ export async function fetchNewapiRatioTable(
   if (options.authenticated && !dashboardPat) {
     return { ok: false, reason: "auth", error: "site PAT is not configured" };
   }
+  const dashboardUserId = options.authenticated ? options.context?.dashboardUserId : null;
+  if (options.authenticated && !isValidDashboardUserId(dashboardUserId)) {
+    return { ok: false, reason: "auth", error: "site new-api user UID is not configured" };
+  }
 
   const fetched = await fetchWithProxyFallback(
     target.proxyConfig,
     url,
-    dashboardPat ? { Authorization: `Bearer ${dashboardPat}` } : {}
+    dashboardPat && dashboardUserId != null
+      ? {
+          Authorization: `Bearer ${dashboardPat}`,
+          "New-Api-User": String(dashboardUserId),
+        }
+      : {}
   );
   if (!fetched.ok) {
     return fetched;
@@ -378,6 +393,10 @@ export async function testNewapiDashboardPat(
   if (!dashboardPat) {
     return { ok: false, reason: "auth", error: "site PAT is not configured" };
   }
+  const dashboardUserId = context.dashboardUserId;
+  if (!isValidDashboardUserId(dashboardUserId)) {
+    return { ok: false, reason: "auth", error: "site new-api user UID is not configured" };
+  }
   const target = resolveRequestTarget(provider, context);
   if (!target) {
     return { ok: false, reason: "invalid", error: "probe target is not a valid URL" };
@@ -386,6 +405,7 @@ export async function testNewapiDashboardPat(
   const identityUrl = `${target.baseUrl}/api/user/self`;
   const fetched = await fetchWithProxyFallback(target.proxyConfig, identityUrl, {
     Authorization: `Bearer ${dashboardPat}`,
+    "New-Api-User": String(dashboardUserId),
   });
   if (!fetched.ok) return fetched;
 
@@ -405,8 +425,12 @@ export async function testNewapiDashboardPat(
   } catch {
     return { ok: false, reason: "invalid", error: "identity response is not valid JSON" };
   }
-  if (!dashboardIdentityResponseSchema.safeParse(body).success) {
+  const identity = dashboardIdentityResponseSchema.safeParse(body);
+  if (!identity.success) {
     return { ok: false, reason: "invalid", error: "identity response is invalid" };
+  }
+  if (identity.data.data.id !== dashboardUserId) {
+    return { ok: false, reason: "auth", error: "new-api user UID does not match the PAT owner" };
   }
 
   const pricing = await fetchNewapiRatioTable(provider, { context, authenticated: true });

@@ -137,6 +137,7 @@ describe("getNewapiRatioTable 缓存", () => {
       siteId: 501,
       proxyConfig: { id: 501, proxyUrl: null, proxyFallbackToDirect: false },
       dashboardPat: "pat-secret",
+      dashboardUserId: 501,
     };
     fetchMock
       .mockResolvedValueOnce(makePricingResponse({ vip: 0.5 }))
@@ -148,7 +149,10 @@ describe("getNewapiRatioTable 缓存", () => {
     expect(pat).toEqual({ ok: true, table: { vip: 0.5 } });
     expect(anonymous).toEqual({ ok: true, table: { default: 1 } });
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(fetchMock.mock.calls[0]?.[1]?.headers).toEqual({ Authorization: "Bearer pat-secret" });
+    expect(fetchMock.mock.calls[0]?.[1]?.headers).toEqual({
+      Authorization: "Bearer pat-secret",
+      "New-Api-User": "501",
+    });
     expect(fetchMock.mock.calls[1]?.[1]?.headers).toEqual({});
   });
 
@@ -159,6 +163,7 @@ describe("getNewapiRatioTable 缓存", () => {
       siteId: 777,
       proxyConfig: { id: 777, proxyUrl: null, proxyFallbackToDirect: false },
       dashboardPat: null,
+      dashboardUserId: null,
     };
     fetchMock
       .mockResolvedValueOnce(makePricingResponse({ default: 1 }))

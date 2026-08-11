@@ -79,7 +79,8 @@ upstreamSitesRouter.openapi(
     middleware: requireAuth("admin"),
     tags: ["Upstream Sites"],
     summary: "Update upstream site probe configuration",
-    description: "Updates the target, write-only PAT, and proxy policy for an upstream site.",
+    description:
+      "Updates the target, write-only PAT, numeric new-api user UID, and proxy policy for an upstream site.",
     "x-required-access": "admin",
     security,
     request: {
@@ -107,7 +108,8 @@ upstreamSitesRouter.openapi(
     middleware: requireAuth("admin"),
     tags: ["Upstream Sites"],
     summary: "Test an upstream site PAT",
-    description: "Validates a saved or draft PAT and target without changing Provider rates.",
+    description:
+      "Validates a saved or draft PAT, numeric new-api user UID, and target without changing Provider rates.",
     "x-required-access": "admin",
     security,
     request: {

@@ -26,6 +26,7 @@ const SiteConfigSchema = z.object({
   siteId: SiteIdSchema,
   probeBaseUrl: z.string().trim().max(2048).optional().nullable(),
   dashboardPat: z.string().trim().min(1).max(4096).optional().nullable(),
+  dashboardUserId: z.number().int().positive().max(2_147_483_647).optional().nullable(),
   allowInsecureHttp: z.boolean().optional(),
   proxyUrl: z.string().trim().max(2048).optional().nullable(),
   proxyFallbackToDirect: z.boolean().optional(),
@@ -53,6 +54,7 @@ function sanitizeSite(site: UpstreamSite): UpstreamSite {
     siteKey: site.siteKey,
     probeBaseUrl: site.probeBaseUrl,
     patConfigured: site.patConfigured,
+    dashboardUserId: site.dashboardUserId,
     allowInsecureHttp: site.allowInsecureHttp,
     proxyUrl: redactUrlCredentials(site.proxyUrl),
     proxyFallbackToDirect: site.proxyFallbackToDirect,
@@ -101,10 +103,28 @@ function resolveConfig(
 
   const dashboardPat =
     input.dashboardPat === undefined ? current.dashboardPat : input.dashboardPat?.trim() || null;
+  const dashboardUserId =
+    input.dashboardUserId === undefined
+      ? input.dashboardPat === null
+        ? null
+        : current.dashboardUserId
+      : input.dashboardUserId;
   if (dashboardPat && !probeBaseUrl) {
     throw new SiteConfigError(
       "upstream_site.target_required_for_pat",
       "A probe target is required before configuring a PAT"
+    );
+  }
+  if (dashboardPat && dashboardUserId == null) {
+    throw new SiteConfigError(
+      "upstream_site.user_id_required_for_pat",
+      "A new-api user UID is required when configuring a PAT"
+    );
+  }
+  if (!dashboardPat && dashboardUserId != null) {
+    throw new SiteConfigError(
+      "upstream_site.pat_required_for_user_id",
+      "A PAT is required when configuring a new-api user UID"
     );
   }
 
@@ -118,6 +138,7 @@ function resolveConfig(
   return {
     probeBaseUrl,
     dashboardPat,
+    dashboardUserId,
     allowInsecureHttp,
     proxyUrl,
     proxyFallbackToDirect: input.proxyFallbackToDirect ?? current.proxyFallbackToDirect,
@@ -182,6 +203,7 @@ export async function saveUpstreamSiteConfig(
       before: {
         probeBaseUrl: current.probeBaseUrl,
         patConfigured: Boolean(current.dashboardPat),
+        dashboardUserId: current.dashboardUserId,
         allowInsecureHttp: current.allowInsecureHttp,
         proxyUrl: redactUrlCredentials(current.proxyUrl),
         proxyFallbackToDirect: current.proxyFallbackToDirect,
@@ -189,6 +211,7 @@ export async function saveUpstreamSiteConfig(
       after: {
         probeBaseUrl: config.probeBaseUrl,
         patConfigured: Boolean(config.dashboardPat),
+        dashboardUserId: config.dashboardUserId,
         allowInsecureHttp: config.allowInsecureHttp,
         proxyUrl: redactUrlCredentials(config.proxyUrl),
         proxyFallbackToDirect: config.proxyFallbackToDirect,
@@ -236,10 +259,15 @@ export async function testUpstreamSitePat(
 
   try {
     const config = resolveConfig(parsed.data, current);
-    if (!current || !config.probeBaseUrl || !config.dashboardPat) {
+    if (
+      !current ||
+      !config.probeBaseUrl ||
+      !config.dashboardPat ||
+      config.dashboardUserId == null
+    ) {
       throw new SiteConfigError(
-        "upstream_site.pat_and_target_required",
-        "A probe target and PAT are required for testing"
+        "upstream_site.credentials_and_target_required",
+        "A probe target, PAT, and new-api user UID are required for testing"
       );
     }
 
@@ -255,6 +283,7 @@ export async function testUpstreamSitePat(
       siteId: current.id,
       proxyConfig,
       dashboardPat: config.dashboardPat,
+      dashboardUserId: config.dashboardUserId,
     };
     const probeProvider = {
       ...proxyConfig,
@@ -331,6 +360,7 @@ export async function removeUpstreamSite(siteId: number): Promise<ActionResult<{
         ? {
             probeBaseUrl: current.probeBaseUrl,
             patConfigured: Boolean(current.dashboardPat),
+            dashboardUserId: current.dashboardUserId,
             proxyUrl: redactUrlCredentials(current.proxyUrl),
           }
         : undefined,

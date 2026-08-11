@@ -26,6 +26,7 @@ export async function resolveNewapiProbeRequestContext(
         proxyFallbackToDirect: site.proxyFallbackToDirect,
       },
       dashboardPat: site.dashboardPat,
+      dashboardUserId: site.dashboardUserId,
     };
   }
 
@@ -37,6 +38,7 @@ export async function resolveNewapiProbeRequestContext(
       siteId: site?.id ?? null,
       proxyConfig: provider,
       dashboardPat: null,
+      dashboardUserId: null,
     };
   } catch {
     return null;

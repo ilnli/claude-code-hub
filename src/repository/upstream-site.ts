@@ -15,6 +15,7 @@ export interface UpstreamSiteProbeConfig {
   siteKey: string;
   probeBaseUrl: string | null;
   dashboardPat: string | null;
+  dashboardUserId: number | null;
   allowInsecureHttp: boolean;
   proxyUrl: string | null;
   proxyFallbackToDirect: boolean;
@@ -24,6 +25,7 @@ export interface UpstreamSiteProbeConfig {
 export interface UpdateUpstreamSiteConfig {
   probeBaseUrl?: string | null;
   dashboardPat?: string | null;
+  dashboardUserId?: number | null;
   allowInsecureHttp?: boolean;
   proxyUrl?: string | null;
   proxyFallbackToDirect?: boolean;
@@ -35,6 +37,7 @@ function toProbeConfig(row: typeof upstreamSites.$inferSelect): UpstreamSiteProb
     siteKey: row.siteKey,
     probeBaseUrl: row.probeBaseUrl ?? null,
     dashboardPat: row.dashboardPat ?? null,
+    dashboardUserId: row.dashboardUserId ?? null,
     allowInsecureHttp: row.allowInsecureHttp,
     proxyUrl: row.proxyUrl ?? null,
     proxyFallbackToDirect: row.proxyFallbackToDirect,
@@ -96,6 +99,7 @@ function toPublicSite(
     siteKey: row.siteKey,
     probeBaseUrl: row.probeBaseUrl ?? null,
     patConfigured: Boolean(row.dashboardPat),
+    dashboardUserId: row.dashboardUserId ?? null,
     allowInsecureHttp: row.allowInsecureHttp,
     proxyUrl: row.proxyUrl ?? null,
     proxyFallbackToDirect: row.proxyFallbackToDirect,
@@ -279,6 +283,7 @@ export async function tryDeleteUnconfiguredUpstreamSiteIfEmpty(id: number): Prom
     if (
       site.probeBaseUrl ||
       site.dashboardPat ||
+      site.dashboardUserId != null ||
       site.proxyUrl ||
       site.allowInsecureHttp ||
       site.proxyFallbackToDirect

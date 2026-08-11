@@ -69,6 +69,7 @@ describe("syncProviderUpstreamRate (newapi)", () => {
       siteId: 1,
       proxyConfig: { id: 1, proxyUrl: null, proxyFallbackToDirect: false },
       dashboardPat: null,
+      dashboardUserId: null,
     });
     updateUpstreamBillingProbeResultMock = vi.fn().mockResolvedValue(true);
     restoreProviderCostMultiplierMock = vi.fn().mockResolvedValue(true);
@@ -125,6 +126,7 @@ describe("syncProviderUpstreamRate (newapi)", () => {
       siteId: 1,
       proxyConfig: { id: 1, proxyUrl: null, proxyFallbackToDirect: false },
       dashboardPat: "pat-secret",
+      dashboardUserId: 8,
     });
     fetchNewapiTokenGroupMock.mockResolvedValue({ ok: true, group: "vip" });
     getNewapiRatioTableMock.mockResolvedValue({ ok: true, table: { vip: 0.6 } });
@@ -146,6 +148,7 @@ describe("syncProviderUpstreamRate (newapi)", () => {
       siteId: 1,
       proxyConfig: { id: 1, proxyUrl: null, proxyFallbackToDirect: false },
       dashboardPat: "pat-secret",
+      dashboardUserId: 8,
     });
     fetchNewapiTokenGroupMock.mockResolvedValue({ ok: true, group: "vip" });
     getNewapiRatioTableMock

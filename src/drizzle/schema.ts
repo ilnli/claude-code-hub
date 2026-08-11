@@ -191,6 +191,7 @@ export const upstreamSites = pgTable('upstream_sites', {
   siteKey: varchar('site_key', { length: 255 }).notNull(),
   probeBaseUrl: text('probe_base_url'),
   dashboardPat: text('dashboard_pat'),
+  dashboardUserId: integer('dashboard_user_id'),
   allowInsecureHttp: boolean('allow_insecure_http').notNull().default(false),
   proxyUrl: text('proxy_url'),
   proxyFallbackToDirect: boolean('proxy_fallback_to_direct').notNull().default(false),

@@ -60,6 +60,7 @@ function makeSiteContext() {
       proxyFallbackToDirect: true,
     },
     dashboardPat: "dashboard-pat",
+    dashboardUserId: 8,
   };
 }
 
@@ -97,7 +98,7 @@ describe("fetchNewapiRatioTable", () => {
     expect(result).toMatchObject({ ok: false, reason: "unsupported", status: 403 });
   });
 
-  it("PAT 模式使用站点目标、站点代理和 Bearer PAT", async () => {
+  it("PAT 模式使用站点目标、站点代理、Bearer PAT 和用户 UID", async () => {
     fetchMock.mockResolvedValue(
       makeResponse({ ok: true, status: 200, body: { group_ratio: { vip: 0.7 } } })
     );
@@ -111,7 +112,12 @@ describe("fetchNewapiRatioTable", () => {
     expect(result).toEqual({ ok: true, table: { vip: 0.7 } });
     expect(fetchMock).toHaveBeenCalledWith(
       "https://newapi.example.com/management/api/pricing",
-      expect.objectContaining({ headers: { Authorization: "Bearer dashboard-pat" } })
+      expect.objectContaining({
+        headers: {
+          Authorization: "Bearer dashboard-pat",
+          "New-Api-User": "8",
+        },
+      })
     );
     expect(createProxyAgentForProvider).toHaveBeenCalledWith(
       context.proxyConfig,
@@ -126,6 +132,16 @@ describe("fetchNewapiRatioTable", () => {
       authenticated: true,
     });
     expect(result).toMatchObject({ ok: false, reason: "auth", status: 403 });
+  });
+
+  it("PAT 模式缺少用户 UID 时不发送请求", async () => {
+    const result = await fetchNewapiRatioTable(makeProvider(), {
+      context: { ...makeSiteContext(), dashboardUserId: null },
+      authenticated: true,
+    });
+
+    expect(result).toMatchObject({ ok: false, reason: "auth" });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("404：非 new-api 站点 -> unsupported", async () => {
@@ -214,6 +230,18 @@ describe("fetchNewapiTokenGroup", () => {
     expect(init.headers).toEqual({ Authorization: "Bearer sk-abc" });
   });
 
+  it("Provider token 日志请求不携带站点 Dashboard UID", async () => {
+    fetchMock.mockResolvedValue(
+      makeResponse({ ok: true, status: 200, body: { success: true, data: [] } })
+    );
+
+    await fetchNewapiTokenGroup(makeProvider({ key: "sk-provider" }), makeSiteContext());
+
+    expect(fetchMock.mock.calls[0]?.[1]?.headers).toEqual({
+      Authorization: "Bearer sk-provider",
+    });
+  });
+
   it("空日志（冷启动/站点关日志）-> ok 且 group 为 null", async () => {
     fetchMock.mockResolvedValue(
       makeResponse({ ok: true, status: 200, body: { success: true, data: [] } })
@@ -280,9 +308,11 @@ describe("testNewapiDashboardPat", () => {
     ]);
     expect(fetchMock.mock.calls[0]?.[1]?.headers).toEqual({
       Authorization: "Bearer dashboard-pat",
+      "New-Api-User": "8",
     });
     expect(fetchMock.mock.calls[1]?.[1]?.headers).toEqual({
       Authorization: "Bearer dashboard-pat",
+      "New-Api-User": "8",
     });
   });
 
@@ -293,6 +323,26 @@ describe("testNewapiDashboardPat", () => {
     });
     expect(result).toMatchObject({ ok: false, reason: "auth" });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("无用户 UID 时不发送请求", async () => {
+    const result = await testNewapiDashboardPat(makeProvider(), {
+      ...makeSiteContext(),
+      dashboardUserId: null,
+    });
+    expect(result).toMatchObject({ ok: false, reason: "auth" });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("身份响应与配置 UID 不一致时拒绝继续读取价格表", async () => {
+    fetchMock.mockResolvedValueOnce(
+      makeResponse({ ok: true, status: 200, body: { success: true, data: { id: 9 } } })
+    );
+
+    const result = await testNewapiDashboardPat(makeProvider(), makeSiteContext());
+
+    expect(result).toMatchObject({ ok: false, reason: "auth" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -807,6 +807,7 @@ export interface UpstreamSite {
   siteKey: string;
   probeBaseUrl: string | null;
   patConfigured: boolean;
+  dashboardUserId: number | null;
   allowInsecureHttp: boolean;
   proxyUrl: string | null;
   proxyFallbackToDirect: boolean;

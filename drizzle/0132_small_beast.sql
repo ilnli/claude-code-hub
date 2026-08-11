@@ -1,0 +1,1 @@
+ALTER TABLE "upstream_sites" ADD COLUMN "dashboard_user_id" integer;

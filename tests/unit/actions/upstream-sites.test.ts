@@ -54,6 +54,7 @@ function makeProbeConfig() {
     siteKey: "example.com",
     probeBaseUrl: "https://example.com/new-api",
     dashboardPat: "stored-pat",
+    dashboardUserId: 42,
     allowInsecureHttp: false,
     proxyUrl: "http://user:pass@proxy.example.com:8080",
     proxyFallbackToDirect: true,
@@ -67,6 +68,7 @@ function makePublicSite() {
     siteKey: "example.com",
     probeBaseUrl: "https://example.com/new-api",
     patConfigured: true,
+    dashboardUserId: 42,
     allowInsecureHttp: false,
     proxyUrl: "http://user:pass@proxy.example.com:8080",
     proxyFallbackToDirect: true,
@@ -95,6 +97,7 @@ describe("upstream site actions", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.data.sites[0]).not.toHaveProperty("dashboardPat");
+    expect(result.data.sites[0]?.dashboardUserId).toBe(42);
     expect(result.data.sites[0]?.proxyUrl).toContain("REDACTED");
     expect(JSON.stringify(result)).not.toContain("stored-pat");
   });
@@ -111,6 +114,7 @@ describe("upstream site actions", () => {
       4,
       expect.objectContaining({
         dashboardPat: "stored-pat",
+        dashboardUserId: 42,
         proxyUrl: "http://user:pass@proxy.example.com:8080",
       })
     );
@@ -123,7 +127,7 @@ describe("upstream site actions", () => {
     expect(result.ok).toBe(true);
     expect(updateConfigMock).toHaveBeenCalledWith(
       4,
-      expect.objectContaining({ dashboardPat: null })
+      expect.objectContaining({ dashboardPat: null, dashboardUserId: null })
     );
     expect(emitAuditMock).toHaveBeenCalledWith(
       expect.objectContaining({ action: "upstream_site.pat.clear", success: true })
@@ -147,6 +151,7 @@ describe("upstream site actions", () => {
     const result = await testUpstreamSitePat({
       siteId: 4,
       dashboardPat: "draft-pat",
+      dashboardUserId: 84,
       probeBaseUrl: "https://example.com/draft/v1",
     });
 
@@ -156,8 +161,41 @@ describe("upstream site actions", () => {
       expect.objectContaining({
         baseUrl: "https://example.com/draft",
         dashboardPat: "draft-pat",
+        dashboardUserId: 84,
       })
     );
+    expect(updateConfigMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a PAT without a numeric new-api user UID", async () => {
+    findProbeConfigMock.mockResolvedValue({
+      ...makeProbeConfig(),
+      dashboardPat: null,
+      dashboardUserId: null,
+    });
+
+    const result = await saveUpstreamSiteConfig({ siteId: 4, dashboardPat: "new-pat" });
+
+    expect(result).toMatchObject({
+      ok: false,
+      errorCode: "upstream_site.user_id_required_for_pat",
+    });
+    expect(updateConfigMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a new-api user UID without a PAT", async () => {
+    findProbeConfigMock.mockResolvedValue({
+      ...makeProbeConfig(),
+      dashboardPat: null,
+      dashboardUserId: null,
+    });
+
+    const result = await saveUpstreamSiteConfig({ siteId: 4, dashboardUserId: 84 });
+
+    expect(result).toMatchObject({
+      ok: false,
+      errorCode: "upstream_site.pat_required_for_user_id",
+    });
     expect(updateConfigMock).not.toHaveBeenCalled();
   });
 

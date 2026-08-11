@@ -226,7 +226,7 @@ async function syncProviderUpstreamRateNewApi(
   }
 
   let patTable: Awaited<ReturnType<typeof getNewapiRatioTable>> | null = null;
-  if (context.dashboardPat) {
+  if (context.dashboardPat && context.dashboardUserId != null) {
     try {
       patTable = await getNewapiRatioTable(provider, {
         context,

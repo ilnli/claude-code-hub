@@ -2863,7 +2863,7 @@ export interface paths {
         head?: never;
         /**
          * Update upstream site probe configuration
-         * @description Updates the target, write-only PAT, and proxy policy for an upstream site.
+         * @description Updates the target, write-only PAT, numeric new-api user UID, and proxy policy for an upstream site.
          */
         patch: operations["patchUpstreamSitesById"];
         trace?: never;
@@ -2879,7 +2879,7 @@ export interface paths {
         put?: never;
         /**
          * Test an upstream site PAT
-         * @description Validates a saved or draft PAT and target without changing Provider rates.
+         * @description Validates a saved or draft PAT, numeric new-api user UID, and target without changing Provider rates.
          */
         post: operations["postUpstreamSitesByIdPatTest"];
         delete?: never;
@@ -39274,6 +39274,7 @@ export interface operations {
                             /** Format: uri */
                             probeBaseUrl: string | null;
                             patConfigured: boolean;
+                            dashboardUserId: number | null;
                             allowInsecureHttp: boolean;
                             /** @description Proxy URL with credentials redacted. */
                             proxyUrl: string | null;
@@ -39705,6 +39706,8 @@ export interface operations {
                     probeBaseUrl?: string | null;
                     /** @description Write-only new-api dashboard PAT. Omit to preserve it and use null to clear it. */
                     dashboardPat?: string | null;
+                    /** @description new-api user UID sent through the New-Api-User header. */
+                    dashboardUserId?: number | null;
                     allowInsecureHttp?: boolean;
                     proxyUrl?: string | null;
                     proxyFallbackToDirect?: boolean;
@@ -39724,6 +39727,7 @@ export interface operations {
                         /** Format: uri */
                         probeBaseUrl: string | null;
                         patConfigured: boolean;
+                        dashboardUserId: number | null;
                         allowInsecureHttp: boolean;
                         /** @description Proxy URL with credentials redacted. */
                         proxyUrl: string | null;
@@ -39945,6 +39949,8 @@ export interface operations {
                     probeBaseUrl?: string | null;
                     /** @description Write-only new-api dashboard PAT. Omit to preserve it and use null to clear it. */
                     dashboardPat?: string | null;
+                    /** @description new-api user UID sent through the New-Api-User header. */
+                    dashboardUserId?: number | null;
                     allowInsecureHttp?: boolean;
                     proxyUrl?: string | null;
                     proxyFallbackToDirect?: boolean;
