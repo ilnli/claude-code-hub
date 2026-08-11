@@ -6,10 +6,10 @@ import {
 } from "@/lib/recharge/money";
 
 describe("recharge money", () => {
-  it("rounds the payable amount upward to cents after fees", () => {
-    expect(calculateAlipayAmount("100", "0.38")).toBe("100.39");
+  it("adds the configured fee to the recharge amount and rounds upward to cents", () => {
+    expect(calculateAlipayAmount("100", "0.38")).toBe("100.38");
     expect(calculateAlipayAmount("1", "0")).toBe("1.00");
-    expect(calculateAlipayAmount("10.01", "3.5")).toBe("10.38");
+    expect(calculateAlipayAmount("10.01", "3.5")).toBe("10.37");
   });
 
   it("normalizes valid credit values and rejects fractions beyond cents", () => {

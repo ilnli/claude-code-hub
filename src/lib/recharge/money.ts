@@ -20,8 +20,8 @@ export function calculateAlipayAmount(
     throw new Error("INVALID_FEE_RATE");
   }
 
-  const denominator = new Decimal(1).minus(feePercent.div(100));
-  return credit.div(denominator).toDecimalPlaces(2, Decimal.ROUND_CEIL).toFixed(2);
+  const multiplier = new Decimal(1).plus(feePercent.div(100));
+  return credit.mul(multiplier).toDecimalPlaces(2, Decimal.ROUND_CEIL).toFixed(2);
 }
 
 export function isAmountWithinRange(amount: string, minimum: string, maximum: string): boolean {

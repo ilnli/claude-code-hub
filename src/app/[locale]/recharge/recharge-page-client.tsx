@@ -19,6 +19,7 @@ import {
   getRechargeAvailability,
   listMyRechargeOrders,
 } from "@/lib/api-client/v1/actions/recharge";
+import { calculateAlipayAmount } from "@/lib/recharge/money";
 import type {
   RechargeAvailability,
   RechargeOrderStatus,
@@ -82,10 +83,11 @@ export function RechargePageClient({ returnHref, keyName }: RechargePageClientPr
   }, [activeOrder, load]);
 
   const payableAmount = useMemo(() => {
-    const credit = Number(amount);
-    const fee = Number(availability?.feeRatePercent ?? 0) / 100;
-    if (!Number.isFinite(credit) || credit <= 0 || fee < 0 || fee >= 1) return null;
-    return (Math.ceil((credit / (1 - fee)) * 100) / 100).toFixed(2);
+    try {
+      return calculateAlipayAmount(amount, availability?.feeRatePercent ?? 0);
+    } catch {
+      return null;
+    }
   }, [amount, availability?.feeRatePercent]);
 
   const remainingSeconds = activeOrder
