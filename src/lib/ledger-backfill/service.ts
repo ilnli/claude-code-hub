@@ -79,6 +79,7 @@ export async function backfillUsageLedger(
             mr.is_replay,
             mr.replay_source_request_id,
             mr.status_code,
+            mr.public_error_code,
             fn_compute_message_request_success_rate_outcome(
               mr.blocked_by,
               mr.status_code,
@@ -86,7 +87,7 @@ export async function backfillUsageLedger(
               mr.provider_chain
             ) AS success_rate_outcome,
             (mr.error_message IS NULL OR mr.error_message = '')
-              AND (mr.status_code IS NULL OR mr.status_code < 400) AS is_success,
+              AND mr.status_code BETWEEN 200 AND 299 AS is_success,
             mr.blocked_by,
             CASE WHEN mr.is_replay THEN 0 ELSE mr.cost_usd END AS cost_usd,
             mr.cost_multiplier,
@@ -128,6 +129,7 @@ export async function backfillUsageLedger(
               OR ul.replay_source_request_id IS DISTINCT FROM mr.replay_source_request_id
               OR ul.compaction_version IS DISTINCT FROM mr.compaction_version
               OR ul.billing_state IS DISTINCT FROM mr.billing_state
+              OR ul.public_error_code IS DISTINCT FROM mr.public_error_code
               OR (mr.is_replay AND ul.cost_usd IS DISTINCT FROM 0)
               OR ul.group_cost_multiplier IS DISTINCT FROM mr.group_cost_multiplier
               OR ul.client_ip IS DISTINCT FROM mr.client_ip
@@ -142,7 +144,7 @@ export async function backfillUsageLedger(
             billing_state, api_type, session_id,
             session_identity, session_identity_kind, affinity_scope_tag,
             affinity_fingerprint, affinity_fingerprint_chain, is_replay, replay_source_request_id,
-            status_code, is_success, success_rate_outcome, blocked_by,
+            status_code, public_error_code, is_success, success_rate_outcome, blocked_by,
             cost_usd, cost_multiplier, group_cost_multiplier,
             input_tokens, output_tokens,
             cache_creation_input_tokens, cache_read_input_tokens,
@@ -172,6 +174,7 @@ export async function backfillUsageLedger(
             batch.is_replay,
             batch.replay_source_request_id,
             batch.status_code,
+            batch.public_error_code,
             batch.is_success,
             batch.success_rate_outcome,
             batch.blocked_by,
@@ -214,6 +217,7 @@ export async function backfillUsageLedger(
             is_replay = EXCLUDED.is_replay,
             replay_source_request_id = EXCLUDED.replay_source_request_id,
             status_code = EXCLUDED.status_code,
+            public_error_code = EXCLUDED.public_error_code,
             is_success = EXCLUDED.is_success,
             success_rate_outcome = EXCLUDED.success_rate_outcome,
             blocked_by = EXCLUDED.blocked_by,

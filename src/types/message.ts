@@ -2,6 +2,7 @@ import type { Numeric } from "decimal.js-light";
 import type { CacheTtlApplied } from "./cache";
 import type { HedgeLoserBilling } from "./cost-breakdown";
 import type { ProviderType } from "./provider";
+import type { PublicErrorCode } from "./public-error";
 import type { RoutingTraceV1 } from "./routing-trace";
 import type { SpecialSetting } from "./special-settings";
 
@@ -280,7 +281,8 @@ export interface ProviderChainItem {
  */
 export interface MessageRequest {
   id: number;
-  providerId: number;
+  requestUuid?: string | null;
+  providerId: number | null;
   userId: number;
   key: string;
   model?: string;
@@ -335,6 +337,8 @@ export interface MessageRequest {
 
   // 错误信息
   errorMessage?: string;
+  publicErrorCode?: PublicErrorCode | null;
+  publicErrorMessage?: string | null;
 
   // User-Agent（用于客户端类型分析）
   userAgent?: string;
@@ -373,7 +377,8 @@ export interface MessageRequest {
  * 创建消息请求数据
  */
 export interface CreateMessageRequestData {
-  provider_id: number;
+  request_uuid?: string;
+  provider_id: number | null;
   user_id: number;
   key: string;
   model?: string;
@@ -427,6 +432,10 @@ export interface CreateMessageRequestData {
 
   // 错误信息
   error_message?: string;
+  public_error_code?: PublicErrorCode | null;
+  public_error_message?: string | null;
+  blocked_by?: string | null;
+  blocked_reason?: string | null;
 
   // User-Agent（用于客户端类型分析）
   user_agent?: string;

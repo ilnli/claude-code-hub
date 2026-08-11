@@ -14,6 +14,7 @@ import {
 import { formatCostForStorage } from "@/lib/utils/currency";
 import type { HedgeLoserBilling, StoredCostBreakdown } from "@/types/cost-breakdown";
 import type { CreateMessageRequestData, MessageRequest, ProviderChainItem } from "@/types/message";
+import type { PublicErrorCode } from "@/types/public-error";
 import { normalizeRoutingTrace, type RoutingTraceV1 } from "@/types/routing-trace";
 import type { SpecialSetting } from "@/types/special-settings";
 import { LEDGER_AUDIT_CONDITION, LEDGER_BILLING_CONDITION } from "./_shared/ledger-conditions";
@@ -107,6 +108,8 @@ type PublicStatusFinalDetails = {
   firstByteMs?: number | null;
   providerChain?: CreateMessageRequestData["provider_chain"];
   errorMessage?: string;
+  publicErrorCode?: PublicErrorCode | null;
+  publicErrorMessage?: string | null;
   model?: string;
 };
 
@@ -297,6 +300,7 @@ export async function createMessageRequest(
 ): Promise<MessageRequest> {
   const formattedCost = formatCostForStorage(data.cost_usd);
   const dbData = {
+    requestUuid: data.request_uuid,
     providerId: data.provider_id,
     userId: data.user_id,
     key: data.key,
@@ -315,8 +319,10 @@ export async function createMessageRequest(
     isReplay: data.is_replay,
     replaySourceRequestId: data.replay_source_request_id,
     requestSequence: data.request_sequence, // Request Sequence（Session 内请求序号）
+    providerChain: data.provider_chain,
     routingTrace:
       data.routing_trace === undefined ? undefined : normalizeRoutingTrace(data.routing_trace),
+    statusCode: data.status_code,
     userAgent: data.user_agent, // User-Agent
     clientIp: data.client_ip, // 客户端 IP（IPv4/IPv6）
     endpoint: data.endpoint, // 请求端点（可为空）
@@ -329,10 +335,20 @@ export async function createMessageRequest(
     cacheCreation5mInputTokens: data.cache_creation_5m_input_tokens,
     cacheCreation1hInputTokens: data.cache_creation_1h_input_tokens,
     cacheReadInputTokens: data.cache_read_input_tokens,
+    errorMessage: data.error_message,
+    publicErrorCode: data.public_error_code,
+    publicErrorMessage: data.public_error_message,
+    blockedBy: data.blocked_by,
+    blockedReason: data.blocked_reason,
   };
 
-  const [result] = await db.insert(messageRequest).values(dbData).returning({
+  const insertStatement = db.insert(messageRequest).values(dbData);
+  const idempotentInsert = data.request_uuid
+    ? insertStatement.onConflictDoNothing()
+    : insertStatement;
+  let [result] = await idempotentInsert.returning({
     id: messageRequest.id,
+    requestUuid: messageRequest.requestUuid,
     providerId: messageRequest.providerId,
     userId: messageRequest.userId,
     key: messageRequest.key,
@@ -363,10 +379,24 @@ export async function createMessageRequest(
     cacheCreation1hInputTokens: messageRequest.cacheCreation1hInputTokens,
     cacheReadInputTokens: messageRequest.cacheReadInputTokens,
     specialSettings: messageRequest.specialSettings,
+    errorMessage: messageRequest.errorMessage,
+    publicErrorCode: messageRequest.publicErrorCode,
+    publicErrorMessage: messageRequest.publicErrorMessage,
     createdAt: messageRequest.createdAt,
     updatedAt: messageRequest.updatedAt,
     deletedAt: messageRequest.deletedAt,
   });
+
+  if (!result && data.request_uuid) {
+    [result] = await db
+      .select()
+      .from(messageRequest)
+      .where(eq(messageRequest.requestUuid, data.request_uuid))
+      .limit(1);
+  }
+  if (!result) {
+    throw new Error("Failed to create message request");
+  }
 
   rememberPublicStatusRequestSeed(result.id, {
     createdAt: result.createdAt!,
@@ -629,11 +659,13 @@ export type MessageRequestDetailsUpdate = {
   providerChain?: CreateMessageRequestData["provider_chain"];
   routingTrace?: RoutingTraceV1 | null;
   errorMessage?: string;
+  publicErrorCode?: PublicErrorCode | null;
+  publicErrorMessage?: string | null;
   errorStack?: string; // 完整堆栈信息
   errorCause?: string; // 嵌套错误原因（JSON 格式）
   model?: string; // ⭐ 新增：支持更新重定向后的模型名称
   actualResponseModel?: string | null; // 上游响应实际返回的模型名(audit 用途，不影响计费)
-  providerId?: number; // ⭐ 新增：支持更新最终供应商ID（重试切换后）
+  providerId?: number | null; // ⭐ 新增：支持更新最终供应商ID（重试切换后）
   context1mApplied?: boolean; // 是否应用了1M上下文窗口
   swapCacheTtlApplied?: boolean; // Swap Cache TTL Billing active at request time
   specialSettings?: CreateMessageRequestData["special_settings"]; // 特殊设置（审计/展示）
@@ -709,6 +741,12 @@ export async function updateMessageRequestDetails(
   }
   if (details.errorMessage !== undefined) {
     updateData.errorMessage = details.errorMessage;
+  }
+  if (details.publicErrorCode !== undefined) {
+    updateData.publicErrorCode = details.publicErrorCode;
+  }
+  if (details.publicErrorMessage !== undefined) {
+    updateData.publicErrorMessage = details.publicErrorMessage;
   }
   if (details.errorStack !== undefined) {
     updateData.errorStack = details.errorStack;
@@ -928,6 +966,29 @@ export async function updateMessageRequestDetailsDurably(
     onCommitted: publishCommit,
   });
   return committed;
+}
+
+export async function updateMessageRequestPublicErrorDurably(
+  id: number,
+  details: Pick<MessageRequestDetailsUpdate, "publicErrorCode" | "publicErrorMessage">,
+  timeoutMs = 3_000
+): Promise<void> {
+  if (getEnvConfig().MESSAGE_REQUEST_WRITE_MODE === "async") {
+    await enqueueMessageRequestUpdateDurably(id, details, {
+      timeoutMs,
+      writeScope: "post-terminal-metadata",
+    });
+    return;
+  }
+
+  await db
+    .update(messageRequest)
+    .set({
+      publicErrorCode: details.publicErrorCode,
+      publicErrorMessage: details.publicErrorMessage,
+      updatedAt: new Date(),
+    })
+    .where(eq(messageRequest.id, id));
 }
 
 /**
@@ -1609,7 +1670,11 @@ export async function listPhysicalSessionSourcesForIdentity(
       keyId: row.keyId,
       providerIds: new Set<number>(),
     };
-    if (Number.isInteger(row.providerId) && row.providerId > 0) {
+    if (
+      typeof row.providerId === "number" &&
+      Number.isInteger(row.providerId) &&
+      row.providerId > 0
+    ) {
       source.providerIds.add(row.providerId);
     }
     if (

@@ -20,7 +20,10 @@ import { SessionTracker } from "@/lib/session-tracker";
 import type { CurrencyCode } from "@/lib/utils";
 import { ERROR_CODES } from "@/lib/utils/error-messages";
 import { resolveSystemTimezone } from "@/lib/utils/timezone";
-import { LEDGER_BILLING_CONDITION } from "@/repository/_shared/ledger-conditions";
+import {
+  LEDGER_BILLING_CONDITION,
+  LEDGER_REQUEST_CONDITION,
+} from "@/repository/_shared/ledger-conditions";
 import { EXCLUDE_WARMUP_CONDITION } from "@/repository/_shared/message-request-conditions";
 import { getSystemSettings } from "@/repository/system-config";
 import {
@@ -90,22 +93,30 @@ function scrubSpecialSettingsForReadonly(
 function scrubUsageLogsBatchForReadonly(result: UsageLogsBatchResult): UsageLogsBatchResult {
   return {
     ...result,
-    logs: result.logs.map((log) => ({
-      ...log,
-      userName: "",
-      keyName: "",
-      providerName: null,
-      errorMessage: null,
-      blockedReason: null,
-      userAgent: null,
-      messagesCount: null,
-      _liveChain: null,
-      providerChain: scrubProviderChainRequestForReadonly(log.providerChain),
-      costMultiplier: null,
-      groupCostMultiplier: null,
-      costBreakdown: null,
-      specialSettings: scrubSpecialSettingsForReadonly(log.specialSettings),
-    })),
+    logs: result.logs.map((log) => {
+      const hasPublicError = Boolean(log.publicErrorCode);
+      return {
+        ...log,
+        userName: "",
+        keyName: "",
+        providerName: null,
+        errorMessage: null,
+        blockedReason: null,
+        userAgent: null,
+        messagesCount: null,
+        _liveChain: null,
+        providerChain: hasPublicError
+          ? null
+          : scrubProviderChainRequestForReadonly(log.providerChain),
+        routingTrace: hasPublicError ? null : log.routingTrace,
+        costMultiplier: null,
+        groupCostMultiplier: null,
+        costBreakdown: null,
+        specialSettings: hasPublicError
+          ? null
+          : scrubSpecialSettingsForReadonly(log.specialSettings),
+      };
+    }),
   };
 }
 
@@ -282,6 +293,7 @@ export interface MyUsageLogsFilters {
   actualResponseModelMismatch?: boolean;
   statusCode?: number;
   excludeStatusCode200?: boolean;
+  failedOnly?: boolean;
   endpoint?: string;
   minRetryCount?: number;
   page?: number;
@@ -562,15 +574,15 @@ export async function getMyTodayStats(): Promise<ActionResult<MyTodayStats>> {
         model: usageLedger.model,
         originalModel: usageLedger.originalModel,
         calls: sql<number>`count(*)::int`,
-        costUsd: sql<string>`COALESCE(sum(${usageLedger.costUsd}), 0)`,
-        inputTokens: sql<number>`COALESCE(sum(${usageLedger.inputTokens}), 0)::double precision`,
-        outputTokens: sql<number>`COALESCE(sum(${usageLedger.outputTokens}), 0)::double precision`,
+        costUsd: sql<string>`COALESCE(sum(${usageLedger.costUsd}) FILTER (WHERE ${LEDGER_BILLING_CONDITION}), 0)`,
+        inputTokens: sql<number>`COALESCE(sum(${usageLedger.inputTokens}) FILTER (WHERE ${LEDGER_BILLING_CONDITION}), 0)::double precision`,
+        outputTokens: sql<number>`COALESCE(sum(${usageLedger.outputTokens}) FILTER (WHERE ${LEDGER_BILLING_CONDITION}), 0)::double precision`,
       })
       .from(usageLedger)
       .where(
         and(
           eq(usageLedger.key, session.key.key),
-          LEDGER_BILLING_CONDITION,
+          LEDGER_REQUEST_CONDITION,
           gte(usageLedger.createdAt, timeRange.startTime),
           lt(usageLedger.createdAt, timeRange.endTime)
         )
@@ -630,6 +642,7 @@ export interface MyUsageLogsBatchFilters {
   actualResponseModelMismatch?: boolean;
   statusCode?: number;
   excludeStatusCode200?: boolean;
+  failedOnly?: boolean;
   endpoint?: string;
   minRetryCount?: number;
   cursor?: { createdAt: string; id: number };
@@ -710,6 +723,7 @@ export async function getMyUsageLogs(
       actualResponseModelMismatch: filters.actualResponseModelMismatch,
       statusCode: filters.statusCode,
       excludeStatusCode200: filters.excludeStatusCode200,
+      failedOnly: filters.failedOnly,
       endpoint: filters.endpoint,
       minRetryCount: filters.minRetryCount,
       page,
@@ -756,6 +770,7 @@ export async function getMyUsageLogsBatch(
       actualResponseModelMismatch: filters.actualResponseModelMismatch,
       statusCode: filters.statusCode,
       excludeStatusCode200: filters.excludeStatusCode200,
+      failedOnly: filters.failedOnly,
       endpoint: filters.endpoint,
       minRetryCount: filters.minRetryCount,
       cursor: filters.cursor,
@@ -805,6 +820,7 @@ export async function getMyUsageLogsBatchFull(
       actualResponseModelMismatch: params.actualResponseModelMismatch,
       statusCode: params.statusCode,
       excludeStatusCode200: params.excludeStatusCode200,
+      failedOnly: params.failedOnly,
       endpoint: params.endpoint,
       minRetryCount: params.minRetryCount,
       cursor: params.cursor,
@@ -1024,28 +1040,28 @@ export async function getMyStatsSummary(
         model: usageLedger.model,
         // User breakdown（跨所有 Key）
         userRequests: sql<number>`count(*)::int`,
-        userCost: sql<string>`COALESCE(sum(${usageLedger.costUsd}), 0)`,
-        userInputTokens: sql<number>`COALESCE(sum(${usageLedger.inputTokens}), 0)::double precision`,
-        userOutputTokens: sql<number>`COALESCE(sum(${usageLedger.outputTokens}), 0)::double precision`,
-        userCacheCreationTokens: sql<number>`COALESCE(sum(${usageLedger.cacheCreationInputTokens}), 0)::double precision`,
-        userCacheReadTokens: sql<number>`COALESCE(sum(${usageLedger.cacheReadInputTokens}), 0)::double precision`,
-        userCacheCreation5mTokens: sql<number>`COALESCE(sum(${usageLedger.cacheCreation5mInputTokens}), 0)::double precision`,
-        userCacheCreation1hTokens: sql<number>`COALESCE(sum(${usageLedger.cacheCreation1hInputTokens}), 0)::double precision`,
+        userCost: sql<string>`COALESCE(sum(${usageLedger.costUsd}) FILTER (WHERE ${LEDGER_BILLING_CONDITION}), 0)`,
+        userInputTokens: sql<number>`COALESCE(sum(${usageLedger.inputTokens}) FILTER (WHERE ${LEDGER_BILLING_CONDITION}), 0)::double precision`,
+        userOutputTokens: sql<number>`COALESCE(sum(${usageLedger.outputTokens}) FILTER (WHERE ${LEDGER_BILLING_CONDITION}), 0)::double precision`,
+        userCacheCreationTokens: sql<number>`COALESCE(sum(${usageLedger.cacheCreationInputTokens}) FILTER (WHERE ${LEDGER_BILLING_CONDITION}), 0)::double precision`,
+        userCacheReadTokens: sql<number>`COALESCE(sum(${usageLedger.cacheReadInputTokens}) FILTER (WHERE ${LEDGER_BILLING_CONDITION}), 0)::double precision`,
+        userCacheCreation5mTokens: sql<number>`COALESCE(sum(${usageLedger.cacheCreation5mInputTokens}) FILTER (WHERE ${LEDGER_BILLING_CONDITION}), 0)::double precision`,
+        userCacheCreation1hTokens: sql<number>`COALESCE(sum(${usageLedger.cacheCreation1hInputTokens}) FILTER (WHERE ${LEDGER_BILLING_CONDITION}), 0)::double precision`,
         // Key breakdown（FILTER 聚合）
         keyRequests: sql<number>`count(*) FILTER (WHERE ${usageLedger.key} = ${keyString})::int`,
-        keyCost: sql<string>`COALESCE(sum(${usageLedger.costUsd}) FILTER (WHERE ${usageLedger.key} = ${keyString}), 0)`,
-        keyInputTokens: sql<number>`COALESCE(sum(${usageLedger.inputTokens}) FILTER (WHERE ${usageLedger.key} = ${keyString}), 0)::double precision`,
-        keyOutputTokens: sql<number>`COALESCE(sum(${usageLedger.outputTokens}) FILTER (WHERE ${usageLedger.key} = ${keyString}), 0)::double precision`,
-        keyCacheCreationTokens: sql<number>`COALESCE(sum(${usageLedger.cacheCreationInputTokens}) FILTER (WHERE ${usageLedger.key} = ${keyString}), 0)::double precision`,
-        keyCacheReadTokens: sql<number>`COALESCE(sum(${usageLedger.cacheReadInputTokens}) FILTER (WHERE ${usageLedger.key} = ${keyString}), 0)::double precision`,
-        keyCacheCreation5mTokens: sql<number>`COALESCE(sum(${usageLedger.cacheCreation5mInputTokens}) FILTER (WHERE ${usageLedger.key} = ${keyString}), 0)::double precision`,
-        keyCacheCreation1hTokens: sql<number>`COALESCE(sum(${usageLedger.cacheCreation1hInputTokens}) FILTER (WHERE ${usageLedger.key} = ${keyString}), 0)::double precision`,
+        keyCost: sql<string>`COALESCE(sum(${usageLedger.costUsd}) FILTER (WHERE ${usageLedger.key} = ${keyString} AND ${LEDGER_BILLING_CONDITION}), 0)`,
+        keyInputTokens: sql<number>`COALESCE(sum(${usageLedger.inputTokens}) FILTER (WHERE ${usageLedger.key} = ${keyString} AND ${LEDGER_BILLING_CONDITION}), 0)::double precision`,
+        keyOutputTokens: sql<number>`COALESCE(sum(${usageLedger.outputTokens}) FILTER (WHERE ${usageLedger.key} = ${keyString} AND ${LEDGER_BILLING_CONDITION}), 0)::double precision`,
+        keyCacheCreationTokens: sql<number>`COALESCE(sum(${usageLedger.cacheCreationInputTokens}) FILTER (WHERE ${usageLedger.key} = ${keyString} AND ${LEDGER_BILLING_CONDITION}), 0)::double precision`,
+        keyCacheReadTokens: sql<number>`COALESCE(sum(${usageLedger.cacheReadInputTokens}) FILTER (WHERE ${usageLedger.key} = ${keyString} AND ${LEDGER_BILLING_CONDITION}), 0)::double precision`,
+        keyCacheCreation5mTokens: sql<number>`COALESCE(sum(${usageLedger.cacheCreation5mInputTokens}) FILTER (WHERE ${usageLedger.key} = ${keyString} AND ${LEDGER_BILLING_CONDITION}), 0)::double precision`,
+        keyCacheCreation1hTokens: sql<number>`COALESCE(sum(${usageLedger.cacheCreation1hInputTokens}) FILTER (WHERE ${usageLedger.key} = ${keyString} AND ${LEDGER_BILLING_CONDITION}), 0)::double precision`,
       })
       .from(usageLedger)
       .where(
         and(
           eq(usageLedger.userId, userId),
-          LEDGER_BILLING_CONDITION,
+          LEDGER_REQUEST_CONDITION,
           startDate ? gte(usageLedger.createdAt, startDate) : undefined,
           endDate ? lt(usageLedger.createdAt, endDate) : undefined
         )

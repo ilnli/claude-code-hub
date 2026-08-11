@@ -36,6 +36,7 @@ export function ActiveFiltersDisplay({
   className,
 }: ActiveFiltersDisplayProps) {
   const t = useTranslations("dashboard.logs.filters");
+  const tDashboard = useTranslations("dashboard");
 
   const activeFilters = useMemo(() => {
     const result: ActiveFilter[] = [];
@@ -124,7 +125,13 @@ export function ActiveFiltersDisplay({
     }
 
     // Status code filter
-    if (filters.excludeStatusCode200) {
+    if (filters.failedOnly) {
+      result.push({
+        key: "failedOnly",
+        label: t("statusCode"),
+        value: tDashboard("logs.statusCodes.failed"),
+      });
+    } else if (filters.excludeStatusCode200) {
       result.push({
         key: "excludeStatusCode200",
         label: t("statusCode"),
@@ -137,7 +144,6 @@ export function ActiveFiltersDisplay({
         value: filters.statusCode.toString(),
       });
     }
-
     // Min retry count filter
     if (filters.minRetryCount !== undefined && filters.minRetryCount > 0) {
       result.push({
@@ -156,7 +162,7 @@ export function ActiveFiltersDisplay({
     }
 
     return result;
-  }, [filters, displayNames, isAdmin, serverTimeZone, t]);
+  }, [filters, displayNames, isAdmin, serverTimeZone, t, tDashboard]);
 
   if (activeFilters.length === 0) {
     return null;

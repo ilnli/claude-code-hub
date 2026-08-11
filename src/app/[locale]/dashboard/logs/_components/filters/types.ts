@@ -15,6 +15,7 @@ export interface UsageLogFilters {
   endTime?: number;
   statusCode?: number;
   excludeStatusCode200?: boolean;
+  failedOnly?: boolean;
   model?: string;
   actualResponseModelMismatch?: boolean;
   endpoint?: string;

@@ -7,6 +7,7 @@ export interface LogsUrlFilters {
   endTime?: number;
   statusCode?: number;
   excludeStatusCode200?: boolean;
+  failedOnly?: boolean;
   model?: string;
   actualResponseModelMismatch?: boolean;
   endpoint?: string;
@@ -41,7 +42,7 @@ export function parseLogsUrlFilters(searchParams: {
   const page = pageRaw && pageRaw >= 1 ? pageRaw : undefined;
 
   const statusCode =
-    statusCodeParam && statusCodeParam !== "!200"
+    statusCodeParam && statusCodeParam !== "!200" && statusCodeParam !== "!failed"
       ? Number.parseInt(statusCodeParam, 10)
       : undefined;
 
@@ -64,6 +65,7 @@ export function parseLogsUrlFilters(searchParams: {
     endTime: parseIntParam(searchParams.endTime),
     statusCode: Number.isFinite(statusCode) ? statusCode : undefined,
     excludeStatusCode200: statusCodeParam === "!200",
+    failedOnly: statusCodeParam === "!failed" ? true : undefined,
     model: parseStringParam(searchParams.model),
     actualResponseModelMismatch,
     endpoint: parseStringParam(searchParams.endpoint),
@@ -86,7 +88,9 @@ export function buildLogsUrlQuery(filters: LogsUrlFilters): URLSearchParams {
   if (filters.startTime !== undefined) query.set("startTime", filters.startTime.toString());
   if (filters.endTime !== undefined) query.set("endTime", filters.endTime.toString());
 
-  if (filters.excludeStatusCode200) {
+  if (filters.failedOnly) {
+    query.set("statusCode", "!failed");
+  } else if (filters.excludeStatusCode200) {
     query.set("statusCode", "!200");
   } else if (filters.statusCode !== undefined) {
     query.set("statusCode", filters.statusCode.toString());

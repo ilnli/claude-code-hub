@@ -289,6 +289,8 @@
         "noSignatureTooltip": "请求开启了思考但响应流中没有 thinking signature，实际响应模型回退到 message_start 明文字段。"
       },
       "errorMessage": "错误信息",
+      "publicErrorSummary": "用户可见错误",
+      "providerNotReached": "未到达上游",
       "fake200ForwardedNotice": "提示：对于流式请求，该失败可能在流结束后才被识别；响应内容可能已原样透传给客户端。",
       "fake200DetectedReason": "检测原因：{reason}",
       "fake200RetryTooltipLabel": "为何这次不能服务端重试？",
@@ -603,7 +605,8 @@
       "401": "401 (未授权)",
       "429": "429 (限流)",
       "500": "500 (服务器错误)",
-      "not200": "非 200（全部非成功请求）"
+      "not200": "非 200（全部非成功请求）",
+      "failed": "失败请求（非 2xx）"
     },
     "billingDetails": {
       "input": "输入",

@@ -90,7 +90,6 @@ vi.mock("@/app/v1/_lib/proxy/session-guard", async (importOriginal) => {
   return {
     ...actual,
     ProxySessionGuard: {
-      ...actual.ProxySessionGuard,
       ensure: async (...args: Parameters<typeof actual.ProxySessionGuard.ensure>) => {
         callOrder.push("session");
         await actual.ProxySessionGuard.ensure(...args);

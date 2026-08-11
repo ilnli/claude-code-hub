@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq, gte, isNull, lt, sql } from "drizzle-orm";
+import { and, desc, eq, gte, isNotNull, isNull, lt, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/drizzle/db";
 import { messageRequest, providers } from "@/drizzle/schema";
@@ -337,12 +337,12 @@ export async function findProviderModelCacheHitRateMetricsForAlert(
         prevExcludeWarmupCondition
       )
     )
-    .where(and(...whereConditions))
+    .where(and(isNotNull(messageRequest.providerId), ...whereConditions))
     .groupBy(messageRequest.providerId, providers.providerType, modelField)
     .orderBy(desc(totalRequestsExpr));
 
   return rows.map((row) => ({
-    providerId: row.providerId,
+    providerId: row.providerId!,
     providerType: row.providerType,
     model: row.model,
     totalRequests: row.totalRequests,

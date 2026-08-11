@@ -90,13 +90,13 @@ vi.mock("@/app/v1/_lib/proxy/guard-pipeline", () => ({
     fromSession: () => ({
       run: async () => {
         if (h.pipelineError) throw h.pipelineError;
-        return h.earlyResponse;
+        return h.earlyResponse ? { response: h.earlyResponse, source: "model" } : null;
       },
     }),
     fromRequestType: () => ({
       run: async () => {
         if (h.pipelineError) throw h.pipelineError;
-        return h.earlyResponse;
+        return h.earlyResponse ? { response: h.earlyResponse, source: "model" } : null;
       },
     }),
   },

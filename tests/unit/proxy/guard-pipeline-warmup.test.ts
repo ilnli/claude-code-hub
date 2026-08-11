@@ -142,7 +142,7 @@ describe("GuardPipeline：warmup 拦截点", () => {
     const res = await pipeline.run(session);
 
     expect(res).not.toBeNull();
-    expect(res?.status).toBe(200);
+    expect(res?.response.status).toBe(200);
 
     expect(callOrder).toEqual([
       "auth",
@@ -178,7 +178,7 @@ describe("GuardPipeline：warmup 拦截点", () => {
     const res = await pipeline.run(session);
 
     expect(res).not.toBeNull();
-    expect(res?.status).toBe(200);
+    expect(res?.response.status).toBe(200);
     expect(callOrder).toEqual(["auth", "sensitive", "client", "model", "version", "probe"]);
     expect(callOrder).not.toContain("session");
     expect(callOrder).not.toContain("warmup");
@@ -279,7 +279,7 @@ describe("GuardPipeline：warmup 拦截点", () => {
     const res = await pipeline.run(session);
 
     expect(res).not.toBeNull();
-    expect(res?.status).toBe(200);
+    expect(res?.response.status).toBe(200);
     expect(callOrder).toEqual([
       "auth",
       "sensitive",

@@ -556,7 +556,8 @@ export type ApiKeyAuthFailureReason = "not_found" | "key_disabled" | "key_expire
 
 export type ApiKeyAuthOutcome =
   | { ok: true; user: User; key: Key }
-  | { ok: false; reason: ApiKeyAuthFailureReason };
+  | { ok: false; reason: "not_found" }
+  | { ok: false; reason: "key_disabled" | "key_expired"; user: User; key: Key };
 
 /**
  * Look up an API key and report a specific outcome so callers can distinguish
@@ -704,15 +705,13 @@ export async function resolveApiKeyAuthOutcome(keyString: string): Promise<ApiKe
       (!candidate.keyExpiresAt || candidate.keyExpiresAt.getTime() > now)
   );
 
-  if (!activeRow) {
-    const expiredRow = result.find((candidate) => candidate.keyIsEnabled === true);
-    if (expiredRow) {
-      return { ok: false, reason: "key_expired" };
-    }
-    return { ok: false, reason: "key_disabled" };
-  }
-
-  const row = activeRow;
+  const expiredRow = result.find((candidate) => candidate.keyIsEnabled === true);
+  const failureReason: "key_disabled" | "key_expired" | null = activeRow
+    ? null
+    : expiredRow
+      ? "key_expired"
+      : "key_disabled";
+  const row = activeRow ?? expiredRow ?? result[0];
 
   const user: User = toUser({
     id: row.userId,
@@ -765,6 +764,10 @@ export async function resolveApiKeyAuthOutcome(keyString: string): Promise<ApiKe
     updatedAt: row.keyUpdatedAt,
     deletedAt: row.keyDeletedAt,
   });
+
+  if (failureReason) {
+    return { ok: false, reason: failureReason, user, key };
+  }
 
   // 最佳努力：写入 Redis 缓存（不影响正确性）
   cacheAuthResult(keyString, { user, key }).catch(() => {});

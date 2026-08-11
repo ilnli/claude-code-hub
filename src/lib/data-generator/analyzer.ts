@@ -100,7 +100,9 @@ export async function analyzeLogDistribution(): Promise<LogDistribution> {
       }
 
       userCounts[log.userId] = (userCounts[log.userId] || 0) + 1;
-      providerCounts[log.providerId] = (providerCounts[log.providerId] || 0) + 1;
+      if (log.providerId !== null) {
+        providerCounts[log.providerId] = (providerCounts[log.providerId] || 0) + 1;
+      }
 
       if (log.model) {
         modelCounts[log.model] = (modelCounts[log.model] || 0) + 1;

@@ -173,6 +173,25 @@ describe("v1 usage log endpoints", () => {
     expect(getUsageLogsBatchMock).not.toHaveBeenCalled();
   });
 
+  test("forwards failedOnly and rejects conflicting failure filters", async () => {
+    const failed = await callV1Route({
+      method: "GET",
+      pathname: "/api/v1/usage-logs?page=1&failedOnly=true",
+      headers,
+    });
+    expect(failed.response.status).toBe(200);
+    expect(getUsageLogsMock).toHaveBeenCalledWith(expect.objectContaining({ failedOnly: true }));
+
+    getUsageLogsMock.mockClear();
+    const conflict = await callV1Route({
+      method: "GET",
+      pathname: "/api/v1/usage-logs?page=1&failedOnly=true&excludeStatusCode200=true",
+      headers,
+    });
+    expect(conflict.response.status).toBe(400);
+    expect(getUsageLogsMock).not.toHaveBeenCalled();
+  });
+
   test("preserves source session identity mappings in list responses", async () => {
     getUsageLogsMock.mockResolvedValueOnce({
       ok: true,

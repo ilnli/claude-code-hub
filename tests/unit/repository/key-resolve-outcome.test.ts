@@ -217,7 +217,12 @@ describe("repository/key resolveApiKeyAuthOutcome", () => {
     const { resolveApiKeyAuthOutcome } = await import("@/repository/key");
     const outcome = await resolveApiKeyAuthOutcome("sk-disabled");
 
-    expect(outcome).toEqual({ ok: false, reason: "key_disabled" });
+    expect(outcome).toMatchObject({
+      ok: false,
+      reason: "key_disabled",
+      user: { id: 2 },
+      key: { id: 1, isEnabled: false },
+    });
   });
 
   it("returns key_expired when expiresAt is in the past", async () => {
@@ -227,7 +232,12 @@ describe("repository/key resolveApiKeyAuthOutcome", () => {
     const { resolveApiKeyAuthOutcome } = await import("@/repository/key");
     const outcome = await resolveApiKeyAuthOutcome("sk-expired");
 
-    expect(outcome).toEqual({ ok: false, reason: "key_expired" });
+    expect(outcome).toMatchObject({
+      ok: false,
+      reason: "key_expired",
+      user: { id: 2 },
+      key: { id: 1, expiresAt: yesterday },
+    });
   });
 
   it("prefers key_disabled over key_expired when both are true", async () => {
@@ -237,7 +247,12 @@ describe("repository/key resolveApiKeyAuthOutcome", () => {
     const { resolveApiKeyAuthOutcome } = await import("@/repository/key");
     const outcome = await resolveApiKeyAuthOutcome("sk-both");
 
-    expect(outcome).toEqual({ ok: false, reason: "key_disabled" });
+    expect(outcome).toMatchObject({
+      ok: false,
+      reason: "key_disabled",
+      user: { id: 2 },
+      key: { id: 1, isEnabled: false },
+    });
   });
 
   it("back-compat wrapper validateApiKeyAndGetUser returns null on any failure", async () => {
@@ -282,7 +297,12 @@ describe("repository/key resolveApiKeyAuthOutcome", () => {
       const { resolveApiKeyAuthOutcome } = await import("@/repository/key");
       const outcome = await resolveApiKeyAuthOutcome("sk-dup-expired");
 
-      expect(outcome).toEqual({ ok: false, reason: "key_expired" });
+      expect(outcome).toMatchObject({
+        ok: false,
+        reason: "key_expired",
+        user: { id: 2 },
+        key: { id: 21, expiresAt: yesterday },
+      });
     });
 
     it("returns key_disabled when every duplicate row is disabled", async () => {
@@ -295,7 +315,12 @@ describe("repository/key resolveApiKeyAuthOutcome", () => {
       const { resolveApiKeyAuthOutcome } = await import("@/repository/key");
       const outcome = await resolveApiKeyAuthOutcome("sk-dup-disabled");
 
-      expect(outcome).toEqual({ ok: false, reason: "key_disabled" });
+      expect(outcome).toMatchObject({
+        ok: false,
+        reason: "key_disabled",
+        user: { id: 2 },
+        key: { id: 30, isEnabled: false },
+      });
     });
   });
 });

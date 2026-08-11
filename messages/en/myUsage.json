@@ -45,6 +45,14 @@
       "reset": "Reset"
     },
     "loadFailed": "Failed to load logs",
+    "errorDetails": {
+      "title": "Request failed",
+      "description": "Use the CCH Session ID when asking an administrator to investigate.",
+      "reason": "Reason",
+      "sessionId": "CCH Session ID",
+      "copy": "Copy Session ID",
+      "copied": "Session ID copied"
+    },
     "table": {
       "time": "Time",
       "model": "Model",

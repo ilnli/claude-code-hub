@@ -45,6 +45,7 @@ import type { BillingModelSource } from "@/types/system-config";
 import { ErrorDetailsDialog } from "./error-details-dialog";
 import { ModelDisplayWithRedirect } from "./model-display-with-redirect";
 import { ProviderChainPopover } from "./provider-chain-popover";
+import { PublicErrorDetailsDialog } from "./public-error-details-dialog";
 import { ThinkingEffortDisplay } from "./thinking-effort-display";
 
 const BATCH_SIZE = 50;
@@ -66,6 +67,7 @@ export interface VirtualizedLogsTableFilters {
   endTime?: number;
   statusCode?: number;
   excludeStatusCode200?: boolean;
+  failedOnly?: boolean;
   model?: string;
   actualResponseModelMismatch?: boolean;
   endpoint?: string;
@@ -155,6 +157,8 @@ interface VirtualizedLogsTableProps {
   queryKeyPrefix?: string;
   /** Disable the detail side-panel dialog on status badge click */
   disableDetailDialog?: boolean;
+  /** Use the privacy-safe user error dialog when a public error snapshot is available. */
+  publicErrorDialog?: boolean;
   /** Select which IP lookup authorization model the detail dialog should use */
   ipLookupMode?: IpGeoLookupMode;
 }
@@ -173,10 +177,10 @@ export function VirtualizedLogsTable({
   fetchFn,
   queryKeyPrefix = "usage-logs-batch",
   disableDetailDialog = false,
+  publicErrorDialog = false,
   ipLookupMode = "default",
 }: VirtualizedLogsTableProps) {
   const t = useTranslations("dashboard");
-  const tChain = useTranslations("provider-chain");
   const [isHistoryBrowsing, setIsHistoryBrowsing] = useState(false);
   const shouldPoll = autoRefreshEnabled && !isHistoryBrowsing;
 
@@ -1030,7 +1034,7 @@ export function VirtualizedLogsTable({
                                         finalProvider={
                                           getFinalProviderName(log.providerChain ?? []) ||
                                           log.providerName ||
-                                          tChain("circuit.unknown")
+                                          t("logs.details.providerNotReached")
                                         }
                                         hasCostBadge={hasCostBadge}
                                         onChainItemClick={(chainIndex) => {
@@ -1316,12 +1320,20 @@ export function VirtualizedLogsTable({
 
                     {/* Status */}
                     <div className="flex-[0.7] min-w-[70px] pr-3">
-                      {disableDetailDialog ? (
+                      {publicErrorDialog && log.publicErrorCode ? (
+                        <PublicErrorDetailsDialog
+                          trigger={<StatusBadgeOnly statusCode={log.statusCode} />}
+                          code={log.publicErrorCode}
+                          sessionId={log.sessionId}
+                        />
+                      ) : disableDetailDialog ? (
                         <StatusBadgeOnly statusCode={log.statusCode} />
                       ) : (
                         <ErrorDetailsDialog
                           statusCode={log.statusCode}
                           errorMessage={log.errorMessage}
+                          publicErrorCode={log.publicErrorCode}
+                          publicErrorMessage={log.publicErrorMessage}
                           providerChain={log.providerChain}
                           routingTrace={log.routingTrace}
                           sessionId={log.sessionId}

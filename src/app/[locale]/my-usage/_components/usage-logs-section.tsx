@@ -48,6 +48,7 @@ interface Filters {
   model?: string;
   statusCode?: number;
   excludeStatusCode200?: boolean;
+  failedOnly?: boolean;
   endpoint?: string;
   minRetryCount?: number;
 }
@@ -112,7 +113,7 @@ export function UsageLogsSection({
       endTime,
       model: appliedFilters.model,
       statusCode: appliedFilters.statusCode,
-      excludeStatusCode200: appliedFilters.excludeStatusCode200,
+      failedOnly: appliedFilters.failedOnly,
       endpoint: appliedFilters.endpoint,
       minRetryCount: appliedFilters.minRetryCount,
     };
@@ -123,7 +124,7 @@ export function UsageLogsSection({
     if (appliedFilters.startDate || appliedFilters.endDate) count++;
     if (appliedFilters.model) count++;
     if (appliedFilters.endpoint) count++;
-    if (appliedFilters.statusCode || appliedFilters.excludeStatusCode200) count++;
+    if (appliedFilters.statusCode || appliedFilters.failedOnly) count++;
     if (appliedFilters.minRetryCount) count++;
     return count;
   }, [appliedFilters]);
@@ -273,17 +274,18 @@ export function UsageLogsSection({
                 <Label>{t("filters.status")}</Label>
                 <Select
                   value={
-                    draftFilters.excludeStatusCode200
-                      ? "!200"
+                    draftFilters.failedOnly
+                      ? "!failed"
                       : (draftFilters.statusCode?.toString() ?? "__all__")
                   }
                   onValueChange={(value) =>
                     handleFilterChange({
                       statusCode:
-                        value === "__all__" || value === "!200"
+                        value === "__all__" || value === "!failed"
                           ? undefined
                           : Number.parseInt(value, 10),
-                      excludeStatusCode200: value === "!200",
+                      failedOnly: value === "!failed",
+                      excludeStatusCode200: undefined,
                     })
                   }
                 >
@@ -292,7 +294,7 @@ export function UsageLogsSection({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__all__">{t("filters.allStatus")}</SelectItem>
-                    <SelectItem value="!200">{tDashboard("logs.statusCodes.not200")}</SelectItem>
+                    <SelectItem value="!failed">{tDashboard("logs.statusCodes.failed")}</SelectItem>
                     <SelectItem value="200">200</SelectItem>
                     <SelectItem value="400">400</SelectItem>
                     <SelectItem value="401">401</SelectItem>
@@ -336,6 +338,7 @@ export function UsageLogsSection({
                 billingModelSource={billingModelSource}
                 hiddenColumns={MY_USAGE_HIDDEN_COLUMNS}
                 disableDetailDialog
+                publicErrorDialog
                 fetchFn={myUsageFetchFn}
                 queryKeyPrefix="my-usage-logs-batch"
                 ipLookupMode="my-usage"

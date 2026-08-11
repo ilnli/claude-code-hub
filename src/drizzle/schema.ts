@@ -13,6 +13,7 @@ import {
   uniqueIndex,
   pgEnum,
   check,
+  uuid,
 } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 import type { SpecialSetting } from '@/types/special-settings';
@@ -26,6 +27,7 @@ import type { RateMarkupType, UpstreamProbeType } from "@/types/upstream-billing
 import type { RoutingTraceV1 } from "@/types/routing-trace";
 import type { ProviderWeightAdjustmentRunSummary } from "@/types/provider-weight-adjustment";
 import { REPLAY_CACHE_TTL_MINUTES_DEFAULT } from "@/lib/validation/replay-settings";
+import type { PublicErrorCode } from "@/types/public-error";
 
 // Enums
 export const dailyResetModeEnum = pgEnum('daily_reset_mode', ['fixed', 'rolling']);
@@ -716,7 +718,8 @@ export const providerEndpointProbeLogs = pgTable('provider_endpoint_probe_logs',
 // Message Request table
 export const messageRequest = pgTable('message_request', {
   id: serial('id').primaryKey(),
-  providerId: integer('provider_id').notNull(),
+  requestUuid: uuid('request_uuid'),
+  providerId: integer('provider_id'),
   userId: integer('user_id').notNull(),
   key: varchar('key').notNull(),
   model: varchar('model', { length: 128 }),
@@ -807,6 +810,8 @@ export const messageRequest = pgTable('message_request', {
 
   // 错误信息
   errorMessage: text('error_message'),
+  publicErrorCode: varchar('public_error_code', { length: 64 }).$type<PublicErrorCode>(),
+  publicErrorMessage: text('public_error_message'),
   errorStack: text('error_stack'),  // 完整堆栈信息，用于排查 TypeError: terminated 等流错误
   errorCause: text('error_cause'),  // 嵌套错误原因（JSON 格式），如 NGHTTP2_INTERNAL_ERROR
 
@@ -837,6 +842,9 @@ export const messageRequest = pgTable('message_request', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
 }, (table) => ({
+  messageRequestRequestUuidIdx: uniqueIndex('idx_message_request_request_uuid')
+    .on(table.requestUuid)
+    .where(sql`${table.requestUuid} IS NOT NULL`),
   // 优化统计查询的复合索引（用户+时间+费用）
   messageRequestUserDateCostIdx: index('idx_message_request_user_date_cost').on(table.userId, table.createdAt, table.costUsd).where(sql`${table.deletedAt} IS NULL`),
   messageRequestUserCreatedAtCostStatsIdx: index('idx_message_request_user_created_at_cost_stats')
@@ -1558,8 +1566,8 @@ export const usageLedger = pgTable('usage_ledger', {
   requestId: integer('request_id').notNull(),
   userId: integer('user_id').notNull(),
   key: varchar('key').notNull(),
-  providerId: integer('provider_id').notNull(),
-  finalProviderId: integer('final_provider_id').notNull(),
+  providerId: integer('provider_id'),
+  finalProviderId: integer('final_provider_id'),
   model: varchar('model', { length: 128 }),
   originalModel: varchar('original_model', { length: 128 }),
   actualResponseModel: varchar('actual_response_model', { length: 128 }),
@@ -1579,6 +1587,7 @@ export const usageLedger = pgTable('usage_ledger', {
   isReplay: boolean('is_replay').notNull().default(false),
   replaySourceRequestId: integer('replay_source_request_id'),
   statusCode: integer('status_code'),
+  publicErrorCode: varchar('public_error_code', { length: 64 }).$type<PublicErrorCode>(),
   isSuccess: boolean('is_success').notNull().default(false),
   successRateOutcome: varchar('success_rate_outcome', { length: 16 }),
   blockedBy: varchar('blocked_by', { length: 50 }),

@@ -11,6 +11,7 @@ export interface UsageLogFilterParams {
   endTime?: number;
   statusCode?: number;
   excludeStatusCode200?: boolean;
+  failedOnly?: boolean;
   model?: string;
   actualResponseModelMismatch?: boolean;
   endpoint?: string;
@@ -167,6 +168,10 @@ export function buildUsageLogConditions(filters: UsageLogFilterParams): SQL[] {
 
   if (filters.statusCode !== undefined) {
     conditions.push(eq(messageRequest.statusCode, filters.statusCode));
+  } else if (filters.failedOnly) {
+    conditions.push(
+      sql`(${messageRequest.statusCode} < 200 OR ${messageRequest.statusCode} > 299)`
+    );
   } else if (filters.excludeStatusCode200) {
     conditions.push(
       sql`(${messageRequest.statusCode} IS NULL OR ${messageRequest.statusCode} <> 200)`

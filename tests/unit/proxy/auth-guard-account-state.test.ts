@@ -94,7 +94,14 @@ describe("ProxyAuthenticator account-state failures", () => {
   });
 
   it("disabled key returns 401 key_disabled and does NOT count toward rate limit", async () => {
-    resolveApiKeyAuthOutcome.mockResolvedValue({ ok: false, reason: "key_disabled" });
+    const user = { id: 7, name: "bob" };
+    const key = { id: 9, name: "disabled-key" };
+    resolveApiKeyAuthOutcome.mockResolvedValue({
+      ok: false,
+      reason: "key_disabled",
+      user,
+      key,
+    });
 
     const { ProxyAuthenticator } = await import("@/app/v1/_lib/proxy/auth-guard");
     const session = makeSession("203.0.113.20", "sk-disabled");
@@ -109,13 +116,27 @@ describe("ProxyAuthenticator account-state failures", () => {
     // Message is the i18n key (mocked); the actual localized text lives in
     // messages/<locale>/errors.json under this key.
     expect(error.message).toBe("PROXY_API_KEY_DISABLED");
+    expect(session.authState).toMatchObject({
+      user,
+      key,
+      apiKey: "sk-disabled",
+      success: false,
+      failureKind: "account_state",
+    });
 
     expect(policyRecordFailure).not.toHaveBeenCalled();
     expect(policyRecordSuccess).not.toHaveBeenCalled();
   });
 
   it("expired key returns 401 key_expired and does NOT count toward rate limit", async () => {
-    resolveApiKeyAuthOutcome.mockResolvedValue({ ok: false, reason: "key_expired" });
+    const user = { id: 8, name: "carol" };
+    const key = { id: 10, name: "expired-key" };
+    resolveApiKeyAuthOutcome.mockResolvedValue({
+      ok: false,
+      reason: "key_expired",
+      user,
+      key,
+    });
 
     const { ProxyAuthenticator } = await import("@/app/v1/_lib/proxy/auth-guard");
     const session = makeSession("203.0.113.21", "sk-expired");
@@ -127,6 +148,13 @@ describe("ProxyAuthenticator account-state failures", () => {
     expect(error.type).toBe("key_expired");
     expect(error.code).toBe("key_expired");
     expect(error.message).toBe("PROXY_API_KEY_EXPIRED");
+    expect(session.authState).toMatchObject({
+      user,
+      key,
+      apiKey: "sk-expired",
+      success: false,
+      failureKind: "account_state",
+    });
 
     expect(policyRecordFailure).not.toHaveBeenCalled();
   });
@@ -216,7 +244,12 @@ describe("ProxyAuthenticator account-state failures", () => {
     // row. Before the fix, the 20th attempt would trip the rate limiter and
     // start returning 429s. After the fix, every attempt should return 401
     // key_disabled and the rate-limiter counter must remain untouched.
-    resolveApiKeyAuthOutcome.mockResolvedValue({ ok: false, reason: "key_disabled" });
+    resolveApiKeyAuthOutcome.mockResolvedValue({
+      ok: false,
+      reason: "key_disabled",
+      user: { id: 7, name: "bob" },
+      key: { id: 9, name: "disabled-key" },
+    });
 
     const { ProxyAuthenticator } = await import("@/app/v1/_lib/proxy/auth-guard");
 

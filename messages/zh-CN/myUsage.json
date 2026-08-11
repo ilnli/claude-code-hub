@@ -45,6 +45,14 @@
       "reset": "重置"
     },
     "loadFailed": "日志加载失败",
+    "errorDetails": {
+      "title": "请求失败",
+      "description": "需要管理员排查时，请提供 CCH Session ID。",
+      "reason": "错误原因",
+      "sessionId": "CCH Session ID",
+      "copy": "复制 Session ID",
+      "copied": "Session ID 已复制"
+    },
     "table": {
       "time": "时间",
       "model": "模型",

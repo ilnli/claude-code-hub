@@ -45,6 +45,14 @@
       "reset": "リセット"
     },
     "loadFailed": "ログの取得に失敗しました",
+    "errorDetails": {
+      "title": "リクエスト失敗",
+      "description": "管理者に調査を依頼する際は CCH Session ID を伝えてください。",
+      "reason": "理由",
+      "sessionId": "CCH Session ID",
+      "copy": "Session ID をコピー",
+      "copied": "Session ID をコピーしました"
+    },
     "table": {
       "time": "時間",
       "model": "モデル",

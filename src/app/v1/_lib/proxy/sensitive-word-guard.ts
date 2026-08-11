@@ -13,8 +13,6 @@
  * - 计费之前（重要！）
  */
 
-import { db } from "@/drizzle/db";
-import { messageRequest } from "@/drizzle/schema";
 import { logger } from "@/lib/logger";
 import { extractTextFromMessages } from "@/lib/message-extractor";
 import { sensitiveWordDetector } from "@/lib/sensitive-word-detector";
@@ -57,11 +55,18 @@ export class ProxySensitiveWordGuard {
             matchedText: result.matchedText,
           });
 
-          // 记录到数据库（异步，不阻塞响应）
-          void ProxySensitiveWordGuard.logBlockedRequest(session, result);
-
           // 构造详细的错误信息
           const errorMessage = ProxySensitiveWordGuard.buildErrorMessage(result);
+          session.setTerminalFailureMetadata({
+            code: "request_blocked",
+            adminMessage: errorMessage,
+            blockedBy: "sensitive_word",
+            blockedReason: JSON.stringify({
+              word: result.word,
+              matchType: result.matchType,
+              matchedText: result.matchedText,
+            }),
+          });
 
           return ProxyResponses.buildError(400, errorMessage);
         }
@@ -71,47 +76,6 @@ export class ProxySensitiveWordGuard {
     } catch (error) {
       logger.error("[SensitiveWordGuard] Detection error:", error);
       return null; // 降级：检测失败时放行，不阻塞正常请求
-    }
-  }
-
-  /**
-   * 记录被拦截的请求到数据库
-   */
-  private static async logBlockedRequest(
-    session: ProxySession,
-    result: { word?: string; matchType?: string; matchedText?: string }
-  ): Promise<void> {
-    try {
-      if (!session.authState?.user || !session.authState?.key || !session.authState?.apiKey) {
-        logger.warn("[SensitiveWordGuard] Cannot log blocked request: missing auth state");
-        return;
-      }
-
-      // 使用 provider_id = 0 表示被拦截的请求（未选择 provider）
-      await db.insert(messageRequest).values({
-        providerId: 0, // 特殊值：表示被拦截
-        userId: session.authState.user.id,
-        key: session.authState.apiKey,
-        model: session.request.model ?? undefined,
-        sessionId: session.sessionId ?? undefined,
-        statusCode: 400,
-        costUsd: "0", // 不计费
-        blockedBy: "sensitive_word",
-        blockedReason: JSON.stringify({
-          word: result.word,
-          matchType: result.matchType,
-          matchedText: result.matchedText,
-        }),
-        errorMessage: `请求包含敏感词："${result.word}"`,
-      });
-
-      logger.info("[SensitiveWordGuard] Blocked request logged to database", {
-        userId: session.authState.user.id,
-        word: result.word,
-      });
-    } catch (error) {
-      logger.error("[SensitiveWordGuard] Failed to log blocked request:", error);
-      // 失败不影响拦截行为
     }
   }
 

@@ -14,6 +14,7 @@ import {
 } from "./proxy/error-session-id";
 import { ProxyError } from "./proxy/errors";
 import { createExplicitCompactionV2HeartbeatResponse } from "./proxy/explicit-compaction-heartbeat";
+import { finalizeFailedRequest } from "./proxy/failure-finalizer";
 import { tryFakeStreamingPath } from "./proxy/fake-streaming/proxy-integration";
 import { detectClientFormat, detectFormatByEndpoint } from "./proxy/format-mapper";
 import { ProxyForwarder } from "./proxy/forwarder";
@@ -124,12 +125,13 @@ export async function handleProxyRequest(c: Context): Promise<Response> {
     // Run guard chain; may return early Response
     const early = await pipeline.run(session);
     if (early) {
-      const isReplayServe = early.headers.has("x-cch-replay");
-      const isHandledWarmup = early.status === 200 && session.isWarmupRequest();
+      const isReplayServe = early.response.headers.has("x-cch-replay");
+      const isHandledWarmup = early.response.status === 200 && session.isWarmupRequest();
       if (!isReplayServe && !isHandledWarmup) {
         await trackObservedSession(session);
       }
-      return await attachSessionIdToErrorResponse(session.sessionId, early);
+      await finalizeFailedRequest(session, early.response);
+      return await attachSessionIdToErrorResponse(session.sessionId, early.response);
     }
 
     const observedSessionIdentity = await trackObservedSession(session);
@@ -178,6 +180,7 @@ export async function handleProxyRequest(c: Context): Promise<Response> {
     if (cachedSystemSettings && !isRawPassthroughEndpointPolicy(session.getEndpointPolicy())) {
       const fakeStreamingResponse = await tryFakeStreamingPath(session, cachedSystemSettings);
       if (fakeStreamingResponse) {
+        await finalizeFailedRequest(session, fakeStreamingResponse);
         return await attachSessionIdToErrorResponse(session.sessionId, fakeStreamingResponse);
       }
     }
@@ -236,6 +239,7 @@ export async function handleProxyRequest(c: Context): Promise<Response> {
     const response = await ProxyForwarder.send(session);
     const handled = await ProxyResponseHandler.dispatch(session, response);
     const finalResponse = await attachSessionIdToErrorResponse(session.sessionId, handled);
+    await finalizeFailedRequest(session, finalResponse);
 
     return finalResponse;
   } catch (error) {
@@ -250,7 +254,9 @@ export async function handleProxyRequest(c: Context): Promise<Response> {
       databasePool: databaseError?.pool,
     });
     if (session) {
-      return await ProxyErrorHandler.handle(session, error);
+      const response = await ProxyErrorHandler.handle(session, error);
+      await finalizeFailedRequest(session, response, error);
+      return response;
     }
 
     if (error instanceof ProxyError) {

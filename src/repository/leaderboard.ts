@@ -1,6 +1,6 @@
 "use server";
 
-import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { db } from "@/drizzle/db";
 import { providers, usageLedger, users } from "@/drizzle/schema";
 import { resolveSystemTimezone } from "@/lib/utils/timezone";
@@ -349,6 +349,7 @@ async function findLeaderboardWithTimezone(
 ): Promise<LeaderboardEntry[]> {
   const whereConditions = [
     LEDGER_BILLING_CONDITION,
+    isNotNull(usageLedger.finalProviderId),
     buildDateCondition(period, timezone, dateRange),
   ];
 
@@ -724,7 +725,7 @@ async function findProviderLeaderboardWithTimezone(
     const totalTokens = entry.totalTokens;
     const avgCosts = computeAvgCosts(totalCost, totalRequests, totalTokens);
     return {
-      providerId: entry.providerId,
+      providerId: entry.providerId!,
       providerName: entry.providerName,
       totalRequests,
       totalCost,
@@ -732,7 +733,7 @@ async function findProviderLeaderboardWithTimezone(
       successRate: clampRatio01Nullable(entry.successRate),
       avgTtftMs: entry.avgTtftMs ?? 0,
       avgTokensPerSecond: entry.avgTokensPerSecond ?? 0,
-      cacheCoefficientBp: cacheCoefficients.get(entry.providerId)?.coefficientBp ?? null,
+      cacheCoefficientBp: cacheCoefficients.get(entry.providerId!)?.coefficientBp ?? null,
       ...avgCosts,
     };
   });
@@ -777,7 +778,7 @@ async function findProviderLeaderboardWithTimezone(
 
   const modelStatsByProvider = new Map<number, ModelProviderStat[]>();
   for (const row of modelRows) {
-    if (!row.model) continue;
+    if (!row.model || row.providerId === null) continue;
     const totalCost = parseFloat(row.totalCost);
     const totalRequests = row.totalRequests;
     const totalTokens = row.totalTokens;
@@ -851,6 +852,7 @@ async function findProviderCacheHitRateLeaderboardWithTimezone(
 
   const whereConditions = [
     LEDGER_BILLING_CONDITION,
+    isNotNull(usageLedger.finalProviderId),
     buildDateCondition(period, timezone, dateRange),
     cacheRequiredCondition,
     providerType ? eq(providers.providerType, providerType) : undefined,
@@ -927,7 +929,7 @@ async function findProviderCacheHitRateLeaderboardWithTimezone(
   // Group model stats by providerId
   const modelStatsByProvider = new Map<number, ModelCacheHitStat[]>();
   for (const row of modelRows) {
-    if (!row.model) continue;
+    if (!row.model || row.providerId === null) continue;
     const stats = modelStatsByProvider.get(row.providerId) ?? [];
     const modelCacheKey = row.model.trim();
     stats.push({
@@ -945,7 +947,7 @@ async function findProviderCacheHitRateLeaderboardWithTimezone(
   }
 
   const entries: ProviderCacheHitRateLeaderboardEntry[] = rankings.map((entry) => ({
-    providerId: entry.providerId,
+    providerId: entry.providerId!,
     providerName: entry.providerName,
     totalRequests: entry.totalRequests,
     totalCost: parseFloat(entry.totalCost),
@@ -954,8 +956,8 @@ async function findProviderCacheHitRateLeaderboardWithTimezone(
     totalInputTokens: entry.totalInputTokens,
     totalTokens: entry.totalInputTokens, // deprecated, for backward compatibility
     cacheHitRate: clampRatio01(entry.cacheHitRate),
-    cacheCoefficientBp: cacheCoefficients.get(entry.providerId)?.coefficientBp ?? null,
-    modelStats: modelStatsByProvider.get(entry.providerId) ?? [],
+    cacheCoefficientBp: cacheCoefficients.get(entry.providerId!)?.coefficientBp ?? null,
+    modelStats: modelStatsByProvider.get(entry.providerId!) ?? [],
   }));
 
   // 默认排序：缓存系数 DESC（无数据排最后），并列再按缓存命中率 DESC

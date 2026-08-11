@@ -17,7 +17,7 @@ import type {
   RateLimitType,
   TimeRange,
 } from "@/types/statistics";
-import { LEDGER_BILLING_CONDITION } from "./_shared/ledger-conditions";
+import { LEDGER_BILLING_CONDITION, LEDGER_REQUEST_CONDITION } from "./_shared/ledger-conditions";
 import { EXCLUDE_WARMUP_CONDITION } from "./_shared/message-request-conditions";
 
 /**
@@ -315,12 +315,12 @@ export async function getUserStatisticsFromDB(
       u.name AS user_name,
       ${bucketExpr} AS bucket,
       COUNT(usage_ledger.id) AS api_calls,
-      COALESCE(SUM(usage_ledger.cost_usd), 0) AS total_cost
+      COALESCE(SUM(usage_ledger.cost_usd) FILTER (WHERE ${LEDGER_BILLING_CONDITION}), 0) AS total_cost
     FROM users u
     LEFT JOIN usage_ledger ON u.id = usage_ledger.user_id
       AND usage_ledger.created_at >= ${startTs}
       AND usage_ledger.created_at < ${endTs}
-      AND ${LEDGER_BILLING_CONDITION}
+      AND ${LEDGER_REQUEST_CONDITION}
     WHERE u.deleted_at IS NULL
     GROUP BY u.id, u.name, bucket
     ORDER BY bucket ASC, u.name ASC
@@ -368,13 +368,13 @@ export async function getKeyStatisticsFromDB(
       k.name AS key_name,
       ${bucketExpr} AS bucket,
       COUNT(usage_ledger.id) AS api_calls,
-      COALESCE(SUM(usage_ledger.cost_usd), 0) AS total_cost
+      COALESCE(SUM(usage_ledger.cost_usd) FILTER (WHERE ${LEDGER_BILLING_CONDITION}), 0) AS total_cost
     FROM keys k
     LEFT JOIN usage_ledger ON usage_ledger.key = k.key
       AND usage_ledger.user_id = ${userId}
       AND usage_ledger.created_at >= ${startTs}
       AND usage_ledger.created_at < ${endTs}
-      AND ${LEDGER_BILLING_CONDITION}
+      AND ${LEDGER_REQUEST_CONDITION}
     WHERE k.user_id = ${userId}
       AND k.deleted_at IS NULL
     GROUP BY k.id, k.name, bucket
@@ -428,13 +428,13 @@ export async function getMixedStatisticsFromDB(
       k.name AS key_name,
       ${bucketExpr} AS bucket,
       COUNT(usage_ledger.id) AS api_calls,
-      COALESCE(SUM(usage_ledger.cost_usd), 0) AS total_cost
+      COALESCE(SUM(usage_ledger.cost_usd) FILTER (WHERE ${LEDGER_BILLING_CONDITION}), 0) AS total_cost
     FROM keys k
     LEFT JOIN usage_ledger ON usage_ledger.key = k.key
       AND usage_ledger.user_id = ${userId}
       AND usage_ledger.created_at >= ${startTs}
       AND usage_ledger.created_at < ${endTs}
-      AND ${LEDGER_BILLING_CONDITION}
+      AND ${LEDGER_REQUEST_CONDITION}
     WHERE k.user_id = ${userId}
       AND k.deleted_at IS NULL
     GROUP BY k.id, k.name, bucket
@@ -445,12 +445,12 @@ export async function getMixedStatisticsFromDB(
     SELECT
       ${bucketExpr} AS bucket,
       COUNT(usage_ledger.id) AS api_calls,
-      COALESCE(SUM(usage_ledger.cost_usd), 0) AS total_cost
+      COALESCE(SUM(usage_ledger.cost_usd) FILTER (WHERE ${LEDGER_BILLING_CONDITION}), 0) AS total_cost
     FROM usage_ledger
     WHERE usage_ledger.user_id <> ${userId}
       AND usage_ledger.created_at >= ${startTs}
       AND usage_ledger.created_at < ${endTs}
-      AND ${LEDGER_BILLING_CONDITION}
+      AND ${LEDGER_REQUEST_CONDITION}
     GROUP BY bucket
     ORDER BY bucket ASC
   `;

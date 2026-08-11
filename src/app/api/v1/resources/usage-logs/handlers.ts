@@ -85,6 +85,9 @@ export async function suggestSessionIds(c: Context): Promise<Response> {
 export async function createUsageLogsExport(c: Context): Promise<Response> {
   const body = await parseHonoJsonBody(c, UsageLogsExportCreateSchema);
   if (!body.ok) return body.response;
+  if (body.data.failedOnly && body.data.excludeStatusCode200) {
+    return conflictingFailureFilters(c);
+  }
   const actions = await import("@/actions/usage-logs");
   const preferAsync = (c.req.header("prefer") ?? "").toLowerCase().includes("respond-async");
 
@@ -166,6 +169,7 @@ function parseUsageLogsQuery(c: Context): UsageLogsActionQueryInput | Response {
     actualResponseModelMismatch: c.req.query("actualResponseModelMismatch"),
     statusCode: c.req.query("statusCode"),
     excludeStatusCode200: c.req.query("excludeStatusCode200"),
+    failedOnly: c.req.query("failedOnly"),
     endpoint: c.req.query("endpoint"),
     minRetryCount: c.req.query("minRetryCount"),
     replayFilter: c.req.query("replayFilter"),
@@ -173,11 +177,23 @@ function parseUsageLogsQuery(c: Context): UsageLogsActionQueryInput | Response {
     endTime: c.req.query("endTime"),
   });
   if (!query.success) return fromZodError(query.error, new URL(c.req.url).pathname);
+  if (query.data.failedOnly && query.data.excludeStatusCode200) {
+    return conflictingFailureFilters(c);
+  }
   const { cursorCreatedAt, cursorId, ...rest } = query.data;
   return {
     ...rest,
     cursor: cursorCreatedAt && cursorId ? { createdAt: cursorCreatedAt, id: cursorId } : undefined,
   };
+}
+
+function conflictingFailureFilters(c: Context): Response {
+  return createProblemResponse({
+    status: 400,
+    instance: new URL(c.req.url).pathname,
+    errorCode: "usage_logs.conflicting_failure_filters",
+    detail: "failedOnly and excludeStatusCode200 cannot be used together.",
+  });
 }
 
 function parseJobParams(c: Context): { jobId: string } | Response {

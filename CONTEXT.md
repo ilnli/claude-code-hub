@@ -4,6 +4,66 @@ This context defines the domain language used by the proxy routing and user rech
 
 ## Language
 
+**Request Record**:
+A single logical proxy request attributable to a resolved User and Key, retained regardless of
+whether it succeeds or where it terminates. A request that cannot be attributed during
+authentication is not a Request Record.
+_Avoid_: Usage Log, Upstream Attempt, authentication failure log
+
+**Attributable Authentication Failure**:
+An authentication rejection in which credentials resolve to a real User and Key but an account
+state such as disablement or expiration prevents access. It is a Request Record even though access
+was not granted.
+_Avoid_: Invalid credential, unknown Key, successful authentication
+
+**Pre-Identity Parse Failure**:
+A request-body parsing, decompression, or size failure that occurs before CCH can resolve a User and
+Key. It remains an application-log event and is not a Request Record.
+_Avoid_: Attributable Authentication Failure, early local guard failure
+
+**Request History**:
+The User or administrator projection of Request Records, including Provider-Unassigned Requests.
+User projections expose only User Error Summaries, while Provider-scoped projections exclude
+records without Provider attribution.
+_Avoid_: Billing ledger, Upstream Attempt history, application log
+
+**Upstream Attempt**:
+One actual upstream call made while resolving a Request Record, including a retry, Provider Switch,
+or Hedge attempt. Any number of Upstream Attempts still belongs to one Request Record.
+_Avoid_: Request Record, user request
+
+**Failed Request**:
+A Request Record whose final client response status is outside the HTTP 2xx range. A Request Record
+without a final status is still in progress and is not a Failed Request.
+_Avoid_: Non-200 request, Provider failure
+
+**Failed Request Filter**:
+A Request History filter that selects exactly Failed Requests. It is distinct from the legacy
+literal operation that excludes only status 200.
+_Avoid_: Non-200 filter, `excludeStatusCode200`
+
+**Failed Request Accounting**:
+The rule that a Failed Request contributes one logical request to request totals, while cost and
+tokens come only from reported Upstream Attempt usage. A failure before any Upstream Attempt has no
+Provider success-rate or availability attribution.
+_Avoid_: Free failed request, Provider failure count, per-attempt request count
+
+**Provider-Unassigned Request**:
+A Request Record that terminates before any Provider is assigned. It remains a normal Request Record
+and has no Provider attribution; the absent Provider is a valid outcome rather than missing data.
+_Avoid_: System Provider request, orphaned request, Provider zero
+
+**Failure Finalization**:
+The bounded, awaited terminal recording of a Failed Request after its final non-2xx outcome is
+known. It updates or creates its Request Record exactly once, while a persistence failure raises an
+internal alert without changing the Client Error Contract.
+_Avoid_: Background error logging, Upstream Attempt log, provisional failure row
+
+**Guard Failure**:
+A structured terminal outcome from a local request guard that carries the Client Error Contract,
+Public Error Snapshot inputs, and administrator diagnostic context to Failure Finalization.
+_Avoid_: Parsed error Response, guard-specific database write, Upstream Attempt failure
+
 **Provider**:
 A concrete routable API credential and configuration record.
 _Avoid_: Provider Vendor, vendor
@@ -104,10 +164,72 @@ semantic cause, rather than a proxy-generated status, determines whether it belo
 or the Provider.
 _Avoid_: Provider 502, transport failure
 
+**Postcommit Stream Failure**:
+A stream failure that occurs after Response Commitment and therefore cannot replace the established
+2xx client status. It is outside Failed Request and User Error Summary semantics.
+_Avoid_: Failed Request, non-2xx response, ordinary upstream failure
+
 **Client Error Contract**:
 The protocol-compatible status, stable error code, and safe message returned to the calling client,
 independent of the error shape received from a Provider.
 _Avoid_: Raw upstream error, Provider response body
+
+**Public Error Snapshot**:
+The retained user-visible result of the Client Error Contract for a Failed Request, fixed when the
+response is produced and containing its final status, stable code, safe message, and CCH Session ID.
+It is independent of administrator diagnostics.
+_Avoid_: Sanitized administrator error, raw upstream error, recomputed error message
+
+**Public Error Code**:
+A stable, User-safe category used for Public Error Rendering without exposing Provider, routing,
+circuit, rule, or infrastructure identity. Internal error codes map to it rather than crossing the
+User API boundary.
+_Avoid_: Internal error code, routing disposition, Provider error code
+
+**User Error Summary**:
+The limited Request Record view of a Public Error Snapshot: the existing final status, a sanitized
+error reason, and a CCH Session ID for support correlation. It excludes Provider and routing
+diagnostics and is intended only to orient the User before administrator investigation.
+_Avoid_: Administrator error detail, raw error, routing summary
+
+**Administrator Error Detail**:
+The privileged Request History view that pairs the User Error Summary with retained internal,
+routing, and Provider diagnostics. A Provider-Unassigned Request is identified as not having reached
+an upstream rather than being assigned a synthetic Provider.
+_Avoid_: User Error Summary, public error response, synthetic Provider detail
+
+**Safe Error Fallback**:
+A localized category-level reason used in a User Error Summary when no diagnostic message can be
+proven safe. It replaces unsafe detail completely rather than partially redacting or omitting it.
+_Avoid_: Partially redacted raw error, blank error reason, Provider error excerpt
+
+**Public Error Rendering**:
+The rendering rule that uses the current User locale for a known public error code or Safe Error
+Fallback and otherwise shows the retained safe dynamic message. The stable code selects content but
+is not itself displayed.
+_Avoid_: Machine-translated diagnostic, displayed error code, localized raw Provider error
+
+**Public Error Retention**:
+The rule that safe dynamic error text follows Request Record log retention, while the permanent
+Usage Ledger retains only its stable public error code. After detail expires, rendering uses the
+localized code or a Safe Error Fallback.
+_Avoid_: Permanent dynamic error text, permanent administrator diagnostic, historical enrichment
+
+**Historical Error Visibility**:
+The rule that a historical Request Record without a Public Error Snapshot retains its prior user
+visibility and gains no synthesized error reason or correlation detail.
+_Avoid_: Error backfill, read-time historical sanitization, inferred Public Error Snapshot
+
+**CCH Session ID**:
+The support correlation identity assigned to every Request Record, including an Attributable
+Authentication Failure or a request that terminates during an early local guard. Its assignment does
+not mean the request passed validation or that request content was retained for Session diagnostics.
+_Avoid_: Upstream request ID, Provider request ID, request acceptance marker
+
+**Request UUID**:
+The private, immutable identity allocated to a Request Record before persistence and used only to
+make creation idempotent across ambiguous database retries. It is not User support information.
+_Avoid_: CCH Session ID, database row ID, client retry key
 
 **Response Commitment**:
 The boundary at which the first valid response content becomes client-visible. Routing outcomes may

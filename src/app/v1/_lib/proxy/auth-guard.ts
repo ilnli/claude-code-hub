@@ -28,24 +28,17 @@ function buildAuthFailure(params: {
   failureKind: AuthFailureKind;
   errorResponse: Response;
   apiKey?: string | null;
+  user?: AuthState["user"];
+  key?: AuthState["key"];
 }): AuthState {
   return {
-    user: null,
-    key: null,
+    user: params.user ?? null,
+    key: params.key ?? null,
     apiKey: params.apiKey ?? null,
     success: false,
     failureKind: params.failureKind,
     errorResponse: params.errorResponse,
   };
-}
-
-/**
- * Exhaustiveness helper. Calling this from a "should be unreachable" branch
- * gives a compile-time error when a new union member is added without an
- * explicit handler.
- */
-function assertNever(value: never, context: string): never {
-  throw new Error(`Unhandled discriminant in ${context}: ${JSON.stringify(value)}`);
 }
 
 /**
@@ -233,6 +226,8 @@ export class ProxyAuthenticator {
           });
           return buildAuthFailure({
             apiKey,
+            user: outcome.user,
+            key: outcome.key,
             failureKind: "account_state",
             errorResponse: ProxyResponses.buildError(
               401,
@@ -247,6 +242,8 @@ export class ProxyAuthenticator {
           });
           return buildAuthFailure({
             apiKey,
+            user: outcome.user,
+            key: outcome.key,
             failureKind: "account_state",
             errorResponse: ProxyResponses.buildError(
               401,
@@ -254,9 +251,6 @@ export class ProxyAuthenticator {
               "key_expired"
             ),
           });
-
-        default:
-          assertNever(outcome.reason, "ProxyAuthenticator.validate outcome.reason");
       }
     }
 
@@ -271,6 +265,8 @@ export class ProxyAuthenticator {
       });
       return buildAuthFailure({
         apiKey,
+        user: outcome.user,
+        key: outcome.key,
         failureKind: "account_state",
         errorResponse: ProxyResponses.buildError(
           401,
@@ -296,6 +292,8 @@ export class ProxyAuthenticator {
       });
       return buildAuthFailure({
         apiKey,
+        user: outcome.user,
+        key: outcome.key,
         failureKind: "account_state",
         errorResponse: ProxyResponses.buildError(
           401,

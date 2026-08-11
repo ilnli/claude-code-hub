@@ -80,6 +80,7 @@ export class ProxyMessageService {
     }
 
     const messageRequest = await createMessageRequest({
+      request_uuid: session.requestUuid,
       provider_id: provider.id,
       user_id: authState.user.id,
       key: authState.apiKey,

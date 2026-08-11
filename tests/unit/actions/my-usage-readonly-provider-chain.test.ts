@@ -184,4 +184,60 @@ describe("getMyUsageLogsBatchFull", () => {
       }),
     ]);
   });
+
+  it("公开错误记录只保留脱敏原因和 CCH Session ID", async () => {
+    vi.resetModules();
+    mocks.getSession.mockResolvedValueOnce({
+      user: { id: 1 },
+      key: { id: 7, key: "sk-readonly" },
+    });
+    mocks.findReadonlyUsageLogsBatchForKey.mockResolvedValueOnce({
+      logs: [
+        {
+          id: 202,
+          sessionId: "cch-session-id",
+          publicErrorCode: "service_unavailable",
+          publicErrorMessage: "The service is temporarily unavailable.",
+          providerName: "private-provider",
+          errorMessage: "No available provider in private-group",
+          blockedReason: "private-policy-details",
+          providerChain: [{ id: 9, name: "private-provider" }],
+          routingTrace: { version: 1, mode: "legacy", events: [] },
+          specialSettings: [{ type: "cache_ttl", ttl: "5m" }],
+          userAgent: "private-client",
+          messagesCount: 3,
+          costMultiplier: 2,
+          groupCostMultiplier: 3,
+          costBreakdown: { input: { usd: "0.1" } },
+        },
+      ],
+      nextCursor: null,
+      hasMore: false,
+    });
+
+    const { getMyUsageLogsBatchFull } = await import("@/actions/my-usage");
+    const result = await getMyUsageLogsBatchFull({ limit: 20 });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.logs[0]).toMatchObject({
+      sessionId: "cch-session-id",
+      publicErrorCode: "service_unavailable",
+      publicErrorMessage: "The service is temporarily unavailable.",
+      providerName: null,
+      errorMessage: null,
+      blockedReason: null,
+      providerChain: null,
+      routingTrace: null,
+      specialSettings: null,
+      userAgent: null,
+      messagesCount: null,
+      costMultiplier: null,
+      groupCostMultiplier: null,
+      costBreakdown: null,
+    });
+    expect(JSON.stringify(result.data.logs[0])).not.toContain("private-provider");
+    expect(JSON.stringify(result.data.logs[0])).not.toContain("private-group");
+    expect(JSON.stringify(result.data.logs[0])).not.toContain("private-policy-details");
+  });
 });

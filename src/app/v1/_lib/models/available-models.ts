@@ -112,10 +112,6 @@ async function authenticateRequest(c: Context): Promise<{
           },
           401
         );
-      default: {
-        const _exhaustive: never = outcome.reason;
-        throw new Error(`Unhandled auth outcome reason: ${JSON.stringify(_exhaustive)}`);
-      }
     }
   }
 

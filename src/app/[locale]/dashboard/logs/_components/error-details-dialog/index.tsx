@@ -11,6 +11,7 @@ import { hasSessionMessages } from "@/lib/api-client/v1/actions/active-sessions"
 import { cn } from "@/lib/utils";
 import type { HedgeLoserBilling, StoredCostBreakdown } from "@/types/cost-breakdown";
 import type { ProviderChainItem } from "@/types/message";
+import type { PublicErrorCode } from "@/types/public-error";
 import type { RoutingTraceV1 } from "@/types/routing-trace";
 import type { SpecialSetting } from "@/types/special-settings";
 import type { BillingModelSource } from "@/types/system-config";
@@ -19,6 +20,8 @@ import { LogicTraceTab, PerformanceTab, SummaryTab } from "./components";
 interface ErrorDetailsDialogProps {
   statusCode: number | null;
   errorMessage: string | null;
+  publicErrorCode?: PublicErrorCode | null;
+  publicErrorMessage?: string | null;
   providerChain: ProviderChainItem[] | null;
   routingTrace?: RoutingTraceV1 | null;
   sessionId: string | null;
@@ -78,6 +81,8 @@ type TabValue = "summary" | "logic-trace" | "performance";
 export function ErrorDetailsDialog({
   statusCode,
   errorMessage,
+  publicErrorCode,
+  publicErrorMessage,
   providerChain,
   routingTrace,
   sessionId,
@@ -323,6 +328,12 @@ export function ErrorDetailsDialog({
         </SheetHeader>
 
         <div className="pb-8">
+          {publicErrorCode && publicErrorMessage ? (
+            <div className="mb-4 rounded border bg-muted/40 p-3">
+              <div className="text-sm font-medium">{t("publicErrorSummary")}</div>
+              <p className="mt-1 text-sm text-muted-foreground">{publicErrorMessage}</p>
+            </div>
+          ) : null}
           <Tabs
             value={activeTab}
             onValueChange={(v) => setActiveTab(v as TabValue)}

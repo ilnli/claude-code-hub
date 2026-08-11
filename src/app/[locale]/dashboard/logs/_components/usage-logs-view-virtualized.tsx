@@ -268,7 +268,7 @@ function UsageLogsViewContent({
     if (statsFilters.keyId !== undefined) count++;
     if (statsFilters.providerId !== undefined) count++;
     if (statsFilters.sessionId) count++;
-    if (statsFilters.statusCode !== undefined || statsFilters.excludeStatusCode200) count++;
+    if (statsFilters.statusCode !== undefined || statsFilters.failedOnly) count++;
     if (statsFilters.model) count++;
     if (statsFilters.actualResponseModelMismatch) count++;
     if (statsFilters.endpoint) count++;

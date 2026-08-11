@@ -47860,8 +47860,10 @@ export interface operations {
                 actualResponseModelMismatch?: "true" | "false" | boolean;
                 /** @description HTTP status code filter. */
                 statusCode?: number | null;
-                /** @description Exclude successful responses. */
+                /** @description Deprecated: exclude status code 200 literally, including in-progress records. */
                 excludeStatusCode200?: "true" | "false" | boolean;
+                /** @description Only include finalized responses outside 2xx. */
+                failedOnly?: "true" | "false" | boolean;
                 /** @description Endpoint filter. */
                 endpoint?: string;
                 /** @description Minimum retry count. */
@@ -48067,8 +48069,10 @@ export interface operations {
                 actualResponseModelMismatch?: "true" | "false" | boolean;
                 /** @description HTTP status code filter. */
                 statusCode?: number | null;
-                /** @description Exclude successful responses. */
+                /** @description Deprecated: exclude status code 200 literally, including in-progress records. */
                 excludeStatusCode200?: "true" | "false" | boolean;
+                /** @description Only include finalized responses outside 2xx. */
+                failedOnly?: "true" | "false" | boolean;
                 /** @description Endpoint filter. */
                 endpoint?: string;
                 /** @description Minimum retry count. */
@@ -49139,8 +49143,10 @@ export interface operations {
                     actualResponseModelMismatch?: "true" | "false" | boolean;
                     /** @description HTTP status code filter. */
                     statusCode?: number | null;
-                    /** @description Exclude successful responses. */
+                    /** @description Deprecated: exclude status code 200 literally, including in-progress records. */
                     excludeStatusCode200?: "true" | "false" | boolean;
+                    /** @description Only include finalized responses outside 2xx. */
+                    failedOnly?: "true" | "false" | boolean;
                     /** @description Endpoint filter. */
                     endpoint?: string;
                     /** @description Minimum retry count. */
@@ -50222,8 +50228,10 @@ export interface operations {
                 actualResponseModelMismatch?: "true" | "false" | boolean;
                 /** @description HTTP status code filter. */
                 statusCode?: number | null;
-                /** @description Exclude successful responses. */
+                /** @description Deprecated: exclude status code 200 literally, including in-progress records. */
                 excludeStatusCode200?: "true" | "false" | boolean;
+                /** @description Only include finalized responses outside 2xx. */
+                failedOnly?: "true" | "false" | boolean;
                 /** @description Endpoint filter. */
                 endpoint?: string;
                 /** @description Minimum retry count. */
@@ -50425,8 +50433,10 @@ export interface operations {
                 actualResponseModelMismatch?: "true" | "false" | boolean;
                 /** @description HTTP status code filter. */
                 statusCode?: number | null;
-                /** @description Exclude successful responses. */
+                /** @description Deprecated: exclude status code 200 literally, including in-progress records. */
                 excludeStatusCode200?: "true" | "false" | boolean;
+                /** @description Only include finalized responses outside 2xx. */
+                failedOnly?: "true" | "false" | boolean;
                 /** @description Endpoint filter. */
                 endpoint?: string;
                 /** @description Minimum retry count. */

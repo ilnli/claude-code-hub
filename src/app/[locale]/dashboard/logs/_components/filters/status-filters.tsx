@@ -41,8 +41,9 @@ export function StatusFilters({ filters, onFiltersChange }: StatusFiltersProps) 
     onFiltersChange({
       ...filters,
       statusCode:
-        value && value !== "!200" && value !== "__all__" ? parseInt(value, 10) : undefined,
-      excludeStatusCode200: value === "!200",
+        value && value !== "!failed" && value !== "__all__" ? parseInt(value, 10) : undefined,
+      failedOnly: value === "!failed",
+      excludeStatusCode200: undefined,
     });
   };
 
@@ -66,9 +67,7 @@ export function StatusFilters({ filters, onFiltersChange }: StatusFiltersProps) 
       <div className="space-y-2">
         <Label>{t("logs.filters.statusCode")}</Label>
         <Select
-          value={
-            filters.excludeStatusCode200 ? "!200" : filters.statusCode?.toString() || "__all__"
-          }
+          value={filters.failedOnly ? "!failed" : filters.statusCode?.toString() || "__all__"}
           onValueChange={handleStatusCodeChange}
           onOpenChange={onStatusCodesOpenChange}
         >
@@ -77,7 +76,7 @@ export function StatusFilters({ filters, onFiltersChange }: StatusFiltersProps) 
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="__all__">{t("logs.filters.allStatusCodes")}</SelectItem>
-            <SelectItem value="!200">{t("logs.statusCodes.not200")}</SelectItem>
+            <SelectItem value="!failed">{t("logs.statusCodes.failed")}</SelectItem>
             <SelectItem value="200">{t("logs.statusCodes.200")}</SelectItem>
             <SelectItem value="400">{t("logs.statusCodes.400")}</SelectItem>
             <SelectItem value="401">{t("logs.statusCodes.401")}</SelectItem>

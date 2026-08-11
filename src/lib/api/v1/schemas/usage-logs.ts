@@ -26,7 +26,10 @@ export const UsageLogsQuerySchema = z.object({
     "Only include records whose requested model differs from the actual response model."
   ),
   statusCode: z.coerce.number().int().optional().describe("HTTP status code filter."),
-  excludeStatusCode200: BooleanQuerySchema.describe("Exclude successful responses."),
+  excludeStatusCode200: BooleanQuerySchema.describe(
+    "Deprecated: exclude status code 200 literally, including in-progress records."
+  ),
+  failedOnly: BooleanQuerySchema.describe("Only include finalized responses outside 2xx."),
   endpoint: z.string().optional().describe("Endpoint filter."),
   minRetryCount: z.coerce.number().int().min(0).optional().describe("Minimum retry count."),
   replayFilter: z

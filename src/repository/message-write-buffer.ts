@@ -8,6 +8,7 @@ import { getEnvConfig } from "@/lib/config/env.schema";
 import { logger } from "@/lib/logger";
 import type { StoredCostBreakdown } from "@/types/cost-breakdown";
 import type { CreateMessageRequestData } from "@/types/message";
+import type { PublicErrorCode } from "@/types/public-error";
 import { normalizeRoutingTrace, type RoutingTraceV1 } from "@/types/routing-trace";
 import { buildMonotonicRoutingTraceAssignments } from "./routing-trace-persistence";
 
@@ -27,12 +28,14 @@ export type MessageRequestUpdatePatch = {
   providerChain?: CreateMessageRequestData["provider_chain"];
   routingTrace?: RoutingTraceV1 | null;
   errorMessage?: string;
+  publicErrorCode?: PublicErrorCode | null;
+  publicErrorMessage?: string | null;
   errorStack?: string;
   errorCause?: string;
   model?: string;
   /** 上游响应中实际返回的模型名(audit);null 显式清空,undefined 不动 */
   actualResponseModel?: string | null;
-  providerId?: number;
+  providerId?: number | null;
   context1mApplied?: boolean;
   swapCacheTtlApplied?: boolean;
   specialSettings?: CreateMessageRequestData["special_settings"];
@@ -279,6 +282,8 @@ const COLUMN_MAP: Record<keyof MessageRequestUpdatePatch, string> = {
   providerChain: "provider_chain",
   routingTrace: "routing_trace",
   errorMessage: "error_message",
+  publicErrorCode: "public_error_code",
+  publicErrorMessage: "public_error_message",
   errorStack: "error_stack",
   errorCause: "error_cause",
   model: "model",

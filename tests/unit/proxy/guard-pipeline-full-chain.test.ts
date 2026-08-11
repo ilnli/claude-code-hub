@@ -174,8 +174,8 @@ describe("GuardPipeline：全链路放行与 replay 短路", () => {
     const res = await pipeline.run(session);
 
     expect(res).not.toBeNull();
-    expect(res?.status).toBe(200);
-    await expect(res?.text()).resolves.toBe("cached");
+    expect(res?.response.status).toBe(200);
+    await expect(res?.response.text()).resolves.toBe("cached");
     expect(callOrder).toEqual([
       "auth",
       "sensitive",

@@ -289,6 +289,8 @@
         "noSignatureTooltip": "Thinking was enabled but no thinking signature was returned in the stream; the actual response model falls back to the plain model field from message_start."
       },
       "errorMessage": "Error Message",
+      "publicErrorSummary": "User-visible error",
+      "providerNotReached": "Not reached upstream",
       "fake200ForwardedNotice": "Note: For streaming requests, this failure may be detected only after the stream ends; the response content may already have been forwarded to the client.",
       "fake200DetectedReason": "Detected reason: {reason}",
       "fake200RetryTooltipLabel": "Why no server retry?",
@@ -603,7 +605,8 @@
       "401": "401 (Unauthorized)",
       "429": "429 (Rate Limited)",
       "500": "500 (Server Error)",
-      "not200": "Non-200 (errors/blocked)"
+      "not200": "Non-200 (errors/blocked)",
+      "failed": "Failed requests (non-2xx)"
     },
     "billingDetails": {
       "input": "Input",

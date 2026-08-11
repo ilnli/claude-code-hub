@@ -25,6 +25,7 @@ import type { Key } from "@/types/key";
 import type { ProviderChainItem } from "@/types/message";
 import type { ModelPriceData } from "@/types/model-price";
 import type { Provider, ProviderType } from "@/types/provider";
+import type { PublicErrorCode } from "@/types/public-error";
 import {
   ROUTING_TRACE_MAX_EVENTS,
   ROUTING_TRACE_VERSION,
@@ -114,6 +115,13 @@ export interface MessageContext {
   apiKey: string;
 }
 
+export interface TerminalFailureMetadata {
+  code: PublicErrorCode;
+  adminMessage?: string | null;
+  blockedBy?: string | null;
+  blockedReason?: string | null;
+}
+
 export interface ProxyRequestPayload {
   message: Record<string, unknown>;
   buffer?: ArrayBuffer;
@@ -140,6 +148,7 @@ interface RequestBodyResult {
 }
 
 export class ProxySession {
+  readonly requestUuid: string;
   readonly startTime: number;
   readonly method: string;
   requestUrl: URL; // 非 readonly，允许模型重定向修改 Gemini URL 路径
@@ -183,6 +192,8 @@ export class ProxySession {
 
   // Request Sequence（Session 内请求序号）
   requestSequence: number = 1;
+  private requestSequenceAssigned = false;
+  private terminalFailureMetadata: TerminalFailureMetadata | null = null;
 
   // 请求格式追踪：记录原始请求格式和供应商类型
   originalFormat: ClientFormat = "claude";
@@ -304,6 +315,7 @@ export class ProxySession {
     context: Context;
     clientAbortSignal: AbortSignal | null;
   }) {
+    this.requestUuid = crypto.randomUUID();
     this.startTime = init.startTime;
     this.method = init.method;
     this.requestUrl = init.requestUrl;
@@ -641,6 +653,14 @@ export class ProxySession {
     }
   }
 
+  setTerminalFailureMetadata(metadata: TerminalFailureMetadata): void {
+    this.terminalFailureMetadata = metadata;
+  }
+
+  getTerminalFailureMetadata(): TerminalFailureMetadata | null {
+    return this.terminalFailureMetadata;
+  }
+
   /**
    * Record Time To First Token (TTFT) for streaming responses.
    *
@@ -719,6 +739,11 @@ export class ProxySession {
    */
   setRequestSequence(sequence: number): void {
     this.requestSequence = sequence;
+    this.requestSequenceAssigned = true;
+  }
+
+  hasAssignedRequestSequence(): boolean {
+    return this.requestSequenceAssigned;
   }
 
   /**

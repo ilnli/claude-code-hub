@@ -1136,6 +1136,7 @@ const { route: getUsageLogsRoute, handler: getUsageLogsHandler } = createActionR
       endpoint: z.string().optional(),
       statusCode: z.number().optional(),
       excludeStatusCode200: z.boolean().optional(),
+      failedOnly: z.boolean().optional(),
       minRetryCount: z.number().int().nonnegative().optional(),
       pageSize: z.number().int().positive().max(100).default(50).optional(),
       page: z.number().int().positive().default(1).optional(),
@@ -1304,6 +1305,7 @@ const { route: getMyUsageLogsRoute, handler: getMyUsageLogsHandler } = createAct
       endpoint: z.string().optional(),
       statusCode: z.number().optional(),
       excludeStatusCode200: z.boolean().optional(),
+      failedOnly: z.boolean().optional(),
       minRetryCount: z.number().int().nonnegative().optional(),
       page: z.number().int().positive().default(1).optional(),
       pageSize: z.number().int().positive().max(100).default(20).optional(),
@@ -1356,6 +1358,7 @@ const { route: getMyUsageLogsBatchRoute, handler: getMyUsageLogsBatchHandler } =
       endpoint: z.string().optional(),
       statusCode: z.number().optional(),
       excludeStatusCode200: z.boolean().optional(),
+      failedOnly: z.boolean().optional(),
       minRetryCount: z.number().int().nonnegative().optional(),
       cursor: z
         .object({
@@ -1414,6 +1417,7 @@ const { route: getMyUsageLogsBatchFullRoute, handler: getMyUsageLogsBatchFullHan
       endpoint: z.string().optional(),
       statusCode: z.number().optional(),
       excludeStatusCode200: z.boolean().optional(),
+      failedOnly: z.boolean().optional(),
       minRetryCount: z.number().int().nonnegative().optional(),
       cursor: z
         .object({

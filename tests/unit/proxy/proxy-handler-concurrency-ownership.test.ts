@@ -1,6 +1,7 @@
 import { Context } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProxySession } from "@/app/v1/_lib/proxy/session";
+import type { GuardFailure } from "@/app/v1/_lib/proxy/guard-pipeline";
 
 type ProxySettingsFixture = {
   readonly enableHighConcurrencyMode: boolean;
@@ -14,7 +15,7 @@ const boundary = vi.hoisted(() => ({
   incrementObservedConcurrentCount: vi.fn<(sessionId: string) => Promise<void>>(),
   loadSettings: vi.fn<() => Promise<ProxySettingsFixture>>(),
   loggerWarn: vi.fn(),
-  runGuards: vi.fn<(session: ProxySession) => Promise<Response | null>>(),
+  runGuards: vi.fn<(session: ProxySession) => Promise<GuardFailure | null>>(),
   send: vi.fn<(session: ProxySession) => Promise<Response>>(),
   storeSessionInfo: vi.fn<(sessionId: string, info: Record<string, unknown>) => Promise<void>>(),
   trackObservedSession: vi.fn<(sessionId: string) => Promise<void>>(),
@@ -107,7 +108,10 @@ describe("handleProxyRequest concurrency ownership", () => {
   it("does not release concurrency for an early guard response before acquisition", async () => {
     boundary.runGuards.mockImplementation(async (session) => {
       session.setSessionId("session-early");
-      return new Response("guard rejected", { status: 429 });
+      return {
+        response: new Response("guard rejected", { status: 429 }),
+        source: "rateLimit",
+      };
     });
 
     const response = await handleProxyRequest(createContext());
@@ -125,10 +129,13 @@ describe("handleProxyRequest concurrency ownership", () => {
     async (mode) => {
       boundary.runGuards.mockImplementation(async (session) => {
         session.setSessionId("session-replay");
-        return new Response("replayed", {
-          status: 200,
-          headers: { "x-cch-replay": mode },
-        });
+        return {
+          response: new Response("replayed", {
+            status: 200,
+            headers: { "x-cch-replay": mode },
+          }),
+          source: "replayAttach",
+        };
       });
 
       const response = await handleProxyRequest(createContext());
@@ -142,7 +149,10 @@ describe("handleProxyRequest concurrency ownership", () => {
   it("does not track a handled warmup early response as an active Session", async () => {
     boundary.runGuards.mockImplementation(async (session) => {
       session.setSessionId("session-warmup");
-      return new Response("warmed", { status: 200 });
+      return {
+        response: new Response("warmed", { status: 200 }),
+        source: "warmup",
+      };
     });
 
     const response = await handleProxyRequest(
@@ -196,7 +206,10 @@ describe("handleProxyRequest concurrency ownership", () => {
         user: { id: 1, name: "user" },
         key: { id: 2, name: "key" },
       } as never);
-      return new Response("guard response", { status: 202 });
+      return {
+        response: new Response("guard response", { status: 202 }),
+        source: "probe",
+      };
     });
 
     const response = await handleProxyRequest(createContext());

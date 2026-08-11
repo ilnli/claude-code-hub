@@ -17,8 +17,12 @@ import type { HedgeLoserBilling, StoredCostBreakdown } from "@/types/cost-breakd
 import type { ProviderChainItem } from "@/types/message";
 import { normalizeRoutingTrace, type RoutingTraceV1 } from "@/types/routing-trace";
 import type { SpecialSetting } from "@/types/special-settings";
+import { LEDGER_BILLING_CONDITION } from "./_shared/ledger-conditions";
 import { escapeLike } from "./_shared/like";
-import { EXCLUDE_WARMUP_CONDITION } from "./_shared/message-request-conditions";
+import {
+  EXCLUDE_WARMUP_CONDITION,
+  MESSAGE_REQUEST_BILLING_CONDITION,
+} from "./_shared/message-request-conditions";
 import {
   buildActualResponseModelMismatchCondition,
   buildDefaultHiddenUsageLogEndpointCondition,
@@ -42,6 +46,8 @@ export interface UsageLogFilters {
   statusCode?: number;
   /** 排除 200 状态码（筛选所有非 200 的请求，包括 NULL） */
   excludeStatusCode200?: boolean;
+  /** 仅筛选已完成的非 2xx 请求，不包含状态未知的进行中请求。 */
+  failedOnly?: boolean;
   model?: string;
   /** 仅筛选请求模型与实际响应模型不一致的记录（不按 originalModel/模型重定向判断） */
   actualResponseModelMismatch?: boolean;
@@ -54,7 +60,9 @@ export interface UsageLogFilters {
 }
 
 function buildLedgerUsageLogConditions(replayFilter: UsageLogReplayFilter | undefined) {
-  const conditions = [isNull(usageLedger.blockedBy)];
+  const conditions = [
+    sql`(${usageLedger.blockedBy} IS NULL OR ${usageLedger.blockedBy} <> 'warmup')`,
+  ];
 
   if (replayFilter === "replay") {
     conditions.push(eq(usageLedger.isReplay, true));
@@ -256,6 +264,8 @@ export interface UsageLogRow {
   ttftMs: number | null;
   firstByteMs: number | null;
   errorMessage: string | null;
+  publicErrorCode?: import("@/types/public-error").PublicErrorCode | null;
+  publicErrorMessage?: string | null;
   providerChain: ProviderChainItem[] | null;
   routingTrace?: RoutingTraceV1 | null;
   blockedBy: string | null; // 拦截类型（如 'sensitive_word'）
@@ -412,6 +422,8 @@ export async function findUsageLogsBatch(
       ttftMs: messageRequest.ttftMs,
       firstByteMs: messageRequest.firstByteMs,
       errorMessage: messageRequest.errorMessage,
+      publicErrorCode: messageRequest.publicErrorCode,
+      publicErrorMessage: messageRequest.publicErrorMessage,
       providerChain: messageRequest.providerChain,
       routingTrace: messageRequest.routingTrace,
       blockedBy: messageRequest.blockedBy,
@@ -544,6 +556,10 @@ export async function findUsageLogsBatch(
 
   if (filters.statusCode !== undefined) {
     ledgerConditions.push(eq(usageLedger.statusCode, filters.statusCode));
+  } else if (filters.failedOnly) {
+    ledgerConditions.push(
+      sql`(${usageLedger.statusCode} < 200 OR ${usageLedger.statusCode} > 299)`
+    );
   } else if (filters.excludeStatusCode200) {
     ledgerConditions.push(
       sql`(${usageLedger.statusCode} IS NULL OR ${usageLedger.statusCode} <> 200)`
@@ -608,6 +624,7 @@ export async function findUsageLogsBatch(
       compactionVersion: usageLedger.compactionVersion,
       billingState: usageLedger.billingState,
       statusCode: usageLedger.statusCode,
+      publicErrorCode: usageLedger.publicErrorCode,
       inputTokens: usageLedger.inputTokens,
       outputTokens: usageLedger.outputTokens,
       cacheCreationInputTokens: usageLedger.cacheCreationInputTokens,
@@ -698,6 +715,8 @@ export async function findUsageLogsBatch(
       ttftMs: row.ttftMs,
       firstByteMs: row.firstByteMs,
       errorMessage: null,
+      publicErrorCode: row.publicErrorCode,
+      publicErrorMessage: null,
       providerChain: null,
       routingTrace: null,
       blockedBy: null,
@@ -738,6 +757,7 @@ interface UsageLogSlimFilters {
   statusCode?: number;
   /** 排除 200 状态码（筛选所有非 200 的请求，包括 NULL） */
   excludeStatusCode200?: boolean;
+  failedOnly?: boolean;
   model?: string;
   actualResponseModelMismatch?: boolean;
   endpoint?: string;
@@ -806,6 +826,7 @@ export async function findUsageLogsForKeySlim(
     filters.endTime ?? "",
     filters.statusCode ?? "",
     filters.excludeStatusCode200 ? "1" : "0",
+    filters.failedOnly ? "1" : "0",
     filters.model ?? "",
     filters.actualResponseModelMismatch ? "1" : "0",
     filters.endpoint ?? "",
@@ -1037,6 +1058,8 @@ function buildKeyLedgerConditions(
 
   if (filters.statusCode !== undefined) {
     conditions.push(eq(usageLedger.statusCode, filters.statusCode));
+  } else if (filters.failedOnly) {
+    conditions.push(sql`(${usageLedger.statusCode} < 200 OR ${usageLedger.statusCode} > 299)`);
   } else if (filters.excludeStatusCode200) {
     conditions.push(sql`(${usageLedger.statusCode} IS NULL OR ${usageLedger.statusCode} <> 200)`);
   }
@@ -1301,6 +1324,8 @@ function mapUsageLogRowFromMessageResult(row: {
   ttftMs: number | null;
   firstByteMs: number | null;
   errorMessage: string | null;
+  publicErrorCode: import("@/types/public-error").PublicErrorCode | null;
+  publicErrorMessage: string | null;
   providerChain: ProviderChainItem[] | null;
   routingTrace: RoutingTraceV1 | null;
   blockedBy: string | null;
@@ -1395,6 +1420,7 @@ function mapUsageLogRowFromLedgerResult(row: {
   swapCacheTtlApplied: boolean | null;
   isReplay: boolean;
   replaySourceRequestId: number | null;
+  publicErrorCode: import("@/types/public-error").PublicErrorCode | null;
 }) {
   const totalRowTokens =
     (row.inputTokens ?? 0) +
@@ -1449,6 +1475,8 @@ function mapUsageLogRowFromLedgerResult(row: {
     ttftMs: row.ttftMs,
     firstByteMs: row.firstByteMs,
     errorMessage: null,
+    publicErrorCode: row.publicErrorCode,
+    publicErrorMessage: null,
     providerChain: null,
     routingTrace: null,
     blockedBy: null,
@@ -1516,6 +1544,8 @@ export async function findReadonlyUsageLogsBatchForKey(
         ttftMs: messageRequest.ttftMs,
         firstByteMs: messageRequest.firstByteMs,
         errorMessage: messageRequest.errorMessage,
+        publicErrorCode: messageRequest.publicErrorCode,
+        publicErrorMessage: messageRequest.publicErrorMessage,
         providerChain: messageRequest.providerChain,
         routingTrace: messageRequest.routingTrace,
         blockedBy: messageRequest.blockedBy,
@@ -1557,6 +1587,7 @@ export async function findReadonlyUsageLogsBatchForKey(
             compactionVersion: usageLedger.compactionVersion,
             billingState: usageLedger.billingState,
             statusCode: usageLedger.statusCode,
+            publicErrorCode: usageLedger.publicErrorCode,
             inputTokens: usageLedger.inputTokens,
             outputTokens: usageLedger.outputTokens,
             cacheCreationInputTokens: usageLedger.cacheCreationInputTokens,
@@ -1730,13 +1761,13 @@ export async function findUsageLogsWithDetails(
             totalRows: sql<number>`count(*)::double precision`,
             // summary：所有统计字段必须排除 warmup（不计入任何统计）
             totalRequests: sql<number>`count(*) FILTER (WHERE ${EXCLUDE_WARMUP_CONDITION})::double precision`,
-            totalCost: sql<string>`COALESCE(sum(${messageRequest.costUsd}) FILTER (WHERE ${EXCLUDE_WARMUP_CONDITION}), 0)`,
-            totalInputTokens: sql<number>`COALESCE(sum(${messageRequest.inputTokens}) FILTER (WHERE ${EXCLUDE_WARMUP_CONDITION})::double precision, 0::double precision)`,
-            totalOutputTokens: sql<number>`COALESCE(sum(${messageRequest.outputTokens}) FILTER (WHERE ${EXCLUDE_WARMUP_CONDITION})::double precision, 0::double precision)`,
-            totalCacheCreationTokens: sql<number>`COALESCE(sum(${messageRequest.cacheCreationInputTokens}) FILTER (WHERE ${EXCLUDE_WARMUP_CONDITION})::double precision, 0::double precision)`,
-            totalCacheReadTokens: sql<number>`COALESCE(sum(${messageRequest.cacheReadInputTokens}) FILTER (WHERE ${EXCLUDE_WARMUP_CONDITION})::double precision, 0::double precision)`,
-            totalCacheCreation5mTokens: sql<number>`COALESCE(sum(${messageRequest.cacheCreation5mInputTokens}) FILTER (WHERE ${EXCLUDE_WARMUP_CONDITION})::double precision, 0::double precision)`,
-            totalCacheCreation1hTokens: sql<number>`COALESCE(sum(${messageRequest.cacheCreation1hInputTokens}) FILTER (WHERE ${EXCLUDE_WARMUP_CONDITION})::double precision, 0::double precision)`,
+            totalCost: sql<string>`COALESCE(sum(${messageRequest.costUsd}) FILTER (WHERE ${MESSAGE_REQUEST_BILLING_CONDITION}), 0)`,
+            totalInputTokens: sql<number>`COALESCE(sum(${messageRequest.inputTokens}) FILTER (WHERE ${MESSAGE_REQUEST_BILLING_CONDITION})::double precision, 0::double precision)`,
+            totalOutputTokens: sql<number>`COALESCE(sum(${messageRequest.outputTokens}) FILTER (WHERE ${MESSAGE_REQUEST_BILLING_CONDITION})::double precision, 0::double precision)`,
+            totalCacheCreationTokens: sql<number>`COALESCE(sum(${messageRequest.cacheCreationInputTokens}) FILTER (WHERE ${MESSAGE_REQUEST_BILLING_CONDITION})::double precision, 0::double precision)`,
+            totalCacheReadTokens: sql<number>`COALESCE(sum(${messageRequest.cacheReadInputTokens}) FILTER (WHERE ${MESSAGE_REQUEST_BILLING_CONDITION})::double precision, 0::double precision)`,
+            totalCacheCreation5mTokens: sql<number>`COALESCE(sum(${messageRequest.cacheCreation5mInputTokens}) FILTER (WHERE ${MESSAGE_REQUEST_BILLING_CONDITION})::double precision, 0::double precision)`,
+            totalCacheCreation1hTokens: sql<number>`COALESCE(sum(${messageRequest.cacheCreation1hInputTokens}) FILTER (WHERE ${MESSAGE_REQUEST_BILLING_CONDITION})::double precision, 0::double precision)`,
           })
           .from(messageRequest)
           .where(and(...conditions))
@@ -1746,13 +1777,13 @@ export async function findUsageLogsWithDetails(
             totalRows: sql<number>`count(*)::double precision`,
             // summary：所有统计字段必须排除 warmup（不计入任何统计）
             totalRequests: sql<number>`count(*) FILTER (WHERE ${EXCLUDE_WARMUP_CONDITION})::double precision`,
-            totalCost: sql<string>`COALESCE(sum(${messageRequest.costUsd}) FILTER (WHERE ${EXCLUDE_WARMUP_CONDITION}), 0)`,
-            totalInputTokens: sql<number>`COALESCE(sum(${messageRequest.inputTokens}) FILTER (WHERE ${EXCLUDE_WARMUP_CONDITION})::double precision, 0::double precision)`,
-            totalOutputTokens: sql<number>`COALESCE(sum(${messageRequest.outputTokens}) FILTER (WHERE ${EXCLUDE_WARMUP_CONDITION})::double precision, 0::double precision)`,
-            totalCacheCreationTokens: sql<number>`COALESCE(sum(${messageRequest.cacheCreationInputTokens}) FILTER (WHERE ${EXCLUDE_WARMUP_CONDITION})::double precision, 0::double precision)`,
-            totalCacheReadTokens: sql<number>`COALESCE(sum(${messageRequest.cacheReadInputTokens}) FILTER (WHERE ${EXCLUDE_WARMUP_CONDITION})::double precision, 0::double precision)`,
-            totalCacheCreation5mTokens: sql<number>`COALESCE(sum(${messageRequest.cacheCreation5mInputTokens}) FILTER (WHERE ${EXCLUDE_WARMUP_CONDITION})::double precision, 0::double precision)`,
-            totalCacheCreation1hTokens: sql<number>`COALESCE(sum(${messageRequest.cacheCreation1hInputTokens}) FILTER (WHERE ${EXCLUDE_WARMUP_CONDITION})::double precision, 0::double precision)`,
+            totalCost: sql<string>`COALESCE(sum(${messageRequest.costUsd}) FILTER (WHERE ${MESSAGE_REQUEST_BILLING_CONDITION}), 0)`,
+            totalInputTokens: sql<number>`COALESCE(sum(${messageRequest.inputTokens}) FILTER (WHERE ${MESSAGE_REQUEST_BILLING_CONDITION})::double precision, 0::double precision)`,
+            totalOutputTokens: sql<number>`COALESCE(sum(${messageRequest.outputTokens}) FILTER (WHERE ${MESSAGE_REQUEST_BILLING_CONDITION})::double precision, 0::double precision)`,
+            totalCacheCreationTokens: sql<number>`COALESCE(sum(${messageRequest.cacheCreationInputTokens}) FILTER (WHERE ${MESSAGE_REQUEST_BILLING_CONDITION})::double precision, 0::double precision)`,
+            totalCacheReadTokens: sql<number>`COALESCE(sum(${messageRequest.cacheReadInputTokens}) FILTER (WHERE ${MESSAGE_REQUEST_BILLING_CONDITION})::double precision, 0::double precision)`,
+            totalCacheCreation5mTokens: sql<number>`COALESCE(sum(${messageRequest.cacheCreation5mInputTokens}) FILTER (WHERE ${MESSAGE_REQUEST_BILLING_CONDITION})::double precision, 0::double precision)`,
+            totalCacheCreation1hTokens: sql<number>`COALESCE(sum(${messageRequest.cacheCreation1hInputTokens}) FILTER (WHERE ${MESSAGE_REQUEST_BILLING_CONDITION})::double precision, 0::double precision)`,
           })
           .from(messageRequest)
           .innerJoin(keysTable, eq(messageRequest.key, keysTable.key))
@@ -1796,6 +1827,8 @@ export async function findUsageLogsWithDetails(
       ttftMs: messageRequest.ttftMs,
       firstByteMs: messageRequest.firstByteMs,
       errorMessage: messageRequest.errorMessage,
+      publicErrorCode: messageRequest.publicErrorCode,
+      publicErrorMessage: messageRequest.publicErrorMessage,
       providerChain: messageRequest.providerChain,
       routingTrace: messageRequest.routingTrace,
       blockedBy: messageRequest.blockedBy, // 拦截类型
@@ -2203,6 +2236,8 @@ export async function findUsageLogsStats(
 
   if (filters.statusCode !== undefined) {
     conditions.push(eq(usageLedger.statusCode, filters.statusCode));
+  } else if (filters.failedOnly) {
+    conditions.push(sql`(${usageLedger.statusCode} < 200 OR ${usageLedger.statusCode} > 299)`);
   } else if (filters.excludeStatusCode200) {
     conditions.push(sql`(${usageLedger.statusCode} IS NULL OR ${usageLedger.statusCode} <> 200)`);
   }
@@ -2246,13 +2281,13 @@ export async function findUsageLogsStats(
   const baseQuery = db
     .select({
       totalRequests: sql<number>`count(*)::double precision`,
-      totalCost: sql<string>`COALESCE(sum(${usageLedger.costUsd}), 0)`,
-      totalInputTokens: sql<number>`COALESCE(sum(${usageLedger.inputTokens})::double precision, 0::double precision)`,
-      totalOutputTokens: sql<number>`COALESCE(sum(${usageLedger.outputTokens})::double precision, 0::double precision)`,
-      totalCacheCreationTokens: sql<number>`COALESCE(sum(${usageLedger.cacheCreationInputTokens})::double precision, 0::double precision)`,
-      totalCacheReadTokens: sql<number>`COALESCE(sum(${usageLedger.cacheReadInputTokens})::double precision, 0::double precision)`,
-      totalCacheCreation5mTokens: sql<number>`COALESCE(sum(${usageLedger.cacheCreation5mInputTokens})::double precision, 0::double precision)`,
-      totalCacheCreation1hTokens: sql<number>`COALESCE(sum(${usageLedger.cacheCreation1hInputTokens})::double precision, 0::double precision)`,
+      totalCost: sql<string>`COALESCE(sum(${usageLedger.costUsd}) FILTER (WHERE ${LEDGER_BILLING_CONDITION}), 0)`,
+      totalInputTokens: sql<number>`COALESCE(sum(${usageLedger.inputTokens}) FILTER (WHERE ${LEDGER_BILLING_CONDITION})::double precision, 0::double precision)`,
+      totalOutputTokens: sql<number>`COALESCE(sum(${usageLedger.outputTokens}) FILTER (WHERE ${LEDGER_BILLING_CONDITION})::double precision, 0::double precision)`,
+      totalCacheCreationTokens: sql<number>`COALESCE(sum(${usageLedger.cacheCreationInputTokens}) FILTER (WHERE ${LEDGER_BILLING_CONDITION})::double precision, 0::double precision)`,
+      totalCacheReadTokens: sql<number>`COALESCE(sum(${usageLedger.cacheReadInputTokens}) FILTER (WHERE ${LEDGER_BILLING_CONDITION})::double precision, 0::double precision)`,
+      totalCacheCreation5mTokens: sql<number>`COALESCE(sum(${usageLedger.cacheCreation5mInputTokens}) FILTER (WHERE ${LEDGER_BILLING_CONDITION})::double precision, 0::double precision)`,
+      totalCacheCreation1hTokens: sql<number>`COALESCE(sum(${usageLedger.cacheCreation1hInputTokens}) FILTER (WHERE ${LEDGER_BILLING_CONDITION})::double precision, 0::double precision)`,
     })
     .from(usageLedger);
 

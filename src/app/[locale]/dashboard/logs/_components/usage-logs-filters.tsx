@@ -42,6 +42,7 @@ const VALID_FILTER_KEYS: (keyof UsageLogFilters)[] = [
   "endTime",
   "statusCode",
   "excludeStatusCode200",
+  "failedOnly",
   "model",
   "actualResponseModelMismatch",
   "endpoint",
@@ -148,13 +149,13 @@ export function UsageLogsFilters({
 
   const statusActiveCount = useMemo(() => {
     let count = 0;
-    if (localFilters.statusCode !== undefined || localFilters.excludeStatusCode200) count++;
+    if (localFilters.statusCode !== undefined || localFilters.failedOnly) count++;
     if (localFilters.minRetryCount !== undefined && localFilters.minRetryCount > 0) count++;
     if (localFilters.replayFilter && localFilters.replayFilter !== "all") count++;
     return count;
   }, [
     localFilters.statusCode,
-    localFilters.excludeStatusCode200,
+    localFilters.failedOnly,
     localFilters.minRetryCount,
     localFilters.replayFilter,
   ]);
@@ -170,7 +171,7 @@ export function UsageLogsFilters({
       serverTimeZone
     );
     if (timePreset) presets.add(timePreset);
-    if (localFilters.excludeStatusCode200) presets.add("errors-only");
+    if (localFilters.failedOnly) presets.add("errors-only");
     if (localFilters.minRetryCount !== undefined && localFilters.minRetryCount > 0) {
       presets.add("show-retries");
     }
@@ -178,7 +179,7 @@ export function UsageLogsFilters({
   }, [
     localFilters.startTime,
     localFilters.endTime,
-    localFilters.excludeStatusCode200,
+    localFilters.failedOnly,
     localFilters.minRetryCount,
     serverTimeZone,
   ]);
@@ -331,9 +332,10 @@ export function UsageLogsFilters({
           }
         } else if (preset === "errors-only") {
           if (isActive) {
-            delete next.excludeStatusCode200;
+            delete next.failedOnly;
           } else {
-            next.excludeStatusCode200 = true;
+            next.failedOnly = true;
+            next.excludeStatusCode200 = undefined;
             next.statusCode = undefined;
           }
         } else if (preset === "show-retries") {

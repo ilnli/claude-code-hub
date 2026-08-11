@@ -71,6 +71,40 @@ async function executeWithRetry(
  * 调用时机：在认证成功后、限流检查前
  */
 export class ProxySessionGuard {
+  static async ensureCorrelation(session: ProxySession): Promise<void> {
+    if (session.sessionId) return;
+
+    const keyId = session.authState?.key?.id;
+    if (!keyId) return;
+
+    try {
+      const clientSessionId = SessionManager.extractClientSessionId(
+        session.request.message,
+        session.headers,
+        session.userAgent
+      );
+      const sessionId = await SessionManager.getOrCreateSessionId(
+        keyId,
+        session.getMessages(),
+        clientSessionId
+      );
+      session.setSessionId(sessionId);
+      session.setSessionIdentityMetadata({
+        identity: buildPublicSessionIdentity(sessionId, keyId),
+        kind: "session_id",
+        scopeTag: null,
+        fingerprint: null,
+        fingerprints: [],
+      });
+      session.setRequestSequence(await SessionManager.getNextRequestSequence(sessionId, keyId));
+    } catch (error) {
+      logger.warn("[ProxySessionGuard] Failed to assign correlation session", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      session.setSessionId(SessionManager.generateSessionId());
+    }
+  }
+
   /**
    * 为请求分配 Session ID
    */

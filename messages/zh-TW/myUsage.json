@@ -45,6 +45,14 @@
       "reset": "重設"
     },
     "loadFailed": "載入日誌失敗",
+    "errorDetails": {
+      "title": "請求失敗",
+      "description": "需要管理員排查時，請提供 CCH Session ID。",
+      "reason": "錯誤原因",
+      "sessionId": "CCH Session ID",
+      "copy": "複製 Session ID",
+      "copied": "Session ID 已複製"
+    },
     "table": {
       "time": "時間",
       "model": "模型（Model）",

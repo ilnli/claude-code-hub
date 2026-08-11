@@ -112,10 +112,19 @@ function parseMeUsageLogsQuery(c: Context): MeUsageLogsActionQueryInput | Respon
     actualResponseModelMismatch: c.req.query("actualResponseModelMismatch"),
     statusCode: c.req.query("statusCode"),
     excludeStatusCode200: c.req.query("excludeStatusCode200"),
+    failedOnly: c.req.query("failedOnly"),
     endpoint: c.req.query("endpoint"),
     minRetryCount: c.req.query("minRetryCount"),
   });
   if (!query.success) return fromZodError(query.error, new URL(c.req.url).pathname);
+  if (query.data.failedOnly && query.data.excludeStatusCode200) {
+    return createProblemResponse({
+      status: 400,
+      instance: new URL(c.req.url).pathname,
+      errorCode: "me.conflicting_failure_filters",
+      detail: "failedOnly and excludeStatusCode200 cannot be used together.",
+    });
+  }
   const { cursorCreatedAt, cursorId, ...rest } = query.data;
   return {
     ...rest,

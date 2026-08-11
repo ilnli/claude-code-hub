@@ -26,6 +26,11 @@ export interface GuardStep {
   execute(session: ProxySession): Promise<Response | null>;
 }
 
+export interface GuardFailure {
+  response: Response;
+  source: GuardStepKey;
+}
+
 // Pipeline configuration describes an ordered list of step keys
 export type GuardStepKey =
   | "auth"
@@ -48,7 +53,46 @@ export interface GuardConfig {
 }
 
 export interface GuardPipeline {
-  run(session: ProxySession): Promise<Response | null>;
+  run(session: ProxySession): Promise<GuardFailure | null>;
+}
+
+async function classifyGuardFailure(
+  session: ProxySession,
+  source: GuardStepKey,
+  response: Response
+): Promise<void> {
+  if (response.status >= 200 && response.status <= 299) return;
+  if (session.getTerminalFailureMetadata()) return;
+
+  const code =
+    source === "auth"
+      ? session.authState?.failureKind === "account_state"
+        ? "account_unavailable"
+        : "authentication_failed"
+      : source === "provider"
+        ? "service_unavailable"
+        : response.status === 402
+          ? "quota_exceeded"
+          : response.status === 429
+            ? "rate_limited"
+            : response.status === 499
+              ? "request_cancelled"
+              : response.status >= 500
+                ? "service_unavailable"
+                : "invalid_request";
+
+  let responseBody = "";
+  try {
+    responseBody = (await response.clone().text()).trim().slice(0, 4_000);
+  } catch {
+    // The status and guard name still provide a stable administrator diagnostic.
+  }
+
+  const statusSummary = `Guard ${source} returned HTTP ${response.status}`;
+  session.setTerminalFailureMetadata({
+    code,
+    adminMessage: responseBody ? `${statusSummary}: ${responseBody}` : statusSummary,
+  });
 }
 
 // Concrete GuardStep implementations (adapters over existing guards)
@@ -158,10 +202,13 @@ export class GuardPipelineBuilder {
     const steps: GuardStep[] = config.steps.map((k) => Steps[k]);
 
     return {
-      async run(session: ProxySession): Promise<Response | null> {
+      async run(session: ProxySession): Promise<GuardFailure | null> {
         for (const step of steps) {
           const res = await step.execute(session);
-          if (res) return res; // early exit
+          if (res) {
+            await classifyGuardFailure(session, step.name as GuardStepKey, res);
+            return { response: res, source: step.name as GuardStepKey };
+          }
         }
         return null;
       },

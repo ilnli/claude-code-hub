@@ -45,6 +45,14 @@
       "reset": "Сбросить"
     },
     "loadFailed": "Не удалось загрузить логи",
+    "errorDetails": {
+      "title": "Запрос завершился ошибкой",
+      "description": "Передайте CCH Session ID администратору для расследования.",
+      "reason": "Причина",
+      "sessionId": "CCH Session ID",
+      "copy": "Копировать Session ID",
+      "copied": "Session ID скопирован"
+    },
     "table": {
       "time": "Время",
       "model": "Модель",

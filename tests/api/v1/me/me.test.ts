@@ -171,6 +171,25 @@ describe("v1 me endpoints", () => {
     expect(getMyUsageLogsBatchFullMock).toHaveBeenCalledWith({ limit: 20, model: "claude" });
   });
 
+  test("forwards failedOnly and rejects conflicting failure filters", async () => {
+    const failed = await callV1Route({
+      method: "GET",
+      pathname: "/api/v1/me/usage-logs?page=1&failedOnly=true",
+      headers,
+    });
+    expect(failed.response.status).toBe(200);
+    expect(getMyUsageLogsMock).toHaveBeenCalledWith(expect.objectContaining({ failedOnly: true }));
+
+    getMyUsageLogsMock.mockClear();
+    const conflict = await callV1Route({
+      method: "GET",
+      pathname: "/api/v1/me/usage-logs?page=1&failedOnly=true&excludeStatusCode200=true",
+      headers,
+    });
+    expect(conflict.response.status).toBe(400);
+    expect(getMyUsageLogsMock).not.toHaveBeenCalled();
+  });
+
   test("passes actual response model mismatch filter through self usage-log request params", async () => {
     const list = await callV1Route({
       method: "GET",

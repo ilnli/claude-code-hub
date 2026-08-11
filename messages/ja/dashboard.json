@@ -289,6 +289,8 @@
         "noSignatureTooltip": "思考が有効ですが、応答ストリームに thinking signature が含まれていないため、実際の応答モデルは message_start の平文モデル名にフォールバックしました。"
       },
       "errorMessage": "エラーメッセージ",
+      "publicErrorSummary": "ユーザーに表示されるエラー",
+      "providerNotReached": "アップストリーム未到達",
       "fake200ForwardedNotice": "注意：ストリーミング要求では、失敗判定がストリーム終了後になる場合があります。応答内容は既にクライアントへ転送されている可能性があります。",
       "fake200DetectedReason": "検出理由：{reason}",
       "fake200RetryTooltipLabel": "なぜ今回はサーバー側で再試行できないのか？",
@@ -603,7 +605,8 @@
       "401": "401 (未認証)",
       "429": "429 (レート制限)",
       "500": "500 (サーバーエラー)",
-      "not200": "非 200(エラー／ブロック)"
+      "not200": "非 200(エラー／ブロック)",
+      "failed": "失敗したリクエスト (非 2xx)"
     },
     "billingDetails": {
       "input": "入力",

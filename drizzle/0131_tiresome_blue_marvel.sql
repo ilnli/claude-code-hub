@@ -1,60 +1,20 @@
-CREATE OR REPLACE FUNCTION fn_is_message_request_finalized(
-  blocked_by varchar,
-  status_code integer,
-  provider_chain jsonb,
-  error_message text
-)
-RETURNS boolean AS $$
-DECLARE
-  last_reason text;
-  last_status_code integer;
-  last_error_message text;
-BEGIN
-  IF blocked_by IS NOT NULL THEN
-    RETURN TRUE;
-  END IF;
-
-  IF status_code IS NOT NULL THEN
-    RETURN TRUE;
-  END IF;
-
-  IF error_message IS NOT NULL AND error_message <> '' THEN
-    RETURN TRUE;
-  END IF;
-
-  IF provider_chain IS NOT NULL
-     AND jsonb_typeof(provider_chain) = 'array'
-     AND jsonb_array_length(provider_chain) > 0
-     AND jsonb_typeof(provider_chain -> -1) = 'object' THEN
-    last_reason := provider_chain -> -1 ->> 'reason';
-    IF (provider_chain -> -1 ? 'statusCode')
-       AND jsonb_typeof(provider_chain -> -1 -> 'statusCode') = 'number' THEN
-      last_status_code := (provider_chain -> -1 ->> 'statusCode')::integer;
-    END IF;
-    last_error_message := provider_chain -> -1 ->> 'errorMessage';
-
-    IF last_reason IN (
-      'request_success',
-      'retry_success',
-      'retry_failed',
-      'system_error',
-      'resource_not_found',
-      'client_error_non_retryable',
-      'concurrent_limit_failed',
-      'hedge_winner',
-      'hedge_loser_cancelled',
-      'hedge_loser_billed',
-      'client_abort'
-    )
-    OR last_status_code IS NOT NULL
-    OR COALESCE(last_error_message, '') <> '' THEN
-      RETURN TRUE;
-    END IF;
-  END IF;
-
-  RETURN FALSE;
-END;
-$$ LANGUAGE plpgsql IMMUTABLE;
+ALTER TABLE "message_request" ALTER COLUMN "provider_id" DROP NOT NULL;--> statement-breakpoint
+ALTER TABLE "usage_ledger" ALTER COLUMN "provider_id" DROP NOT NULL;--> statement-breakpoint
+ALTER TABLE "usage_ledger" ALTER COLUMN "final_provider_id" DROP NOT NULL;--> statement-breakpoint
+ALTER TABLE "message_request" ADD COLUMN IF NOT EXISTS "request_uuid" uuid;--> statement-breakpoint
+ALTER TABLE "message_request" ADD COLUMN IF NOT EXISTS "public_error_code" varchar(64);--> statement-breakpoint
+ALTER TABLE "message_request" ADD COLUMN IF NOT EXISTS "public_error_message" text;--> statement-breakpoint
+ALTER TABLE "usage_ledger" ADD COLUMN IF NOT EXISTS "public_error_code" varchar(64);--> statement-breakpoint
+CREATE UNIQUE INDEX IF NOT EXISTS "idx_message_request_request_uuid" ON "message_request" USING btree ("request_uuid") WHERE "message_request"."request_uuid" IS NOT NULL;--> statement-breakpoint
+UPDATE "message_request"
+SET "provider_id" = NULL
+WHERE "provider_id" = 0 AND "blocked_by" = 'sensitive_word';--> statement-breakpoint
+UPDATE "usage_ledger"
+SET
+  "provider_id" = CASE WHEN "provider_id" = 0 THEN NULL ELSE "provider_id" END,
+  "final_provider_id" = CASE WHEN "final_provider_id" = 0 THEN NULL ELSE "final_provider_id" END
+WHERE "blocked_by" = 'sensitive_word'
+  AND ("provider_id" = 0 OR "final_provider_id" = 0);--> statement-breakpoint
 
 CREATE OR REPLACE FUNCTION fn_compute_message_request_success_rate_outcome(
   blocked_by varchar,
@@ -149,7 +109,7 @@ BEGIN
 
   RETURN 'failure';
 END;
-$$ LANGUAGE plpgsql IMMUTABLE;
+$$ LANGUAGE plpgsql IMMUTABLE;--> statement-breakpoint
 
 CREATE OR REPLACE FUNCTION fn_upsert_usage_ledger()
 RETURNS TRIGGER AS $$
@@ -166,8 +126,6 @@ BEGIN
   );
 
   IF NEW.blocked_by = 'warmup' THEN
-    -- If a ledger row already exists (row was originally non-warmup), mark it as warmup
-    -- and sync the latest actual_response_model so audit stays consistent across tables.
     UPDATE usage_ledger
     SET blocked_by = 'warmup',
         success_rate_outcome = v_success_rate_outcome,
@@ -215,8 +173,9 @@ BEGIN
     NEW.model, NEW.original_model, NEW.actual_response_model, NEW.endpoint,
     NEW.compaction_version, NEW.billing_state, NEW.api_type, NEW.session_id,
     NEW.session_identity, NEW.session_identity_kind, NEW.affinity_scope_tag,
-    NEW.affinity_fingerprint, NEW.affinity_fingerprint_chain, NEW.is_replay, NEW.replay_source_request_id,
-    NEW.status_code, NEW.public_error_code, v_is_success, v_success_rate_outcome, NEW.blocked_by,
+    NEW.affinity_fingerprint, NEW.affinity_fingerprint_chain, NEW.is_replay,
+    NEW.replay_source_request_id, NEW.status_code, NEW.public_error_code,
+    v_is_success, v_success_rate_outcome, NEW.blocked_by,
     CASE WHEN NEW.is_replay THEN 0 ELSE NEW.cost_usd END,
     NEW.cost_multiplier, NEW.group_cost_multiplier,
     NEW.input_tokens, NEW.output_tokens,
@@ -266,18 +225,15 @@ BEGIN
     ttfb_ms = EXCLUDED.ttfb_ms,
     first_byte_ms = EXCLUDED.first_byte_ms,
     client_ip = EXCLUDED.client_ip;
-    -- created_at deliberately NOT updated on conflict: it represents the
-    -- original insert time of the ledger row, which is immutable by design.
 
   RETURN NEW;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'fn_upsert_usage_ledger failed for request_id=%: %', NEW.id, SQLERRM;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql;--> statement-breakpoint
 
-DROP TRIGGER IF EXISTS trg_upsert_usage_ledger ON message_request;
-
+DROP TRIGGER IF EXISTS trg_upsert_usage_ledger ON message_request;--> statement-breakpoint
 CREATE TRIGGER trg_upsert_usage_ledger
 AFTER INSERT OR UPDATE OF
   blocked_by,
