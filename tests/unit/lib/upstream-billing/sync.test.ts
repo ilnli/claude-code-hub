@@ -151,6 +151,7 @@ describe("syncProviderUpstreamRate", () => {
       wrote: true,
       fallbackApplied: true,
       fallbackRate: 1.2,
+      fallbackCause: "failure_threshold",
     });
   });
 });

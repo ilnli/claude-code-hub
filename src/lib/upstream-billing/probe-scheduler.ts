@@ -28,9 +28,9 @@ import type { Provider } from "@/types/provider";
  *    但不设单轮数量上限，避免固定顺序切片导致靠后的 provider 饿死；
  * 4. 成功后回写 cost_multiplier = applyMarkup(resolved_rate_multiplier)，
  *    并记录上游倍率快照与同步时间；
- * 5. 常规失败时，前两次保留上次成功倍率，第三次起回退默认倍率；
- *    每次失败均通知，并按 ×2（封顶 ×8）退避。HTTP 404 则立即用默认倍率兜底，
- *    并固定为 8 倍间隔降频；
+ * 5. 常规失败时，前两次保留上次成功倍率，第三次起回退默认倍率；仅在第三次失败
+ *    成功触发默认倍率回退时通知，并按 ×2（封顶 ×8）退避。HTTP 404 则立即用默认倍率
+ *    兜底，并固定为 8 倍间隔降频；
  * 6. provider_changed（管理员并发改动导致 CAS 写入跳过）不算上游故障：
  *    只刷新本轮尝试时间，不计入连续失败、不发失败通知。
  *
@@ -265,24 +265,19 @@ export async function syncAndTrackProviderUpstreamRate(
   }
 
   const failureCount = noteUpstreamRateSyncOutcome(provider.id, outcome);
-  if (outcome.status !== "synced" && !isConcurrentProviderChange(outcome)) {
-    const fallbackApplied =
-      outcome.status === "unsupported_restored" ||
-      (outcome.status === "failed" && outcome.fallbackApplied === true);
-    const fallbackRate =
-      outcome.status === "unsupported_restored"
-        ? outcome.finalRate
-        : outcome.status === "failed"
-          ? outcome.fallbackRate
-          : undefined;
-
+  if (
+    outcome.status === "failed" &&
+    outcome.fallbackCause === "failure_threshold" &&
+    outcome.fallbackApplied === true &&
+    failureCount === 3
+  ) {
     await sendUpstreamBillingProbeFailureAlert({
       providerId: provider.id,
       providerName: provider.name,
       failureCount,
       lastError: describeSyncFailure(outcome),
-      fallbackApplied,
-      fallbackRate,
+      fallbackApplied: true,
+      fallbackRate: outcome.fallbackRate,
     });
   }
 

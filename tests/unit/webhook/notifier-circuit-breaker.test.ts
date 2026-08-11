@@ -178,7 +178,7 @@ describe("sendCircuitBreakerAlert", () => {
       expect(mockRedisGet).toHaveBeenCalledTimes(2);
     });
 
-    it("should enqueue every upstream billing probe failure without deduplication", async () => {
+    it("should enqueue upstream billing alerts only for the third failure fallback", async () => {
       const { sendUpstreamBillingProbeFailureAlert } = await import("@/lib/notification/notifier");
       const data = {
         providerName: "Nested Provider",
@@ -190,21 +190,31 @@ describe("sendCircuitBreakerAlert", () => {
 
       await sendUpstreamBillingProbeFailureAlert(data);
       await sendUpstreamBillingProbeFailureAlert({ ...data, failureCount: 2 });
+      await sendUpstreamBillingProbeFailureAlert({
+        ...data,
+        failureCount: 3,
+        fallbackApplied: true,
+        fallbackRate: 1.2,
+      });
+      await sendUpstreamBillingProbeFailureAlert({
+        ...data,
+        failureCount: 4,
+        fallbackApplied: true,
+        fallbackRate: 1.2,
+      });
 
       expect(mockRedisGet).not.toHaveBeenCalled();
       expect(mockRedisSet).not.toHaveBeenCalled();
-      expect(mockAddNotificationJob).toHaveBeenCalledTimes(2);
-      expect(mockAddNotificationJob).toHaveBeenNthCalledWith(
-        1,
+      expect(mockAddNotificationJob).toHaveBeenCalledTimes(1);
+      expect(mockAddNotificationJob).toHaveBeenCalledWith(
         "circuit-breaker",
         expect.any(String),
-        expect.objectContaining({ incidentSource: "upstream_billing", failureCount: 1 })
-      );
-      expect(mockAddNotificationJob).toHaveBeenNthCalledWith(
-        2,
-        "circuit-breaker",
-        expect.any(String),
-        expect.objectContaining({ incidentSource: "upstream_billing", failureCount: 2 })
+        expect.objectContaining({
+          incidentSource: "upstream_billing",
+          failureCount: 3,
+          fallbackApplied: true,
+          fallbackRate: 1.2,
+        })
       );
     });
   });

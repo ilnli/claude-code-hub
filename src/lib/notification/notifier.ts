@@ -21,7 +21,8 @@ async function deliverCircuitBreakerAlert(
       return;
     }
 
-    // 常规熔断告警 5 分钟内去重；倍率探测要求每次失败都通知，因此显式跳过去重。
+    // 常规熔断告警 5 分钟内去重；倍率探测只在第三次失败触发保底时发送一次，
+    // 因此不需要 Redis 时间窗口去重。
     const redisClient = options.deduplicate ? getRedisClient() : null;
     const source = data.incidentSource ?? "provider";
     const dedupSuffix =
@@ -137,11 +138,21 @@ export async function sendCircuitBreakerAlert(data: CircuitBreakerAlertData): Pr
 
 /**
  * 通过现有熔断告警通知渠道发送上游倍率探测失败。
- * 此类告警不去重，确保每次失败都会进入通知队列。
+ * 仅连续第三次失败且已成功触发默认倍率保底时允许进入通知队列。
  */
 export async function sendUpstreamBillingProbeFailureAlert(
   data: Omit<CircuitBreakerAlertData, "incidentSource">
 ): Promise<void> {
+  if (data.failureCount !== 3 || data.fallbackApplied !== true) {
+    logger.info({
+      action: "upstream_billing_probe_alert_suppressed",
+      providerId: data.providerId,
+      failureCount: data.failureCount,
+      reason: "fallback_threshold_not_reached",
+    });
+    return;
+  }
+
   await deliverCircuitBreakerAlert(
     {
       ...data,

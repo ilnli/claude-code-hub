@@ -38,6 +38,7 @@ export type UpstreamRateSyncOutcome =
       wrote: boolean;
       fallbackApplied?: boolean;
       fallbackRate?: number;
+      fallbackCause?: "failure_threshold";
       fallbackError?: "provider_changed";
     };
 
@@ -153,6 +154,7 @@ async function buildFailureOutcome(
       ...base,
       fallbackApplied: true,
       fallbackRate,
+      fallbackCause: "failure_threshold",
     };
   }
 
@@ -162,6 +164,7 @@ async function buildFailureOutcome(
     wrote,
     fallbackApplied: wrote,
     fallbackRate,
+    fallbackCause: "failure_threshold",
     ...(wrote ? {} : { fallbackError: "provider_changed" as const }),
   };
 }

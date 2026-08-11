@@ -203,6 +203,7 @@ describe("syncProviderUpstreamRate (newapi)", () => {
       wrote: true,
       fallbackApplied: true,
       fallbackRate: 1.2,
+      fallbackCause: "failure_threshold",
     });
     expect(restoreProviderCostMultiplierMock).toHaveBeenCalledWith(
       7,

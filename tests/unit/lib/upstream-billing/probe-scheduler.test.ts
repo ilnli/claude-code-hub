@@ -253,6 +253,7 @@ describe("upstream-billing probe-scheduler", () => {
       1.2,
       new Date("2026-08-02T12:00:00.000Z")
     );
+    expect(sendFailureAlertMock).not.toHaveBeenCalled();
     expect(publishInvalidationMock).toHaveBeenCalled();
 
     // unsupported 固定 ×8 降频（而非首次失败的 ×2）
@@ -371,7 +372,7 @@ describe("upstream-billing probe-scheduler", () => {
     expect(getUpstreamBillingProbeSchedulerStatus().queuedProviders).toBe(0);
   });
 
-  it("notifies on every failure and falls back on the third consecutive failure", async () => {
+  it("notifies only when the third consecutive failure triggers fallback", async () => {
     const provider = makeProvider({
       id: 41,
       costMultiplier: 1.6,
@@ -385,13 +386,21 @@ describe("upstream-billing probe-scheduler", () => {
     });
 
     await syncAndTrackProviderUpstreamRate(provider);
+    expect(sendFailureAlertMock).not.toHaveBeenCalled();
+
     await syncAndTrackProviderUpstreamRate(provider);
+    expect(sendFailureAlertMock).not.toHaveBeenCalled();
+
     const third = await syncAndTrackProviderUpstreamRate(provider);
 
-    expect(sendFailureAlertMock).toHaveBeenCalledTimes(3);
-    expect(sendFailureAlertMock.mock.calls.map((call) => call[0]?.failureCount)).toEqual([1, 2, 3]);
+    expect(sendFailureAlertMock).toHaveBeenCalledTimes(1);
     expect(restoreProviderCostMultiplierMock).toHaveBeenCalledTimes(1);
-    expect(third).toMatchObject({ status: "failed", fallbackApplied: true, wrote: true });
+    expect(third).toMatchObject({
+      status: "failed",
+      fallbackApplied: true,
+      fallbackCause: "failure_threshold",
+      wrote: true,
+    });
     expect(sendFailureAlertMock).toHaveBeenLastCalledWith(
       expect.objectContaining({
         providerId: 41,
@@ -400,6 +409,34 @@ describe("upstream-billing probe-scheduler", () => {
         fallbackRate: 1.2,
       })
     );
+
+    await syncAndTrackProviderUpstreamRate(provider);
+    expect(sendFailureAlertMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not notify when an invalid newapi group uses immediate fallback", async () => {
+    const provider = makeProvider({
+      id: 42,
+      rateUpstreamType: "newapi",
+      newapiGroup: "default",
+      costMultiplier: 1.6,
+      rateDefaultMultiplier: 1.2,
+      upstreamRateMultiplier: 1.6,
+    });
+    getNewapiRatioTableMock.mockResolvedValue({ ok: true, table: { default: 1 } });
+    fetchNewapiTokenGroupMock.mockResolvedValue({ ok: true, group: "hidden" });
+
+    await syncAndTrackProviderUpstreamRate(provider);
+    await syncAndTrackProviderUpstreamRate(provider);
+    const third = await syncAndTrackProviderUpstreamRate(provider);
+
+    expect(third).toMatchObject({
+      status: "failed",
+      reason: "group_not_in_table",
+      fallbackApplied: true,
+    });
+    expect(third).not.toHaveProperty("fallbackCause");
+    expect(sendFailureAlertMock).not.toHaveBeenCalled();
   });
 
   it("skips a provider whose persisted sync time is still fresh after a leadership handoff", async () => {
@@ -456,14 +493,11 @@ describe("upstream-billing probe-scheduler", () => {
     // 已记录尝试时间
     expect(getUpstreamBillingProbeSchedulerStatus().trackedProviders).toBe(1);
 
-    // 连续失败计数未被污染：随后的真实失败仍从 1 开始计
+    // 连续失败计数未被污染：随后的真实失败仍从 1 开始计且不告警
     probeUpstreamBillingMock.mockResolvedValue({ ok: false, reason: "network", error: "boom" });
     await syncAndTrackProviderUpstreamRate(provider);
 
-    expect(sendFailureAlertMock).toHaveBeenCalledTimes(1);
-    expect(sendFailureAlertMock).toHaveBeenLastCalledWith(
-      expect.objectContaining({ providerId: 51, failureCount: 1 })
-    );
+    expect(sendFailureAlertMock).not.toHaveBeenCalled();
   });
 
   it("does not back off extra when a scheduled probe hits a concurrent provider change", async () => {
