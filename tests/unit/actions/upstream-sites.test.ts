@@ -7,13 +7,19 @@ let deleteSiteMock: ReturnType<typeof vi.fn>;
 let testPatMock: ReturnType<typeof vi.fn>;
 let invalidateCacheMock: ReturnType<typeof vi.fn>;
 let emitAuditMock: ReturnType<typeof vi.fn>;
+let loggerWarnMock: ReturnType<typeof vi.fn>;
 
 vi.mock("@/lib/auth", () => ({
   getSession: vi.fn(async () => ({ user: { role: "admin" } })),
 }));
 
 vi.mock("@/lib/logger", () => ({
-  logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
+  logger: {
+    error: vi.fn(),
+    warn: (...args: unknown[]) => loggerWarnMock(...args),
+    info: vi.fn(),
+    debug: vi.fn(),
+  },
 }));
 
 vi.mock("@/lib/audit/emit", () => ({
@@ -89,6 +95,7 @@ describe("upstream site actions", () => {
     testPatMock = vi.fn().mockResolvedValue({ ok: true, groupCount: 3 });
     invalidateCacheMock = vi.fn();
     emitAuditMock = vi.fn();
+    loggerWarnMock = vi.fn();
   });
 
   it("never returns PAT and redacts proxy credentials", async () => {
@@ -165,6 +172,40 @@ describe("upstream site actions", () => {
       })
     );
     expect(updateConfigMock).not.toHaveBeenCalled();
+  });
+
+  it("logs the failed PAT probe stage and safe upstream diagnostics", async () => {
+    testPatMock.mockResolvedValue({
+      ok: false,
+      stage: "pricing",
+      reason: "auth",
+      status: 403,
+      error: "PRICING_DISABLED: pricing is disabled",
+    });
+
+    const result = await testUpstreamSitePat({
+      siteId: 4,
+      dashboardPat: "draft-pat-must-not-be-logged",
+      dashboardUserId: 84,
+      probeBaseUrl: "https://example.com/draft/v1",
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      errorCode: "upstream_site.pat_test_auth",
+    });
+    expect(loggerWarnMock).toHaveBeenCalledWith("testUpstreamSitePat:failed", {
+      siteId: 4,
+      siteKey: "example.com",
+      reason: "upstream_site.pat_test_auth",
+      probeBaseUrl: "https://example.com/draft",
+      probeEndpoint: "/api/pricing",
+      probeStage: "pricing",
+      upstreamReason: "auth",
+      upstreamStatus: 403,
+      upstreamMessage: "PRICING_DISABLED: pricing is disabled",
+    });
+    expect(JSON.stringify(loggerWarnMock.mock.calls)).not.toContain("draft-pat-must-not-be-logged");
   });
 
   it("rejects a PAT without a numeric new-api user UID", async () => {

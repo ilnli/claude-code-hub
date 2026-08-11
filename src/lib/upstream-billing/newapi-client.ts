@@ -22,6 +22,8 @@ import type { Provider } from "@/types/provider";
 
 const NEWAPI_PROBE_TIMEOUT_MS = 10_000;
 
+const MAX_UPSTREAM_ERROR_LENGTH = 500;
+
 // new-api model/log.go：消费日志类型值（其一注释明确 "don't use iota, avoid change"）
 const NEWAPI_LOG_TYPE_CONSUME = 2;
 
@@ -61,6 +63,15 @@ const dashboardIdentityResponseSchema = z
   })
   .loose();
 
+const newapiErrorEnvelopeSchema = z
+  .object({
+    success: z.boolean().optional(),
+    code: z.string().optional(),
+    message: z.string().optional(),
+    error: z.union([z.string(), z.object({ message: z.string().optional() }).loose()]).optional(),
+  })
+  .loose();
+
 export type NewapiProbeFailureReason =
   | "unsupported" // 端点不存在（404）或 pricing 模块关闭/需登录（403）
   | "auth" // Provider sk 或 Dashboard PAT 被拒绝（HTTP 401/403）
@@ -78,6 +89,8 @@ export type NewapiTokenGroupResult =
   | { ok: true; group: string | null }
   | { ok: false; reason: NewapiProbeFailureReason; error?: string; status?: number };
 
+export type NewapiPatTestStage = "identity" | "pricing";
+
 /**
  * Request destination resolved by the site-owned probe configuration. The cache key must not
  * include any credential material.
@@ -93,7 +106,13 @@ export interface NewapiProbeRequestContext {
 
 export type NewapiPatTestResult =
   | { ok: true; groupCount: number }
-  | { ok: false; reason: NewapiProbeFailureReason; error?: string; status?: number };
+  | {
+      ok: false;
+      stage: NewapiPatTestStage;
+      reason: NewapiProbeFailureReason;
+      error?: string;
+      status?: number;
+    };
 
 interface NewapiRatioTableOptions {
   context?: NewapiProbeRequestContext;
@@ -127,6 +146,64 @@ async function releaseResponseBody(response: Response): Promise<void> {
     await response.body?.cancel();
   } catch {
     // 释放失败不影响探测结果判定
+  }
+}
+
+function sanitizeUpstreamError(
+  value: string,
+  sensitiveValues: Array<string | null | undefined> = []
+): string | undefined {
+  let sanitized = Array.from(value, (character) => {
+    const code = character.charCodeAt(0);
+    return code < 32 || code === 127 ? " " : character;
+  })
+    .join("")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!sanitized) return undefined;
+
+  for (const sensitiveValue of sensitiveValues) {
+    const secret = sensitiveValue?.trim();
+    if (secret) sanitized = sanitized.replaceAll(secret, "[REDACTED]");
+  }
+  return sanitized.slice(0, MAX_UPSTREAM_ERROR_LENGTH);
+}
+
+function extractUpstreamError(
+  body: unknown,
+  sensitiveValues: Array<string | null | undefined> = []
+): string | undefined {
+  if (typeof body === "string") return sanitizeUpstreamError(body, sensitiveValues);
+
+  const parsed = newapiErrorEnvelopeSchema.safeParse(body);
+  if (!parsed.success) return undefined;
+
+  const nestedError =
+    typeof parsed.data.error === "string" ? parsed.data.error : parsed.data.error?.message;
+  const message = parsed.data.message || nestedError;
+  const detail =
+    parsed.data.code && message ? `${parsed.data.code}: ${message}` : parsed.data.code || message;
+  return detail ? sanitizeUpstreamError(detail, sensitiveValues) : undefined;
+}
+
+async function readUpstreamError(
+  response: Response,
+  sensitiveValues: Array<string | null | undefined> = []
+): Promise<string | undefined> {
+  try {
+    const bodyText = await response.text();
+    if (!bodyText) return undefined;
+    try {
+      return (
+        extractUpstreamError(JSON.parse(bodyText), sensitiveValues) ??
+        sanitizeUpstreamError(bodyText, sensitiveValues)
+      );
+    } catch {
+      return sanitizeUpstreamError(bodyText, sensitiveValues);
+    }
+  } catch {
+    await releaseResponseBody(response);
+    return undefined;
   }
 }
 
@@ -254,18 +331,18 @@ export async function fetchNewapiRatioTable(
 
   if (!response.ok) {
     const status = response.status;
-    await releaseResponseBody(response);
+    const error = await readUpstreamError(response, [dashboardPat]);
     if (status === 401 || (status === 403 && dashboardPat)) {
-      return { ok: false, reason: "auth", status };
+      return { ok: false, reason: "auth", status, ...(error ? { error } : {}) };
     }
     // pricing 模块关闭/需登录（403）与端点不存在（404）都意味着无法匿名取表
     if (status === 403 || status === 404) {
-      return { ok: false, reason: "unsupported", status };
+      return { ok: false, reason: "unsupported", status, ...(error ? { error } : {}) };
     }
     if (status === 429) {
-      return { ok: false, reason: "rate_limited", status };
+      return { ok: false, reason: "rate_limited", status, ...(error ? { error } : {}) };
     }
-    return { ok: false, reason: "http", status, error: `HTTP ${status}` };
+    return { ok: false, reason: "http", status, error: error ?? `HTTP ${status}` };
   }
 
   let body: unknown;
@@ -277,7 +354,11 @@ export async function fetchNewapiRatioTable(
 
   const parsed = pricingResponseSchema.safeParse(body);
   if (!parsed.success) {
-    return { ok: false, reason: "invalid", error: "missing group_ratio" };
+    return {
+      ok: false,
+      reason: "invalid",
+      error: extractUpstreamError(body, [dashboardPat]) ?? "missing group_ratio",
+    };
   }
 
   return { ok: true, table: parsed.data.group_ratio };
@@ -351,17 +432,17 @@ export async function fetchNewapiTokenGroup(
 
   if (!response.ok) {
     const status = response.status;
-    await releaseResponseBody(response);
+    const error = await readUpstreamError(response, [provider.key]);
     if (status === 401 || status === 403) {
-      return { ok: false, reason: "auth", status };
+      return { ok: false, reason: "auth", status, ...(error ? { error } : {}) };
     }
     if (status === 404) {
-      return { ok: false, reason: "unsupported", status };
+      return { ok: false, reason: "unsupported", status, ...(error ? { error } : {}) };
     }
     if (status === 429) {
-      return { ok: false, reason: "rate_limited", status };
+      return { ok: false, reason: "rate_limited", status, ...(error ? { error } : {}) };
     }
-    return { ok: false, reason: "http", status, error: `HTTP ${status}` };
+    return { ok: false, reason: "http", status, error: error ?? `HTTP ${status}` };
   }
 
   let body: unknown;
@@ -373,11 +454,21 @@ export async function fetchNewapiTokenGroup(
 
   const parsed = tokenLogsResponseSchema.safeParse(body);
   if (!parsed.success) {
-    return { ok: false, reason: "invalid", error: "missing log data" };
+    return {
+      ok: false,
+      reason: "invalid",
+      error: extractUpstreamError(body, [provider.key]) ?? "missing log data",
+    };
   }
   if (parsed.data.success !== true) {
     // new-api 约定 200 + success:false（如令牌无效）
-    return { ok: false, reason: "auth", error: parsed.data.message ?? "token rejected" };
+    return {
+      ok: false,
+      reason: "auth",
+      error:
+        sanitizeUpstreamError(parsed.data.message ?? "token rejected", [provider.key]) ??
+        "token rejected",
+    };
   }
 
   const logs = parsed.data.data ?? [];
@@ -391,15 +482,30 @@ export async function testNewapiDashboardPat(
 ): Promise<NewapiPatTestResult> {
   const dashboardPat = context.dashboardPat?.trim();
   if (!dashboardPat) {
-    return { ok: false, reason: "auth", error: "site PAT is not configured" };
+    return {
+      ok: false,
+      stage: "identity",
+      reason: "auth",
+      error: "site PAT is not configured",
+    };
   }
   const dashboardUserId = context.dashboardUserId;
   if (!isValidDashboardUserId(dashboardUserId)) {
-    return { ok: false, reason: "auth", error: "site new-api user UID is not configured" };
+    return {
+      ok: false,
+      stage: "identity",
+      reason: "auth",
+      error: "site new-api user UID is not configured",
+    };
   }
   const target = resolveRequestTarget(provider, context);
   if (!target) {
-    return { ok: false, reason: "invalid", error: "probe target is not a valid URL" };
+    return {
+      ok: false,
+      stage: "identity",
+      reason: "invalid",
+      error: "probe target is not a valid URL",
+    };
   }
 
   const identityUrl = `${target.baseUrl}/api/user/self`;
@@ -407,33 +513,73 @@ export async function testNewapiDashboardPat(
     Authorization: `Bearer ${dashboardPat}`,
     "New-Api-User": String(dashboardUserId),
   });
-  if (!fetched.ok) return fetched;
+  if (!fetched.ok) return { ...fetched, stage: "identity" };
 
   const { response } = fetched;
   if (!response.ok) {
     const status = response.status;
-    await releaseResponseBody(response);
-    if (status === 401 || status === 403) return { ok: false, reason: "auth", status };
-    if (status === 404) return { ok: false, reason: "unsupported", status };
-    if (status === 429) return { ok: false, reason: "rate_limited", status };
-    return { ok: false, reason: "http", status, error: `HTTP ${status}` };
+    const error = await readUpstreamError(response, [dashboardPat]);
+    if (status === 401 || status === 403) {
+      return { ok: false, stage: "identity", reason: "auth", status, ...(error ? { error } : {}) };
+    }
+    if (status === 404) {
+      return {
+        ok: false,
+        stage: "identity",
+        reason: "unsupported",
+        status,
+        ...(error ? { error } : {}),
+      };
+    }
+    if (status === 429) {
+      return {
+        ok: false,
+        stage: "identity",
+        reason: "rate_limited",
+        status,
+        ...(error ? { error } : {}),
+      };
+    }
+    return {
+      ok: false,
+      stage: "identity",
+      reason: "http",
+      status,
+      error: error ?? `HTTP ${status}`,
+    };
   }
 
   let body: unknown;
   try {
     body = await response.json();
   } catch {
-    return { ok: false, reason: "invalid", error: "identity response is not valid JSON" };
+    return {
+      ok: false,
+      stage: "identity",
+      reason: "invalid",
+      error: "identity response is not valid JSON",
+    };
   }
   const identity = dashboardIdentityResponseSchema.safeParse(body);
   if (!identity.success) {
-    return { ok: false, reason: "invalid", error: "identity response is invalid" };
+    const envelope = newapiErrorEnvelopeSchema.safeParse(body);
+    return {
+      ok: false,
+      stage: "identity",
+      reason: envelope.success && envelope.data.success === false ? "auth" : "invalid",
+      error: extractUpstreamError(body, [dashboardPat]) ?? "identity response is invalid",
+    };
   }
   if (identity.data.data.id !== dashboardUserId) {
-    return { ok: false, reason: "auth", error: "new-api user UID does not match the PAT owner" };
+    return {
+      ok: false,
+      stage: "identity",
+      reason: "auth",
+      error: "new-api user UID does not match the PAT owner",
+    };
   }
 
   const pricing = await fetchNewapiRatioTable(provider, { context, authenticated: true });
-  if (!pricing.ok) return pricing;
+  if (!pricing.ok) return { ...pricing, stage: "pricing" };
   return { ok: true, groupCount: Object.keys(pricing.table).length };
 }

@@ -40,10 +40,17 @@ function makeResponse(init: {
   body?: unknown;
   stream?: Pick<ReadableStream, "cancel">;
 }): Response {
+  const bodyText =
+    init.body === undefined
+      ? ""
+      : typeof init.body === "string"
+        ? init.body
+        : JSON.stringify(init.body);
   return {
     ok: init.ok,
     status: init.status,
     json: async () => init.body,
+    text: async () => bodyText,
     body: init.stream ?? null,
   } as Response;
 }
@@ -126,12 +133,27 @@ describe("fetchNewapiRatioTable", () => {
   });
 
   it("PAT 模式的 403 归类为鉴权失败", async () => {
-    fetchMock.mockResolvedValue(makeResponse({ ok: false, status: 403 }));
+    fetchMock.mockResolvedValue(
+      makeResponse({
+        ok: false,
+        status: 403,
+        body: {
+          success: false,
+          code: "PRICING_DISABLED",
+          message: "pricing is disabled\nby administrator for dashboard-pat",
+        },
+      })
+    );
     const result = await fetchNewapiRatioTable(makeProvider(), {
       context: makeSiteContext(),
       authenticated: true,
     });
-    expect(result).toMatchObject({ ok: false, reason: "auth", status: 403 });
+    expect(result).toMatchObject({
+      ok: false,
+      reason: "auth",
+      status: 403,
+      error: "PRICING_DISABLED: pricing is disabled by administrator for [REDACTED]",
+    });
   });
 
   it("PAT 模式缺少用户 UID 时不发送请求", async () => {
@@ -341,8 +363,52 @@ describe("testNewapiDashboardPat", () => {
 
     const result = await testNewapiDashboardPat(makeProvider(), makeSiteContext());
 
-    expect(result).toMatchObject({ ok: false, reason: "auth" });
+    expect(result).toMatchObject({ ok: false, stage: "identity", reason: "auth" });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("保留 HTTP 200 身份失败消息并标记 identity 阶段", async () => {
+    fetchMock.mockResolvedValueOnce(
+      makeResponse({
+        ok: true,
+        status: 200,
+        body: { success: false, code: "AUTH_UNAUTHORIZED", message: "access token is invalid" },
+      })
+    );
+
+    const result = await testNewapiDashboardPat(makeProvider(), makeSiteContext());
+
+    expect(result).toEqual({
+      ok: false,
+      stage: "identity",
+      reason: "auth",
+      error: "AUTH_UNAUTHORIZED: access token is invalid",
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("价格表失败时保留状态、消息并标记 pricing 阶段", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        makeResponse({ ok: true, status: 200, body: { success: true, data: { id: 8 } } })
+      )
+      .mockResolvedValueOnce(
+        makeResponse({
+          ok: false,
+          status: 403,
+          body: { success: false, message: "pricing is disabled" },
+        })
+      );
+
+    const result = await testNewapiDashboardPat(makeProvider(), makeSiteContext());
+
+    expect(result).toEqual({
+      ok: false,
+      stage: "pricing",
+      reason: "auth",
+      status: 403,
+      error: "pricing is disabled",
+    });
   });
 });
 

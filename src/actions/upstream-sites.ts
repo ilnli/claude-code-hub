@@ -37,7 +37,15 @@ export type UpstreamSiteConfigInput = z.infer<typeof SiteConfigSchema>;
 class SiteConfigError extends Error {
   constructor(
     readonly errorCode: string,
-    message: string
+    message: string,
+    readonly diagnostics?: {
+      probeBaseUrl: string;
+      probeEndpoint: "/api/user/self" | "/api/pricing";
+      probeStage: "identity" | "pricing";
+      upstreamReason: string;
+      upstreamStatus?: number;
+      upstreamMessage?: string;
+    }
   ) {
     super(message);
   }
@@ -294,7 +302,15 @@ export async function testUpstreamSitePat(
     if (!result.ok) {
       throw new SiteConfigError(
         `upstream_site.pat_test_${result.reason}`,
-        result.error ?? `PAT test failed (${result.reason})`
+        result.error ?? `PAT test failed (${result.reason})`,
+        {
+          probeBaseUrl: config.probeBaseUrl,
+          probeEndpoint: result.stage === "identity" ? "/api/user/self" : "/api/pricing",
+          probeStage: result.stage,
+          upstreamReason: result.reason,
+          ...(result.status != null ? { upstreamStatus: result.status } : {}),
+          ...(result.error ? { upstreamMessage: result.error } : {}),
+        }
       );
     }
 
@@ -322,7 +338,12 @@ export async function testUpstreamSitePat(
     });
     logger.warn("testUpstreamSitePat:failed", {
       siteId: parsed.data.siteId,
+      siteKey: current?.siteKey,
       reason: error instanceof SiteConfigError ? error.errorCode : "operation_failed",
+      ...(error instanceof SiteConfigError && error.diagnostics ? error.diagnostics : {}),
+      ...(error instanceof Error && !(error instanceof SiteConfigError)
+        ? { errorName: error.name, errorMessage: error.message }
+        : {}),
     });
     return actionError(error);
   }
