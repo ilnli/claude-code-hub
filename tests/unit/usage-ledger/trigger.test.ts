@@ -3,6 +3,10 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const sql = readFileSync(resolve(process.cwd(), "src/lib/ledger-backfill/trigger.sql"), "utf-8");
+const nullSuccessMigration = readFileSync(
+  resolve(process.cwd(), "drizzle/0133_fix_usage_ledger_null_success.sql"),
+  "utf-8"
+);
 
 describe("fn_upsert_usage_ledger trigger SQL", () => {
   it("defines shared request outcome helpers", () => {
@@ -28,6 +32,15 @@ describe("fn_upsert_usage_ledger trigger SQL", () => {
 
   it("computes is_success from error_message", () => {
     expect(sql).toContain("error_message IS NULL");
+  });
+
+  it("coerces a missing status code to is_success=false", () => {
+    expect(sql).toContain("COALESCE(NEW.status_code BETWEEN 200 AND 299, FALSE)");
+  });
+
+  it("updates the deployed trigger function with the null-safe expression", () => {
+    expect(nullSuccessMigration).toContain("CREATE OR REPLACE FUNCTION fn_upsert_usage_ledger()");
+    expect(nullSuccessMigration).toContain("COALESCE(NEW.status_code BETWEEN 200 AND 299, FALSE)");
   });
 
   it("persists success_rate_outcome into usage_ledger", () => {

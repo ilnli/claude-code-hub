@@ -87,7 +87,7 @@ export async function backfillUsageLedger(
               mr.provider_chain
             ) AS success_rate_outcome,
             (mr.error_message IS NULL OR mr.error_message = '')
-              AND mr.status_code BETWEEN 200 AND 299 AS is_success,
+              AND COALESCE(mr.status_code BETWEEN 200 AND 299, FALSE) AS is_success,
             mr.blocked_by,
             CASE WHEN mr.is_replay THEN 0 ELSE mr.cost_usd END AS cost_usd,
             mr.cost_multiplier,

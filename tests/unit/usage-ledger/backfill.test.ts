@@ -47,6 +47,12 @@ describe("backfillUsageLedger", () => {
     expect(serviceSource).toContain("fn_compute_message_request_success_rate_outcome");
   });
 
+  it("coerces a missing status code to is_success=false", () => {
+    expect(serviceSource).toContain(
+      "COALESCE(mr.status_code BETWEEN 200 AND 299, FALSE) AS is_success"
+    );
+  });
+
   it("repairs Session identity and Replay provenance in existing ledger rows", () => {
     const projectionFields = [
       "session_identity",

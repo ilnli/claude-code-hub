@@ -321,6 +321,22 @@ run("usage ledger integration", () => {
       expect(ledgerRow?.successRateOutcome).toBe("failure");
     });
 
+    test("sets is_success=false while status_code is null", async () => {
+      const requestId = await insertMessageRequestRow({
+        key: nextKey("trigger-pending"),
+        userId: nextUserId(),
+        providerId: nextProviderId(),
+        statusCode: null,
+        errorMessage: null,
+      });
+
+      const ledgerRow = await selectLedgerRowByRequestId(requestId);
+      expect(ledgerRow).not.toBeNull();
+      expect(ledgerRow?.statusCode).toBeNull();
+      expect(ledgerRow?.isSuccess).toBe(false);
+      expect(ledgerRow?.successRateOutcome).toBeNull();
+    });
+
     test("sets is_success=true when error_message is absent", async () => {
       const requestId = await insertMessageRequestRow({
         key: nextKey("trigger-success"),

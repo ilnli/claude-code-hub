@@ -195,7 +195,7 @@ BEGIN
   END IF;
 
   v_is_success := (NEW.error_message IS NULL OR NEW.error_message = '')
-                  AND NEW.status_code BETWEEN 200 AND 299;
+                  AND COALESCE(NEW.status_code BETWEEN 200 AND 299, FALSE);
 
   INSERT INTO usage_ledger (
     request_id, user_id, key, provider_id, final_provider_id,
