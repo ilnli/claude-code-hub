@@ -692,6 +692,17 @@ export async function register() {
         });
       }
 
+      try {
+        const { startAvailabilityProjectionWorker } = await import(
+          "@/lib/availability/projection-worker"
+        );
+        startAvailabilityProjectionWorker();
+      } catch (error) {
+        logger.warn("[Instrumentation] Failed to start availability projection worker", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
       // 初始化端点熔断器（禁用时清理残留状态）
       try {
         const { initEndpointCircuitBreaker } = await import("@/lib/endpoint-circuit-breaker");
@@ -899,6 +910,17 @@ export async function register() {
           startPublicStatusRebuildScheduler();
         } catch (error) {
           logger.warn("[Instrumentation] Failed to start public status rebuild scheduler", {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+
+        try {
+          const { startAvailabilityProjectionWorker } = await import(
+            "@/lib/availability/projection-worker"
+          );
+          startAvailabilityProjectionWorker();
+        } catch (error) {
+          logger.warn("[Instrumentation] Failed to start availability projection worker", {
             error: error instanceof Error ? error.message : String(error),
           });
         }
