@@ -416,6 +416,24 @@ describe("computeFingerprintChain - responses format", () => {
     expect(b.tail[0].fp).not.toBe(a.tail[0].fp);
   });
 
+  it("remote compaction v2 retains the pre-trigger conversation prefix for affinity lookup", () => {
+    const conversation = [
+      { type: "message", role: "user", content: "one" },
+      { type: "message", role: "assistant", content: "two" },
+    ];
+    const ordinary = mustChain({ instructions: "be brief", input: conversation }, "response");
+    const compact = mustChain(
+      {
+        instructions: "be brief",
+        input: [...conversation, { type: "compaction_trigger" }],
+      },
+      "response"
+    );
+
+    expect(fingerprintTip(compact).fp).not.toBe(fingerprintTip(ordinary).fp);
+    expect(fingerprintsDeepestFirst(compact)).toContain(fingerprintTip(ordinary).fp);
+  });
+
   it("returns null when input is neither string nor array", () => {
     expect(computeFingerprintChain({ input: 42 }, "response")).toBeNull();
   });

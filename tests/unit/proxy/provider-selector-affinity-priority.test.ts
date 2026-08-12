@@ -3,7 +3,9 @@ import type { Provider } from "@/types/provider";
 
 /**
  * F3a nomination priority inside ProxyProviderResolver.ensure():
- * with "ignore client session id" off: explicit session binding > affinity hint > weighted random;
+ * ordinary requests with "ignore client session id" off use
+ * explicit session binding > affinity hint > weighted random;
+ * explicit remote compaction uses affinity hint > session binding > weighted random;
  * with it on (product default) fingerprintable requests skip the session binding read entirely.
  * An affinity hint must still pass the full hard validation either way.
  */
@@ -156,6 +158,7 @@ function makeSession(overrides: Record<string, unknown> = {}): any {
     authState: { key: { id: 5, providerGroup: "default" }, user: null },
     request: { message: claudeMessage },
     getEndpointPolicy: () => ({ kind: "default" }),
+    isExplicitCompactionRequest: () => false,
     shouldReuseProvider: () => false,
     getOriginalModel: () => "claude-sonnet-4-5",
     getCurrentModel: () => null,
@@ -231,6 +234,108 @@ describe("ensure() nomination priority", () => {
     expect(session.affinity?.matchedFp).toBeNull();
     expect(session.affinity?.identityFp).toBe("rootfp");
     expect(session.affinity?.generation).toBe("3");
+  });
+
+  test("explicit remote compaction prefers affinity over an existing session binding", async () => {
+    settingsControl.ignoreClientSessionId = false;
+    sessionManagerMocks.SessionManager.getSessionProvider.mockResolvedValue(91);
+    storeMocks.lookup.mockResolvedValue({
+      generation: "4",
+      identityFp: "rootfp",
+      hint: {
+        providerId: 42,
+        matchedFp: "deepfp",
+        matchedIndex: 0,
+        tier: "conversation",
+      },
+    });
+    providerRepositoryMocks.findProviderById.mockImplementation(async (providerId: number) =>
+      makeProvider(providerId, { providerType: "codex" })
+    );
+
+    const session = makeSession({
+      sessionId: "sess_compact",
+      originalFormat: "response",
+      request: {
+        message: {
+          model: "gpt-5.5",
+          input: [
+            { type: "message", role: "user", content: "compact this conversation" },
+            { type: "compaction_trigger" },
+          ],
+        },
+      },
+      getEndpointPolicy: () => ({ kind: "raw_passthrough" }),
+      isExplicitCompactionRequest: () => true,
+      shouldReuseProvider: () => true,
+      getOriginalModel: () => "gpt-5.5",
+    });
+
+    const result = await ProxyProviderResolver.ensure(session);
+
+    expect(result).toBeNull();
+    expect(session.provider?.id).toBe(42);
+    expect(session.affinity?.nominatedProviderId).toBe(42);
+    expect(sessionManagerMocks.SessionManager.getSessionProvider).not.toHaveBeenCalled();
+    expect(session.getProviderChain().map((item: { reason?: string }) => item.reason)).toEqual([
+      "affinity_hit",
+    ]);
+  });
+
+  test("explicit remote compaction falls back to its session binding after an affinity miss", async () => {
+    settingsControl.ignoreClientSessionId = true;
+    sessionManagerMocks.SessionManager.getSessionProvider.mockResolvedValue(91);
+    storeMocks.lookup.mockResolvedValue({
+      generation: "4",
+      identityFp: "rootfp",
+      hint: null,
+    });
+    providerRepositoryMocks.findProviderById.mockResolvedValue(
+      makeProvider(91, { providerType: "codex" })
+    );
+
+    const session = makeSession({
+      sessionId: "sess_compact",
+      originalFormat: "response",
+      request: {
+        message: {
+          model: "gpt-5.5",
+          input: [{ type: "message", role: "user", content: "compact this conversation" }],
+        },
+      },
+      getEndpointPolicy: () => ({ kind: "raw_passthrough" }),
+      isExplicitCompactionRequest: () => true,
+      shouldReuseProvider: () => true,
+      getOriginalModel: () => "gpt-5.5",
+    });
+
+    const result = await ProxyProviderResolver.ensure(session);
+
+    expect(result).toBeNull();
+    expect(storeMocks.lookup).toHaveBeenCalledTimes(1);
+    expect(sessionManagerMocks.SessionManager.getSessionProvider).toHaveBeenCalledTimes(1);
+    expect(session.provider?.id).toBe(91);
+    expect(session.getProviderChain().map((item: { reason?: string }) => item.reason)).toEqual([
+      "session_reuse",
+    ]);
+  });
+
+  test("other raw passthrough endpoints do not participate in prefix affinity", async () => {
+    sessionManagerMocks.SessionManager.getSessionProvider.mockResolvedValue(91);
+    providerRepositoryMocks.findProviderById.mockResolvedValue(makeProvider(91));
+
+    const session = makeSession({
+      sessionId: "sess_count_tokens",
+      getEndpointPolicy: () => ({ kind: "raw_passthrough" }),
+      shouldReuseProvider: () => true,
+    });
+
+    const result = await ProxyProviderResolver.ensure(session);
+
+    expect(result).toBeNull();
+    expect(storeMocks.lookup).not.toHaveBeenCalled();
+    expect(session.affinity).toBeNull();
+    expect(session.provider?.id).toBe(91);
   });
 
   test("affinity hit wins over weighted random and records affinity_hit in the chain", async () => {

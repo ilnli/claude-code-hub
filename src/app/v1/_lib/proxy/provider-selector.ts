@@ -200,10 +200,12 @@ export class ProxyProviderResolver {
 
     // === F3a 前置：读一次运行时设置并计算指纹状态 ===
     // 「忽略客户端 Session ID」开启且请求可指纹化时，粘性交给最长前缀亲和，
-    // 跳过 session-ID 绑定的读取；不可指纹化（如非 chat 体）仍走既有会话复用。
+    // 跳过 session-ID 绑定的读取；显式远端压缩例外：先尝试亲和，未命中再复用会话。
+    // 其他不可指纹化请求仍走既有会话复用。
     // 任何异常整体退回旧顺序（会话复用正常执行），绝不影响主选路。
     let affinityRoutingEnabled = false;
     let skipSessionBinding = false;
+    let preferAffinityBeforeSession = false;
     try {
       const runtimeSettings = await getProxyRuntimeSettings();
       affinityRoutingEnabled = isAffinityRoutingEnabledWith(runtimeSettings);
@@ -211,17 +213,30 @@ export class ProxyProviderResolver {
         session,
         affinityRoutingEnabled
       );
-      skipSessionBinding = runtimeSettings.affinityIgnoreClientSessionId && fingerprintable;
+      preferAffinityBeforeSession =
+        affinityRoutingEnabled &&
+        fingerprintable &&
+        session.isExplicitCompactionRequest?.() === true;
+      skipSessionBinding =
+        runtimeSettings.affinityIgnoreClientSessionId &&
+        fingerprintable &&
+        !preferAffinityBeforeSession;
     } catch (error) {
       affinityRoutingEnabled = false;
       skipSessionBinding = false;
+      preferAffinityBeforeSession = false;
       logger.warn("ProviderSelector: Affinity settings unavailable, using legacy order", {
         error: error instanceof Error ? error.message : String(error),
       });
     }
 
+    // 显式远端压缩优先沿用最长缓存前缀；miss/硬校验失败后继续走会话复用。
+    if (preferAffinityBeforeSession) {
+      await ProxyProviderResolver.tryPrefixAffinityNomination(session);
+    }
+
     // === 会话复用（「忽略客户端 Session ID」语义下仅跳过读取；写路径不变）===
-    if (!skipSessionBinding) {
+    if (!skipSessionBinding && !session.provider) {
       const reusedProvider = await ProxyProviderResolver.findReusable(session);
       if (reusedProvider) {
         session.setProvider(reusedProvider);
@@ -267,8 +282,8 @@ export class ProxyProviderResolver {
       }
     }
 
-    // === 前缀亲和提名（优先级：显式 session 绑定 > 亲和 > 加权随机）===
-    if (affinityRoutingEnabled && !session.provider) {
+    // 普通请求维持既有顺序：显式 session 绑定 > 亲和 > 加权随机。
+    if (affinityRoutingEnabled && !preferAffinityBeforeSession && !session.provider) {
       await ProxyProviderResolver.tryPrefixAffinityNomination(session);
     }
 
@@ -576,7 +591,7 @@ export class ProxyProviderResolver {
   /**
    * F3a 指纹状态：计算链式指纹与 scopeTag 挂到 session.affinity（幂等，已有则跳过）。
    *
-   * 仅 default endpoint policy 建状态——raw 端点（如 count_tokens）绝不建，
+   * default endpoint policy 与显式远端压缩可建状态；其他 raw 端点（如 count_tokens）不建，
    * 各终态写回随之全部 no-op；亲和路由与缓存效果指标（F3b）任一开启即计算，
    * 仅指标模式下也要指纹供终态落值。返回 session.affinity 是否可用（可指纹化）。
    */
@@ -585,7 +600,12 @@ export class ProxyProviderResolver {
     affinityRoutingEnabled: boolean
   ): boolean {
     if (session.affinity) return true;
-    if (session.getEndpointPolicy().kind !== "default") return false;
+    if (
+      session.getEndpointPolicy().kind !== "default" &&
+      session.isExplicitCompactionRequest?.() !== true
+    ) {
+      return false;
+    }
     const keyId = session.authState?.key?.id;
     if (!keyId) return false;
 
