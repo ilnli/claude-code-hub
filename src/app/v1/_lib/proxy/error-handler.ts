@@ -159,7 +159,7 @@ export function resolveFinalClientErrorMessage({
   if (error instanceof ProxyError) {
     return (
       deriveClientSafeUpstreamErrorMessage({
-        rawText: error.upstreamError?.rawBody,
+        rawText: error.upstreamError?.rawBody ?? error.upstreamError?.body,
         candidateMessage:
           error.upstreamError?.safeClientMessageCandidate ??
           error.upstreamError?.body ??
@@ -185,7 +185,7 @@ function buildRoutingErrorResponse(
 ): Response {
   const param = classification.clientParam ?? null;
   let payload: Record<string, unknown>;
-  const errorType = statusCode >= 500 ? "service_unavailable_error" : "invalid_request_error";
+  const errorType = getRoutingErrorType(statusCode);
 
   if (session.originalFormat === "claude") {
     payload = {
@@ -203,7 +203,7 @@ function buildRoutingErrorResponse(
       error: {
         code: statusCode,
         message,
-        status: statusCode >= 500 ? "UNAVAILABLE" : "INVALID_ARGUMENT",
+        status: getGeminiRoutingErrorStatus(statusCode),
         details: [
           {
             "@type": "type.googleapis.com/google.rpc.ErrorInfo",
@@ -229,6 +229,61 @@ function buildRoutingErrorResponse(
     status: statusCode,
     headers: { "content-type": "application/json; charset=utf-8" },
   });
+}
+
+function getRoutingErrorType(statusCode: number): string {
+  switch (statusCode) {
+    case 401:
+      return "authentication_error";
+    case 402:
+      return "payment_required_error";
+    case 403:
+      return "permission_error";
+    case 404:
+      return "not_found_error";
+    case 413:
+    case 415:
+    case 422:
+      return "invalid_request_error";
+    case 429:
+      return "rate_limit_error";
+    case 451:
+      return "permission_error";
+    case 400:
+      return "invalid_request_error";
+    default:
+      return statusCode >= 500 ? "service_unavailable_error" : "api_error";
+  }
+}
+
+function getGeminiRoutingErrorStatus(statusCode: number): string {
+  switch (statusCode) {
+    case 401:
+      return "UNAUTHENTICATED";
+    case 402:
+      return "RESOURCE_EXHAUSTED";
+    case 403:
+      return "PERMISSION_DENIED";
+    case 404:
+      return "NOT_FOUND";
+    case 408:
+      return "DEADLINE_EXCEEDED";
+    case 409:
+      return "ABORTED";
+    case 413:
+      return "RESOURCE_EXHAUSTED";
+    case 415:
+    case 422:
+      return "INVALID_ARGUMENT";
+    case 429:
+      return "RESOURCE_EXHAUSTED";
+    case 451:
+      return "PERMISSION_DENIED";
+    case 400:
+      return "INVALID_ARGUMENT";
+    default:
+      return statusCode >= 500 ? "UNAVAILABLE" : "UNKNOWN";
+  }
 }
 
 /**
@@ -357,9 +412,6 @@ export class ProxyErrorHandler {
 
     if (!databaseError && routingClassification?.disposition === "request_terminal") {
       statusCode = routingClassification.clientStatusCode;
-      if (routingClassification.clientMessage) {
-        clientErrorMessage = routingClassification.clientMessage;
-      }
     }
 
     const buildClientResponse = (

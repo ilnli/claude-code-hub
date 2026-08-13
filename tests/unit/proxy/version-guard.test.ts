@@ -4,17 +4,7 @@ import type { ProxySession } from "@/app/v1/_lib/proxy/session";
 
 const getCachedSystemSettingsMock = vi.fn();
 const checkVersionMock = vi.fn();
-const insertMock = vi.fn();
-const valuesMock = vi.fn();
-
-vi.mock("@/drizzle/db", () => ({
-  db: {
-    insert: (...args: unknown[]) => {
-      insertMock(...args);
-      return { values: valuesMock };
-    },
-  },
-}));
+const getErrorMessageServerMock = vi.fn();
 
 vi.mock("@/lib/config", () => ({
   getCachedSystemSettings: () => getCachedSystemSettingsMock(),
@@ -24,6 +14,14 @@ vi.mock("@/lib/client-version-checker", () => ({
   ClientVersionChecker: {
     checkVersion: (...args: unknown[]) => checkVersionMock(...args),
   },
+}));
+
+vi.mock("next-intl/server", () => ({
+  getLocale: vi.fn(async () => "en"),
+}));
+
+vi.mock("@/lib/utils/error-messages", () => ({
+  getErrorMessageServer: (...args: unknown[]) => getErrorMessageServerMock(...args),
 }));
 
 vi.mock("@/lib/logger", () => ({
@@ -47,6 +45,7 @@ function createSession(userAgent = "claude-cli/2.0.1 (external, cli)"): ProxySes
     getRequestSequence: () => 4,
     getMessagesLength: () => 2,
     getEndpoint: () => "/v1/messages",
+    setTerminalFailureMetadata: vi.fn(),
   } as unknown as ProxySession;
 }
 
@@ -68,9 +67,7 @@ beforeEach(() => {
     policy: { clientType: "claude-cli" },
     evaluation: evaluation("within_range"),
   });
-  insertMock.mockClear();
-  valuesMock.mockClear();
-  valuesMock.mockResolvedValue(undefined);
+  getErrorMessageServerMock.mockImplementation(async (_locale, code) => `public:${code}`);
 });
 
 describe("ProxyVersionGuard", () => {
@@ -80,22 +77,25 @@ describe("ProxyVersionGuard", () => {
       evaluation: evaluation("below_minimum"),
     });
 
-    const response = await ProxyVersionGuard.ensure(
-      createSession("claude-cli/1.9.9 (external, cli)")
-    );
+    const session = createSession("claude-cli/1.9.9 (external, cli)");
+    const response = await ProxyVersionGuard.ensure(session);
 
     expect(response?.status).toBe(400);
-    await expect(response?.json()).resolves.toMatchObject({
+    const body = await response?.json();
+    expect(body).toMatchObject({
       error: {
         type: "client_upgrade_required",
-        current_version: "1.9.9",
         required_version: "2.0.0",
         minimum_supported_version: "2.0.0",
         maximum_supported_version: "2.0.2",
       },
     });
-    expect(valuesMock).toHaveBeenCalledWith(
-      expect.objectContaining({ blockedBy: "client_version", statusCode: 400 })
+    expect(session.setTerminalFailureMetadata).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: "invalid_request",
+        blockedBy: "client_version",
+        blockedReason: expect.stringContaining('"version":"1.9.9"'),
+      })
     );
   });
 
@@ -105,21 +105,22 @@ describe("ProxyVersionGuard", () => {
       evaluation: evaluation("above_maximum"),
     });
 
-    const response = await ProxyVersionGuard.ensure(
-      createSession("claude-cli/2.0.3 (external, cli)")
-    );
+    const session = createSession("claude-cli/2.0.3 (external, cli)");
+    const response = await ProxyVersionGuard.ensure(session);
 
     expect(response?.status).toBe(400);
     const body = await response?.json();
     expect(body).toMatchObject({
       error: {
         type: "client_version_too_new",
-        current_version: "2.0.3",
         minimum_supported_version: "2.0.0",
         maximum_supported_version: "2.0.2",
       },
     });
     expect(body.error.required_version).toBeUndefined();
+    expect(session.setTerminalFailureMetadata).toHaveBeenCalledWith(
+      expect.objectContaining({ code: "invalid_request", blockedBy: "client_version" })
+    );
   });
 
   test("allows malformed versions and client types without a policy", async () => {
@@ -133,13 +134,11 @@ describe("ProxyVersionGuard", () => {
 
     checkVersionMock.mockResolvedValueOnce({ policy: null, evaluation: evaluation("unchecked") });
     expect(await ProxyVersionGuard.ensure(createSession())).toBeNull();
-    expect(valuesMock).not.toHaveBeenCalled();
   });
 
   test("fails open when policy evaluation cannot be loaded", async () => {
     checkVersionMock.mockRejectedValueOnce(new Error("database unavailable"));
 
     await expect(ProxyVersionGuard.ensure(createSession())).resolves.toBeNull();
-    expect(valuesMock).not.toHaveBeenCalled();
   });
 });

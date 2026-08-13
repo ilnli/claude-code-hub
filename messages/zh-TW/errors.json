@@ -44,6 +44,8 @@
   "PUBLIC_ERROR_SERVICE_UNAVAILABLE": "服務暫時不可用，請稍後重試，或將 CCH Session ID 提供給管理員排查。",
   "PUBLIC_ERROR_REQUEST_CANCELLED": "請求在完成前被取消。",
   "PUBLIC_ERROR_INTERNAL": "請求因內部錯誤失敗，請稍後重試，或將 CCH Session ID 提供給管理員排查。",
+  "CLIENT_VERSION_UPGRADE_REQUIRED": "{client} 版本過舊，請升級至受支援的版本後繼續使用。",
+  "CLIENT_VERSION_TOO_NEW": "{client} 版本超出支援範圍，請使用受支援的版本後重試。",
 
   "INTERNAL_ERROR": "系統內部錯誤，請稍後重試",
   "DATABASE_ERROR": "資料庫錯誤",

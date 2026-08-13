@@ -4,6 +4,7 @@ import { ProxyErrorHandler } from "@/app/v1/_lib/proxy/error-handler";
 import { ProxyError, RateLimitError } from "@/app/v1/_lib/proxy/errors";
 import { ProxySession } from "@/app/v1/_lib/proxy/session";
 import { StreamPrecommitError } from "@/app/v1/_lib/proxy/stream-gate/stream-content-gate";
+import { rememberRoutingErrorClassification } from "@/app/v1/_lib/proxy/routing-error-classifier";
 import type { ErrorDetectionResult } from "@/lib/error-rule-detector";
 import type { Provider } from "@/types/provider";
 
@@ -301,4 +302,39 @@ describe("ProxyErrorHandler.handle terminal status", () => {
       param: "input",
     });
   });
+
+  test.each([
+    [401, "authentication_error", "UNAUTHENTICATED"],
+    [403, "permission_error", "PERMISSION_DENIED"],
+    [404, "not_found_error", "NOT_FOUND"],
+    [429, "rate_limit_error", "RESOURCE_EXHAUSTED"],
+  ] as const)(
+    "uses protocol-specific error types for reviewed status %i",
+    async (status, type, geminiStatus) => {
+      const session = await createSession();
+      session.setOriginalFormat("openai");
+      const error = new ProxyError("reviewed", 502, {
+        body: JSON.stringify({ error: { message: "reviewed" } }),
+        origin: "upstream_http",
+      });
+      rememberRoutingErrorClassification(error, {
+        disposition: "request_terminal",
+        evidenceSource: "error_rule",
+        evidenceCode: "error_rule:test",
+        clientStatusCode: status,
+        clientCode: "reviewed_error",
+        clientMessage: "unsafe raw upstream message",
+      });
+
+      const response = await ProxyErrorHandler.handle(session, error);
+      expect(response.status).toBe(status);
+      const responseBody = await response.json();
+      expect(responseBody.error.type).toBe(type);
+      expect(responseBody.error.message).not.toContain("unsafe raw upstream message");
+
+      session.setOriginalFormat("gemini");
+      const geminiResponse = await ProxyErrorHandler.handle(session, error);
+      expect((await geminiResponse.json()).error.status).toBe(geminiStatus);
+    }
+  );
 });

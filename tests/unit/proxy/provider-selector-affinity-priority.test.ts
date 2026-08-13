@@ -77,8 +77,12 @@ vi.mock("@/repository/provider-groups", () => ({
 vi.mock("@/lib/utils/timezone", () => ({
   resolveSystemTimezone: vi.fn(async () => "UTC"),
 }));
-vi.mock("@/app/v1/_lib/proxy/provider-selector-settings-cache", () => ({
-  getVerboseProviderErrorCached: vi.fn(async () => false),
+vi.mock("next-intl/server", () => ({
+  getLocale: vi.fn(async () => "en"),
+}));
+vi.mock("@/lib/utils/error-messages", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/utils/error-messages")>()),
+  getErrorMessageServer: vi.fn(async () => "The service is temporarily unavailable."),
 }));
 vi.mock("@/app/v1/_lib/proxy/affinity/affinity-store", () => ({
   getAffinityStore: () => storeMocks,
@@ -204,6 +208,31 @@ beforeEach(() => {
 });
 
 describe("ensure() nomination priority", () => {
+  test("returns a generic error without retry diagnostics when no provider remains", async () => {
+    rateLimitMocks.RateLimitService.checkAndTrackProviderSession.mockResolvedValue({
+      allowed: false,
+      count: 1,
+      tracked: false,
+      referenced: false,
+      reason: "provider_concurrency_limit",
+    });
+
+    const session = makeSession({ sessionId: "public-error-session" });
+    const response = await ProxyProviderResolver.ensure(session);
+
+    expect(response).not.toBeNull();
+    if (!response) throw new Error("Expected a provider selection response");
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({
+      error: {
+        message: "The service is temporarily unavailable.",
+        type: "no_available_providers",
+        code: "no_available_providers",
+      },
+    });
+  });
+
   test("ignore-session off: explicit session binding wins while affinity writeback state is initialized", async () => {
     settingsControl.ignoreClientSessionId = false;
     sessionManagerMocks.SessionManager.getSessionProvider.mockResolvedValue(91);

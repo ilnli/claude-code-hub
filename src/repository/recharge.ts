@@ -296,10 +296,7 @@ export async function createRechargeOrder(input: {
       })
       .where(and(eq(rechargeOrders.id, created.order.id), eq(rechargeOrders.status, "pending")));
     if (error instanceof RechargeError) throw error;
-    throw new RechargeError(
-      "ALIPAY_PRECREATE_FAILED",
-      error instanceof Error ? error.message : "ALIPAY_PRECREATE_FAILED"
-    );
+    throw new RechargeError("ALIPAY_PRECREATE_FAILED");
   }
 }
 

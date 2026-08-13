@@ -80,9 +80,6 @@ vi.mock("@/repository/provider-groups", () => ({
 vi.mock("@/lib/utils/timezone", () => ({
   resolveSystemTimezone: vi.fn(async () => "UTC"),
 }));
-vi.mock("@/app/v1/_lib/proxy/provider-selector-settings-cache", () => ({
-  getVerboseProviderErrorCached: vi.fn(async () => false),
-}));
 vi.mock("@/app/v1/_lib/proxy/affinity/affinity-store", () => ({
   getAffinityStore: () => storeMocks,
 }));

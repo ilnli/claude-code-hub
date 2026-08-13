@@ -128,6 +128,39 @@ describe("routing error classifier", () => {
     });
   });
 
+  it("drops unsafe client params instead of returning arbitrary upstream text", () => {
+    const error = new ProxyError("structured request error", 400, {
+      parsed: {
+        error: {
+          code: "unsupported_parameter",
+          message: "The request must be corrected.",
+          param: "https://provider.example/internal?token=secret",
+        },
+      },
+      origin: "upstream_http",
+    });
+
+    expect(classifyBuiltInRoutingError(error)).toMatchObject({
+      clientCode: "unsupported_parameter",
+      clientParam: null,
+    });
+  });
+
+  it("limits client params to field-path syntax and length", () => {
+    const error = new ProxyError("structured request error", 400, {
+      parsed: {
+        error: {
+          code: "unsupported_parameter",
+          message: "The request must be corrected.",
+          param: `a${"b".repeat(128)}`,
+        },
+      },
+      origin: "upstream_http",
+    });
+
+    expect(classifyBuiltInRoutingError(error)).toMatchObject({ clientParam: null });
+  });
+
   it.each([
     [
       "Unsupported parameter: temperature",

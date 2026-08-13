@@ -119,6 +119,13 @@ function getTopLevelErrorString(payload: Record<string, unknown>, field: string)
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+const CLIENT_PARAM_RE = /^[A-Za-z_][A-Za-z0-9_-]*(?:\[[0-9]+\]|\.[A-Za-z_][A-Za-z0-9_-]*)*$/u;
+
+function sanitizeClientParam(param: string | null): string | null {
+  if (!param || param.length > 128 || !CLIENT_PARAM_RE.test(param)) return null;
+  return param;
+}
+
 function getErrorFields(payload: Record<string, unknown>): {
   code: string | null;
   message: string | null;
@@ -188,7 +195,7 @@ function classifyUncached(error: Error): RoutingErrorClassification | null {
         clientStatusCode: definition.clientStatusCode,
         clientCode: definition.clientCode,
         clientMessage: message ?? undefined,
-        clientParam: param,
+        clientParam: sanitizeClientParam(param),
         ...statusMetadata,
       };
     }
@@ -202,7 +209,7 @@ function classifyUncached(error: Error): RoutingErrorClassification | null {
         clientStatusCode: 400,
         clientCode: parameterSignature.clientCode,
         clientMessage: message ?? undefined,
-        clientParam: param,
+        clientParam: sanitizeClientParam(param),
         ...statusMetadata,
       };
     }
@@ -263,7 +270,7 @@ export function classifyReviewedRuleRoutingError(
       terminalOverrideStatus ?? (rule.routingDisposition === "request_terminal" ? 400 : 503),
     clientCode: rule.category || "invalid_request_error",
     clientMessage: fields.message ?? undefined,
-    clientParam: fields.param,
+    clientParam: sanitizeClientParam(fields.param),
     matchedRuleId: rule.ruleId,
     ...getStatusMetadata(proxyError),
   };

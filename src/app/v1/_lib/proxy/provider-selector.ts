@@ -10,6 +10,7 @@ import {
   getProxyRuntimeSettings,
   isCacheEffectivenessEnabled,
 } from "@/lib/system-settings/proxy-runtime";
+import { getErrorMessageServer } from "@/lib/utils/error-messages";
 import {
   parseProviderGroups,
   resolveBillingProviderGroups,
@@ -22,6 +23,7 @@ import { findAllProviders, findProviderById } from "@/repository/provider";
 import { getGroupCostMultiplier } from "@/repository/provider-groups";
 import type { ProviderChainItem } from "@/types/message";
 import type { Provider } from "@/types/provider";
+import { PUBLIC_ERROR_I18N_KEYS } from "@/types/public-error";
 import { type AffinityLookupResult, getAffinityStore } from "./affinity/affinity-store";
 import { isAffinityRoutingEnabledWith } from "./affinity/config";
 import {
@@ -31,7 +33,6 @@ import {
 } from "./affinity/fingerprint";
 import { isClientAllowedDetailed } from "./client-detector";
 import type { ClientFormat } from "./format-mapper";
-import { getVerboseProviderErrorCached } from "./provider-selector-settings-cache";
 import { ProxyResponses } from "./responses";
 import type { ProxySession } from "./session";
 
@@ -482,16 +483,10 @@ export class ProxyProviderResolver {
     // 循环结束：所有可用供应商都已尝试或无可用供应商
     const status = 503;
 
-    // 获取系统设置中的 verboseProviderError 配置（使用缓存避免频繁查询数据库）
-    const verboseError = await getVerboseProviderErrorCached();
-
-    // 构建详细的错误消息
-    let message = "No available providers";
-    let errorType = "no_available_providers";
+    let diagnosticReason = "no_available_providers";
 
     if (excludedProviders.length > 0) {
-      message = `All providers unavailable (tried ${excludedProviders.length} providers)`;
-      errorType = "all_providers_failed";
+      diagnosticReason = "all_providers_failed";
     } else {
       const selectionContext = session.getLastSelectionContext();
       const filteredProviders = selectionContext?.filteredProviders;
@@ -518,20 +513,17 @@ export class ProxyProviderResolver {
           unavailableCount === totalEnabled
         ) {
           // 全部因为限流
-          message = `All providers rate limited (${rateLimited.length} providers)`;
-          errorType = "rate_limit_exceeded";
+          diagnosticReason = "rate_limit_exceeded";
         } else if (
           circuitOpen.length > 0 &&
           rateLimited.length === 0 &&
           unavailableCount === totalEnabled
         ) {
           // 全部因为熔断
-          message = `All providers circuit breaker open (${circuitOpen.length} providers)`;
-          errorType = "circuit_breaker_open";
+          diagnosticReason = "circuit_breaker_open";
         } else if (rateLimited.length > 0 && circuitOpen.length > 0) {
           // 混合原因
-          message = `All providers unavailable (${rateLimited.length} rate limited, ${circuitOpen.length} circuit open)`;
-          errorType = "mixed_unavailable";
+          diagnosticReason = "mixed_unavailable";
         }
       }
     }
@@ -539,42 +531,23 @@ export class ProxyProviderResolver {
     logger.error("ProviderSelector: No available providers after trying all candidates", {
       excludedProviders,
       totalAttempts: attemptCount,
-      errorType,
+      diagnosticReason,
       filteredProviders: session.getLastSelectionContext()?.filteredProviders,
       cch_session_id: session.sessionId,
     });
 
-    // 根据 verboseProviderError 配置决定返回详细错误还是简洁错误
-    if (!verboseError) {
-      // 简洁模式：返回固定的错误消息，不区分具体原因
-      return ProxyResponses.buildError(status, "No available providers", "no_available_providers");
+    let publicMessage = "The service is temporarily unavailable. Please try again later.";
+    try {
+      const { getLocale } = await import("next-intl/server");
+      publicMessage = await getErrorMessageServer(
+        await getLocale(),
+        PUBLIC_ERROR_I18N_KEYS.service_unavailable
+      );
+    } catch {
+      // Keep the public response generic if locale resolution is unavailable.
     }
 
-    // 详细模式：构建详细的错误响应
-    const details: Record<string, unknown> = {
-      totalAttempts: attemptCount,
-      excludedCount: excludedProviders.length,
-    };
-
-    const filteredProviders = session.getLastSelectionContext()?.filteredProviders;
-    if (filteredProviders) {
-      const clientRestricted = filteredProviders.filter((p) => p.reason === "client_restriction");
-
-      // C-001: 脱敏供应商名称，仅暴露 id 和 reason
-      details.filteredProviders = filteredProviders.map((p) => ({
-        id: p.id,
-        reason: p.reason,
-      }));
-
-      if (clientRestricted.length > 0) {
-        details.clientRestrictedProviders = clientRestricted.map((p) => ({
-          id: p.id,
-          reason: p.reason,
-        }));
-      }
-    }
-
-    return ProxyResponses.buildError(status, message, errorType, details);
+    return ProxyResponses.buildError(status, publicMessage, "no_available_providers");
   }
 
   /**

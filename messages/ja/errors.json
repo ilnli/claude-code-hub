@@ -44,6 +44,8 @@
   "PUBLIC_ERROR_SERVICE_UNAVAILABLE": "サービスは一時的に利用できません。後で再試行するか、CCH Session ID を管理者に伝えてください。",
   "PUBLIC_ERROR_REQUEST_CANCELLED": "リクエストは完了前にキャンセルされました。",
   "PUBLIC_ERROR_INTERNAL": "内部エラーによりリクエストが失敗しました。後で再試行するか、CCH Session ID を管理者に伝えてください。",
+  "CLIENT_VERSION_UPGRADE_REQUIRED": "{client} のバージョンが古いため、サポート対象のバージョンへ更新してください。",
+  "CLIENT_VERSION_TOO_NEW": "{client} のバージョンがサポート範囲を超えています。サポート対象のバージョンを使用してください。",
 
   "INTERNAL_ERROR": "内部サーバーエラー、後でもう一度お試しください",
   "DATABASE_ERROR": "データベースエラー",

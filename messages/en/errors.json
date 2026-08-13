@@ -44,6 +44,8 @@
   "PUBLIC_ERROR_SERVICE_UNAVAILABLE": "The service is temporarily unavailable. Try again later or contact your administrator with the CCH Session ID.",
   "PUBLIC_ERROR_REQUEST_CANCELLED": "The request was cancelled before it completed.",
   "PUBLIC_ERROR_INTERNAL": "The request failed because of an internal error. Try again later or contact your administrator with the CCH Session ID.",
+  "CLIENT_VERSION_UPGRADE_REQUIRED": "{client} is outdated. Upgrade to a supported version to continue.",
+  "CLIENT_VERSION_TOO_NEW": "{client} is newer than the supported range. Use a supported version and try again.",
 
   "INTERNAL_ERROR": "Internal server error, please try again later",
   "DATABASE_ERROR": "Database error",

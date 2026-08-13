@@ -75,7 +75,7 @@ export async function createMyRechargeOrder(c: Context): Promise<Response> {
     return jsonResponse(order, { status: 201 });
   } catch (error) {
     audit(c, auth, "recharge.order.create", null, null, false, error);
-    return rechargeProblem(c, error);
+    return rechargeProblem(c, error, { publicOnly: true });
   }
 }
 
@@ -261,7 +261,7 @@ function parseOrderId(c: Context): number | Response {
     : fromZodError(parsed.error, new URL(c.req.url).pathname);
 }
 
-function rechargeProblem(c: Context, error: unknown): Response {
+function rechargeProblem(c: Context, error: unknown, options?: { publicOnly?: boolean }): Response {
   const code = error instanceof RechargeError ? error.code : "INTERNAL_ERROR";
   const status = code.includes("NOT_FOUND")
     ? 404
@@ -274,7 +274,12 @@ function rechargeProblem(c: Context, error: unknown): Response {
     status,
     instance: new URL(c.req.url).pathname,
     errorCode: `recharge.${code.toLowerCase()}`,
-    detail: error instanceof RechargeError ? error.message : code,
+    detail:
+      options?.publicOnly && code === "ALIPAY_PRECREATE_FAILED"
+        ? code
+        : error instanceof RechargeError
+          ? error.message
+          : code,
   });
 }
 
