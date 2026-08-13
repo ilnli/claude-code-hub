@@ -1,7 +1,7 @@
 "use client";
 
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { ArrowUp, GitBranch, Loader2 } from "lucide-react";
+import { ArrowUp, GitBranch, Loader2, RefreshCw } from "lucide-react";
 import { useTranslations } from "next-intl";
 import {
   type MouseEvent,
@@ -946,10 +946,14 @@ export function VirtualizedLogsTable({
                     {hideProviderColumn ? null : (
                       <div className="flex-[1.5] min-w-[100px] px-1.5">
                         {log.isReplay ? (
-                          <span className="inline-flex items-center gap-1 rounded-md bg-teal-100 dark:bg-teal-950 px-2 py-1 text-xs font-medium text-teal-700 dark:text-teal-300">
-                            <span className="h-1.5 w-1.5 rounded-full bg-teal-600 dark:bg-teal-400" />
+                          <Badge
+                            variant="outline"
+                            className="h-5 gap-1 border-teal-200/80 bg-teal-50/50 px-1.5 py-0 text-[10px] font-medium text-teal-700 shadow-none dark:border-teal-800/70 dark:bg-teal-950/20 dark:text-teal-300"
+                            data-slot="replay-badge"
+                          >
+                            <RefreshCw aria-hidden="true" />
                             {t("logs.table.replay")}
-                          </span>
+                          </Badge>
                         ) : log.blockedBy ? (
                           <span className="inline-flex items-center gap-1 rounded-md bg-orange-100 dark:bg-orange-950 px-2 py-1 text-xs font-medium text-orange-700 dark:text-orange-300">
                             <span className="h-1.5 w-1.5 rounded-full bg-orange-600 dark:bg-orange-400" />
@@ -1034,7 +1038,7 @@ export function VirtualizedLogsTable({
                                         finalProvider={
                                           getFinalProviderName(log.providerChain ?? []) ||
                                           log.providerName ||
-                                          t("logs.details.providerNotReached")
+                                          "-"
                                         }
                                         hasCostBadge={hasCostBadge}
                                         onChainItemClick={(chainIndex) => {

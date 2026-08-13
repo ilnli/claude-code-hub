@@ -15,6 +15,7 @@ let mockError: unknown = null;
 let mockHasNextPage = false;
 let mockIsFetchingNextPage = false;
 const useInfiniteQuerySpy = vi.hoisted(() => vi.fn());
+let mockFinalProviderName = "mock-provider";
 
 vi.mock("next-intl", () => ({
   useTranslations: () => (key: string, values?: Record<string, string>) =>
@@ -69,7 +70,7 @@ vi.mock("@/hooks/use-virtualizer", () => ({
 
 vi.mock("@/lib/utils/provider-chain-formatter", () => ({
   formatProviderSummary: () => "provider summary",
-  getFinalProviderName: () => "mock-provider",
+  getFinalProviderName: () => mockFinalProviderName,
   getRetryCount: () => 0,
   isHedgeRace: () => false,
   isActualRequest: () => true,
@@ -99,8 +100,15 @@ vi.mock("@/components/ui/button", () => ({
 }));
 
 vi.mock("@/components/ui/badge", () => ({
-  Badge: ({ children, className }: React.ComponentProps<"span">) => (
-    <span className={className}>{children}</span>
+  Badge: ({
+    children,
+    className,
+    variant: _variant,
+    ...props
+  }: React.ComponentProps<"span"> & { variant?: string }) => (
+    <span className={className} {...props}>
+      {children}
+    </span>
   ),
 }));
 
@@ -558,6 +566,20 @@ describe("virtualized-logs-table multiplier badge", () => {
 
     expect(html).toContain("logs.table.replay");
     expect(html).not.toContain("logs.table.blocked");
+    expect(html).toContain('data-slot="replay-badge"');
+    expect(html).toContain("lucide-refresh-cw");
+    expect(html).toContain("border-teal-200/80");
+    expect(html).not.toContain("bg-teal-100");
+  });
+
+  test("renders a dash when the request did not reach a provider", () => {
+    mockFinalProviderName = "";
+
+    const html = renderTableWithLog({ providerName: null, providerChain: [] });
+
+    mockFinalProviderName = "mock-provider";
+    expect(html).toContain('<div class="font-medium text-xs">-</div>');
+    expect(html).not.toContain("logs.details.providerNotReached");
   });
 
   test("hides provider column when hiddenColumns includes provider", () => {

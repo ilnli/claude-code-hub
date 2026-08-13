@@ -290,7 +290,6 @@
       },
       "errorMessage": "Error Message",
       "publicErrorSummary": "User-visible error",
-      "providerNotReached": "Not reached upstream",
       "fake200ForwardedNotice": "Note: For streaming requests, this failure may be detected only after the stream ends; the response content may already have been forwarded to the client.",
       "fake200DetectedReason": "Detected reason: {reason}",
       "fake200RetryTooltipLabel": "Why no server retry?",
