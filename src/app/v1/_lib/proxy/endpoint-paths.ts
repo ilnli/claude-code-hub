@@ -8,6 +8,8 @@ export const V1_ENDPOINT_PATHS = {
   CHAT_COMPLETIONS: "/v1/chat/completions",
   EMBEDDINGS: "/v1/embeddings",
   MODELS: "/v1/models",
+  SUB2API_PREFIX: "/v1/sub2api",
+  SUB2API_BILLING: "/v1/sub2api/billing",
 } as const;
 
 export const STANDARD_ENDPOINT_PATHS = [
@@ -55,6 +57,25 @@ export function isCountTokensEndpointPath(pathname: string): boolean {
 
 export function isResponseCompactEndpointPath(pathname: string): boolean {
   return normalizeEndpointPath(pathname) === V1_ENDPOINT_PATHS.RESPONSES_COMPACT;
+}
+
+/**
+ * Internal upstream-protocol endpoints must never be exposed through the public proxy.
+ * The billing probe calls this namespace directly on the configured upstream provider.
+ */
+export function isReservedInternalEndpointPath(pathname: string): boolean {
+  const normalizedPaths = [normalizeEndpointPath(pathname)];
+  try {
+    normalizedPaths.push(normalizeEndpointPath(decodeURIComponent(pathname)));
+  } catch {
+    // Keep the raw normalized path when a malformed escape sequence is supplied.
+  }
+
+  return normalizedPaths.some(
+    (normalizedPath) =>
+      normalizedPath === V1_ENDPOINT_PATHS.SUB2API_PREFIX ||
+      normalizedPath.startsWith(`${V1_ENDPOINT_PATHS.SUB2API_PREFIX}/`)
+  );
 }
 
 export function toV1RoutePath(pathname: string): string {

@@ -186,4 +186,24 @@ describe("handleProxyRequest public error behavior", () => {
     expect(boundary.runGuards).not.toHaveBeenCalled();
     expect(boundary.decrementConcurrentCount).not.toHaveBeenCalled();
   });
+
+  test.each(["/v1/sub2api", "/v1/sub2api/billing", "/v1/sub2api/future-internal-endpoint"])(
+    "does not forward reserved upstream endpoint %s",
+    async (path) => {
+      const request = new Request(`http://localhost${path}`, { method: "GET" });
+
+      const response = await handleProxyRequest(new Context(request));
+
+      expect(response.status).toBe(404);
+      expect(await response.json()).toEqual({
+        error: {
+          message: "Resource not found",
+          type: "not_found_error",
+          code: "not_found_error",
+        },
+      });
+      expect(boundary.runGuards).not.toHaveBeenCalled();
+      expect(boundary.send).not.toHaveBeenCalled();
+    }
+  );
 });

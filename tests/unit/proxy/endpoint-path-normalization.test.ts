@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import { isRawPassthroughEndpointPath } from "@/app/v1/_lib/proxy/endpoint-policy";
 import {
   isCountTokensEndpointPath,
+  isReservedInternalEndpointPath,
   isResponseCompactEndpointPath,
 } from "@/app/v1/_lib/proxy/endpoint-paths";
 import { ProxySession } from "@/app/v1/_lib/proxy/session";
@@ -51,4 +52,24 @@ describe("endpoint path normalization", () => {
   test("session count_tokens detection handles null endpoint", () => {
     expect(isCountTokensRequestWithEndpoint(null)).toBe(false);
   });
+
+  test.each([
+    "/v1/sub2api",
+    "/v1/sub2api/",
+    "/v1/sub2api/billing",
+    "/v1/sub2api/billing/",
+    "/V1/SUB2API/BILLING",
+    "/v1/sub2api/billing?probe=1",
+    "/v1/sub2api%2Fbilling",
+    "/v1/sub2api/future-internal-endpoint",
+  ])("reserved upstream endpoint is blocked for proxy requests: %s", (pathname) => {
+    expect(isReservedInternalEndpointPath(pathname)).toBe(true);
+  });
+
+  test.each(["/v1/messages", "/v1/sub2api-other", "/v1/sub2apix/billing"])(
+    "unrelated endpoint is not treated as reserved upstream: %s",
+    (pathname) => {
+      expect(isReservedInternalEndpointPath(pathname)).toBe(false);
+    }
+  );
 });

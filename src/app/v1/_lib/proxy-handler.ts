@@ -7,6 +7,7 @@ import { ProxyStatusTracker } from "@/lib/proxy-status-tracker";
 import { SessionManager } from "@/lib/session-manager";
 import { SessionTracker } from "@/lib/session-tracker";
 import { ERROR_CODES, getErrorMessageServer } from "@/lib/utils/error-messages";
+import { isReservedInternalEndpointPath } from "./proxy/endpoint-paths";
 import { ProxyErrorHandler } from "./proxy/error-handler";
 import {
   attachSessionIdToErrorMessage,
@@ -58,6 +59,11 @@ export async function handleProxyRequest(c: Context): Promise<Response> {
     return identity.identity;
   };
   try {
+    const requestUrl = typeof c.req?.url === "string" ? new URL(c.req.url) : null;
+    if (requestUrl && isReservedInternalEndpointPath(requestUrl.pathname)) {
+      return ProxyResponses.buildError(404, "Resource not found", "not_found_error");
+    }
+
     session = await ProxySession.fromContext(c);
     try {
       cachedSystemSettings = await getCachedSystemSettings();
