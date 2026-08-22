@@ -28,6 +28,7 @@ export interface ProxyRuntimeSettings {
 
 // 最近一次成功读取的快照；同步热路径消费，异步读取与开机预热负责保鲜。
 let lastKnown: ProxyRuntimeSettings | null = null;
+let highConcurrencyModeEnabled = false;
 
 function envReplayDefault(): boolean {
   try {
@@ -80,6 +81,7 @@ export async function getProxyRuntimeSettings(): Promise<ProxyRuntimeSettings> {
       cacheEffectivenessEnabled:
         settings.cacheEffectivenessEnabled ?? envCacheEffectivenessDefault(),
     };
+    highConcurrencyModeEnabled = settings.enableHighConcurrencyMode === true;
     return lastKnown;
   } catch {
     // getCachedSystemSettings 自身已 fail-safe；此处兜底其意外异常
@@ -97,4 +99,9 @@ export function getCachedProxyRuntimeSettings(): ProxyRuntimeSettings | null {
 /** F3b 有效开关（同步）：系统设置覆写优先，无快照时跟随 env。 */
 export function isCacheEffectivenessEnabled(): boolean {
   return lastKnown?.cacheEffectivenessEnabled ?? envCacheEffectivenessDefault();
+}
+
+/** Shrinks long-lived Redis projections while high-concurrency mode is active. */
+export function resolveRedisRetentionTtlSeconds(defaultTtlSeconds: number): number {
+  return highConcurrencyModeEnabled ? Math.min(defaultTtlSeconds, 24 * 60 * 60) : defaultTtlSeconds;
 }
