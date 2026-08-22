@@ -122,6 +122,28 @@ describe("syncProviderUpstreamRate", () => {
     expect(restoreProviderCostMultiplierMock).not.toHaveBeenCalled();
   });
 
+  it("preserves Cloudflare edge diagnostics in the sync outcome", async () => {
+    probeUpstreamBillingMock.mockResolvedValue({
+      ok: false,
+      reason: "edge_blocked",
+      error: "Cloudflare edge blocked or challenged the probe (HTTP 503, CF-Ray ray-sync)",
+      status: 503,
+      edgeProvider: "cloudflare",
+      requestId: "ray-sync",
+    });
+
+    const outcome = await syncProviderUpstreamRate(makeProvider());
+
+    expect(outcome).toMatchObject({
+      status: "failed",
+      reason: "edge_blocked",
+      httpStatus: 503,
+      edgeProvider: "cloudflare",
+      requestId: "ray-sync",
+      wrote: false,
+    });
+  });
+
   it("keeps the last synced rate for two failures and restores default on the third", async () => {
     probeUpstreamBillingMock.mockResolvedValue({
       ok: false,

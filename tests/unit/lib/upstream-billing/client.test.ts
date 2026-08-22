@@ -50,12 +50,21 @@ function makeResponse(init: {
   ok: boolean;
   status: number;
   body?: unknown;
+  headers?: Record<string, string>;
   stream?: Pick<ReadableStream, "cancel">;
 }): Response {
+  const bodyText =
+    init.body === undefined
+      ? ""
+      : typeof init.body === "string"
+        ? init.body
+        : JSON.stringify(init.body);
   return {
     ok: init.ok,
     status: init.status,
     json: async () => init.body,
+    text: async () => bodyText,
+    headers: new Headers(init.headers),
     body: init.stream ?? null,
   } as Response;
 }
@@ -155,6 +164,32 @@ describe("probeUpstreamBilling", () => {
     });
   });
 
+  it("preserves Cloudflare request metadata when an API response is still classified as auth", async () => {
+    fetchMock.mockResolvedValue(
+      makeResponse({
+        ok: false,
+        status: 401,
+        body: { message: "invalid token" },
+        headers: {
+          server: "cloudflare",
+          "content-type": "application/json",
+          "cf-ray": "ray-auth",
+        },
+      })
+    );
+
+    const result = await probeUpstreamBilling(makeProvider());
+
+    expect(result).toMatchObject({
+      ok: false,
+      reason: "auth",
+      status: 401,
+      edgeProvider: "cloudflare",
+      requestId: "ray-auth",
+      error: "invalid token",
+    });
+  });
+
   it("marks other non-2xx as http failure", async () => {
     fetchMock.mockResolvedValue(makeResponse({ ok: false, status: 500 }));
     expect(await probeUpstreamBilling(makeProvider())).toMatchObject({
@@ -164,14 +199,44 @@ describe("probeUpstreamBilling", () => {
     });
   });
 
-  it("cancels the response body for non-2xx responses to release the connection", async () => {
-    const cancel = vi.fn().mockResolvedValue(undefined);
-    fetchMock.mockResolvedValue(makeResponse({ ok: false, status: 500, stream: { cancel } }));
+  it("consumes the response body for non-2xx responses to release the connection", async () => {
+    const text = vi.fn().mockResolvedValue("upstream failed");
+    fetchMock.mockResolvedValue({
+      ...makeResponse({ ok: false, status: 500 }),
+      text,
+    });
 
     const result = await probeUpstreamBilling(makeProvider());
 
     expect(result).toMatchObject({ ok: false, reason: "http", status: 500 });
-    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(text).toHaveBeenCalledTimes(1);
+  });
+
+  it("classifies a Cloudflare challenge as edge_blocked and preserves CF-Ray", async () => {
+    fetchMock.mockResolvedValue(
+      makeResponse({
+        ok: true,
+        status: 200,
+        body: "<!doctype html><title>Just a moment...</title><script src='/cdn-cgi/challenge-platform/x'></script>",
+        headers: {
+          server: "cloudflare",
+          "content-type": "text/html",
+          "cf-mitigated": "challenge",
+          "cf-ray": "abc123-SJC",
+        },
+      })
+    );
+
+    const result = await probeUpstreamBilling(makeProvider());
+
+    expect(result).toMatchObject({
+      ok: false,
+      reason: "edge_blocked",
+      status: 200,
+      edgeProvider: "cloudflare",
+      requestId: "abc123-SJC",
+      error: expect.stringContaining("Cloudflare edge blocked or challenged"),
+    });
   });
 
   it("rejects responses missing resolved_rate_multiplier", async () => {

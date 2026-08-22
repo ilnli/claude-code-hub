@@ -4,6 +4,7 @@ import { fetchNewapiTokenGroup } from "@/lib/upstream-billing/newapi-client";
 import { resolveNewapiProbeRequestContext } from "@/lib/upstream-billing/newapi-probe-context";
 import { getNewapiRatioTable } from "@/lib/upstream-billing/newapi-table-cache";
 import { applyMarkup, isValidUpstreamRate } from "@/lib/upstream-billing/rate-resolver";
+import type { UpstreamEdgeProvider } from "@/lib/upstream-billing/response-diagnostics";
 import { restoreProviderCostMultiplier, updateUpstreamBillingProbeResult } from "@/repository";
 import type { Provider } from "@/types/provider";
 
@@ -35,6 +36,8 @@ export type UpstreamRateSyncOutcome =
       reason: string;
       error?: string;
       httpStatus?: number;
+      edgeProvider?: UpstreamEdgeProvider;
+      requestId?: string;
       wrote: boolean;
       fallbackApplied?: boolean;
       fallbackRate?: number;
@@ -115,6 +118,8 @@ async function syncProviderUpstreamRateSub2api(
     reason: result.reason,
     error: result.error,
     httpStatus: result.status,
+    edgeProvider: result.edgeProvider,
+    requestId: result.requestId,
   });
 }
 
@@ -125,13 +130,21 @@ async function syncProviderUpstreamRateSub2api(
 async function buildFailureOutcome(
   provider: Provider,
   options: UpstreamRateSyncOptions,
-  failure: { reason: string; error?: string; httpStatus?: number }
+  failure: {
+    reason: string;
+    error?: string;
+    httpStatus?: number;
+    edgeProvider?: UpstreamEdgeProvider;
+    requestId?: string;
+  }
 ): Promise<UpstreamRateSyncOutcome> {
   const base = {
     status: "failed",
     reason: failure.reason,
     error: failure.error,
     httpStatus: failure.httpStatus,
+    edgeProvider: failure.edgeProvider,
+    requestId: failure.requestId,
     wrote: false,
   } as const;
 
@@ -209,6 +222,9 @@ async function syncProviderUpstreamRateNewApi(
         providerId: provider.id,
         reason: groupResult.reason,
         error: groupResult.error,
+        httpStatus: groupResult.status,
+        edgeProvider: groupResult.edgeProvider,
+        requestId: groupResult.requestId,
       });
     }
   } catch (error) {
@@ -235,6 +251,16 @@ async function syncProviderUpstreamRateNewApi(
         context,
         authenticated: true,
       });
+      if (!patTable.ok) {
+        logger.warn("[UpstreamBilling] newapi PAT pricing probe failed, using anonymous pricing", {
+          providerId: provider.id,
+          reason: patTable.reason,
+          error: patTable.error,
+          httpStatus: patTable.status,
+          edgeProvider: patTable.edgeProvider,
+          requestId: patTable.requestId,
+        });
+      }
     } catch (error) {
       logger.warn("[UpstreamBilling] newapi PAT pricing probe failed, using anonymous pricing", {
         providerId: provider.id,
@@ -274,8 +300,14 @@ async function syncProviderUpstreamRateNewApi(
   }
 
   if (rate == null) {
-    if (anonymousTable && !anonymousTable.ok && !patTable?.ok) {
-      if (anonymousTable.reason === "unsupported") {
+    const failedTable =
+      patTable && !patTable.ok && patTable.reason === "edge_blocked"
+        ? patTable
+        : anonymousTable && !anonymousTable.ok
+          ? anonymousTable
+          : null;
+    if (failedTable && !patTable?.ok) {
+      if (failedTable.reason === "unsupported") {
         // pricing 模块关闭/非 new-api 站点：与 sub2api unsupported 同语义，立即还原默认倍率
         if (provider.rateDefaultMultiplier != null) {
           const fallbackRate = applyMarkup(
@@ -298,9 +330,11 @@ async function syncProviderUpstreamRateNewApi(
         return { status: "unsupported", wrote: false };
       }
       return buildFailureOutcome(provider, options, {
-        reason: anonymousTable.reason,
-        error: anonymousTable.error,
-        httpStatus: anonymousTable.status,
+        reason: failedTable.reason,
+        error: failedTable.error,
+        httpStatus: failedTable.status,
+        edgeProvider: failedTable.edgeProvider,
+        requestId: failedTable.requestId,
       });
     }
 

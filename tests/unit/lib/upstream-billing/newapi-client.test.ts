@@ -38,6 +38,7 @@ function makeResponse(init: {
   ok: boolean;
   status: number;
   body?: unknown;
+  headers?: Record<string, string>;
   stream?: Pick<ReadableStream, "cancel">;
 }): Response {
   const bodyText =
@@ -51,6 +52,7 @@ function makeResponse(init: {
     status: init.status,
     json: async () => init.body,
     text: async () => bodyText,
+    headers: new Headers(init.headers),
     body: init.stream ?? null,
   } as Response;
 }
@@ -103,6 +105,32 @@ describe("fetchNewapiRatioTable", () => {
     fetchMock.mockResolvedValue(makeResponse({ ok: false, status: 403 }));
     const result = await fetchNewapiRatioTable(makeProvider());
     expect(result).toMatchObject({ ok: false, reason: "unsupported", status: 403 });
+  });
+
+  it("Cloudflare 拦截页保留边缘诊断信息而不是误报 auth", async () => {
+    fetchMock.mockResolvedValue(
+      makeResponse({
+        ok: false,
+        status: 503,
+        body: "<!doctype html><h1>Sorry, you have been blocked</h1><p>Cloudflare Ray ID: ray-789</p>",
+        headers: {
+          server: "cloudflare",
+          "content-type": "text/html; charset=UTF-8",
+          "cf-ray": "ray-789",
+        },
+      })
+    );
+
+    const result = await fetchNewapiRatioTable(makeProvider());
+
+    expect(result).toMatchObject({
+      ok: false,
+      reason: "edge_blocked",
+      status: 503,
+      edgeProvider: "cloudflare",
+      requestId: "ray-789",
+      error: expect.stringContaining("Cloudflare edge blocked or challenged"),
+    });
   });
 
   it("PAT 模式使用站点目标、站点代理、Bearer PAT 和用户 UID", async () => {

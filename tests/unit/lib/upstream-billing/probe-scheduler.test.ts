@@ -72,6 +72,7 @@ import {
   stopUpstreamBillingProbeScheduler,
   syncAndTrackProviderUpstreamRate,
 } from "@/lib/upstream-billing/probe-scheduler";
+import { logger } from "@/lib/logger";
 
 /** 探测节奏断言的时间基准；全局设置固定为 30 分钟间隔 */
 const BASE_NOW = new Date("2026-08-02T12:00:00.000Z");
@@ -153,6 +154,7 @@ describe("upstream-billing probe-scheduler", () => {
     getSettingsMock = vi.fn().mockResolvedValue({ enabled: true, intervalMinutes: 30 });
     publishInvalidationMock = vi.fn().mockResolvedValue(undefined);
     sendFailureAlertMock = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(logger.warn).mockClear();
 
     // 清空 globalThis 上的调度器内存态
     const state = globalThis as Record<string, unknown>;
@@ -237,6 +239,32 @@ describe("upstream-billing probe-scheduler", () => {
     setClockMinutes(INTERVAL_MINUTES * 2);
     await runNextCycle();
     expect(probeUpstreamBillingMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("logs structured Cloudflare diagnostics for manual and scheduled probes", async () => {
+    const provider = makeProvider({ id: 61, name: "edge-provider" });
+    probeUpstreamBillingMock.mockResolvedValue({
+      ok: false,
+      reason: "edge_blocked",
+      error: "Cloudflare edge blocked or challenged the probe",
+      status: 503,
+      edgeProvider: "cloudflare",
+      requestId: "ray-log",
+    });
+
+    await syncAndTrackProviderUpstreamRate(provider);
+
+    expect(logger.warn).toHaveBeenCalledWith("[UpstreamBillingProbe] probe failed", {
+      providerId: 61,
+      providerName: "edge-provider",
+      probeType: "sub2api",
+      failureCount: 1,
+      reason: "edge_blocked",
+      error: "Cloudflare edge blocked or challenged the probe",
+      httpStatus: 503,
+      edgeProvider: "cloudflare",
+      requestId: "ray-log",
+    });
   });
 
   it("restores default rate when upstream is unsupported", async () => {

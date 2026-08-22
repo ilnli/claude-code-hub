@@ -425,7 +425,13 @@ function ProviderRichListItemInner({
           });
         } else {
           toast.error(tList("syncRateFailed"), {
-            description: data?.error || tList("unknownError"),
+            description:
+              data?.reason === "edge_blocked"
+                ? tList("syncRateEdgeBlockedDesc", {
+                    status: data.httpStatus ?? "-",
+                    requestId: data.requestId ?? "-",
+                  })
+                : data?.error || tList("unknownError"),
           });
         }
         doInvalidate();

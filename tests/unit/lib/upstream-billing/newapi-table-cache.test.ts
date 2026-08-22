@@ -32,10 +32,13 @@ function makeProvider(overrides: Partial<Provider> = {}): Provider {
 }
 
 function makePricingResponse(groupRatio: Record<string, number>): Response {
+  const responseBody = { success: true, data: [], group_ratio: groupRatio };
   return {
     ok: true,
     status: 200,
-    json: async () => ({ success: true, data: [], group_ratio: groupRatio }),
+    json: async () => responseBody,
+    text: async () => JSON.stringify(responseBody),
+    headers: new Headers({ "content-type": "application/json" }),
     body: null,
   } as unknown as Response;
 }

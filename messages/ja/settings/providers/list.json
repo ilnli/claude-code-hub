@@ -50,5 +50,6 @@
   "syncRateSuccessDesc": "{name}: アップストリーム倍率 {upstreamRate}、有効倍率 {finalRate}",
   "syncRateUnsupported": "アップストリームは倍率検出に対応していません",
   "syncRateUnsupportedDesc": "{name} のアップストリームは sub2api 検出プロトコルを実装していないため、デフォルト倍率にフォールバックしました",
+  "syncRateEdgeBlockedDesc": "アップストリームリクエストが Cloudflare/WAF によってブロックまたはチャレンジされました（HTTP {status}、CF-Ray {requestId}）。サイト管理者に CCH サーバーの送信元 IP を許可リストへ追加するよう依頼してください。",
   "syncRateFailed": "アップストリーム倍率の同期に失敗しました"
 }

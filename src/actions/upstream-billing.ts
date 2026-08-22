@@ -31,7 +31,11 @@ export interface UpstreamRateSyncResult {
   status: UpstreamRateSyncOutcome["status"] | "skipped" | "not_found";
   upstreamRate?: number;
   finalRate?: number;
+  reason?: string;
   error?: string;
+  httpStatus?: number;
+  edgeProvider?: string;
+  requestId?: string;
 }
 
 async function requireAdmin(): Promise<boolean> {
@@ -61,7 +65,11 @@ async function syncOne(
         outcome.status === "synced" || outcome.status === "unsupported_restored"
           ? outcome.finalRate
           : undefined,
+      reason: outcome.status === "failed" ? outcome.reason : undefined,
       error: outcome.status === "failed" ? outcome.error || outcome.reason : undefined,
+      httpStatus: outcome.status === "failed" ? outcome.httpStatus : undefined,
+      edgeProvider: outcome.status === "failed" ? outcome.edgeProvider : undefined,
+      requestId: outcome.status === "failed" ? outcome.requestId : undefined,
     },
     wrote: outcome.wrote,
   };
@@ -248,6 +256,8 @@ export async function fetchNewapiUpstreamGroups(data: {
         reason: result.reason,
         ...(result.status != null ? { status: result.status } : {}),
         ...(result.error ? { upstreamMessage: result.error } : {}),
+        ...(result.edgeProvider ? { edgeProvider: result.edgeProvider } : {}),
+        ...(result.requestId ? { requestId: result.requestId } : {}),
       });
       if (result.reason === "unsupported") {
         return {

@@ -163,6 +163,32 @@ describe("syncProviderUpstreamRateNow", () => {
     expect(res.data).toMatchObject({ status: "failed", error: "boom" });
     expect(publishInvalidationMock).not.toHaveBeenCalled();
   });
+
+  it("returns structured Cloudflare diagnostics for manual sync failures", async () => {
+    findProviderByIdMock.mockResolvedValue(makeProvider());
+    syncAndTrackProviderUpstreamRateMock.mockResolvedValue({
+      status: "failed",
+      reason: "edge_blocked",
+      error: "Cloudflare edge blocked or challenged the probe",
+      httpStatus: 503,
+      edgeProvider: "cloudflare",
+      requestId: "ray-action",
+      wrote: false,
+    });
+
+    const res = await syncProviderUpstreamRateNow(1);
+
+    expect(res).toMatchObject({
+      ok: true,
+      data: {
+        status: "failed",
+        reason: "edge_blocked",
+        httpStatus: 503,
+        edgeProvider: "cloudflare",
+        requestId: "ray-action",
+      },
+    });
+  });
 });
 
 describe("syncProvidersUpstreamRateBatch", () => {

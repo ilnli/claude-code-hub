@@ -50,5 +50,6 @@
   "syncRateSuccessDesc": "{name}: upstream rate {upstreamRate}, effective rate {finalRate}",
   "syncRateUnsupported": "Upstream does not support rate probing",
   "syncRateUnsupportedDesc": "The upstream of {name} does not implement the sub2api probing protocol; reverted to the default rate",
+  "syncRateEdgeBlockedDesc": "Cloudflare/WAF blocked or challenged the upstream request (HTTP {status}, CF-Ray {requestId}). Ask the site operator to allowlist the CCH server's egress IP.",
   "syncRateFailed": "Failed to sync upstream rate"
 }

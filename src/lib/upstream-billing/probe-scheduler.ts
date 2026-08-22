@@ -265,6 +265,21 @@ export async function syncAndTrackProviderUpstreamRate(
   }
 
   const failureCount = noteUpstreamRateSyncOutcome(provider.id, outcome);
+  if (outcome.status === "failed" && !isConcurrentProviderChange(outcome)) {
+    logger.warn("[UpstreamBillingProbe] probe failed", {
+      providerId: provider.id,
+      providerName: provider.name,
+      probeType: provider.rateUpstreamType,
+      failureCount,
+      reason: outcome.reason,
+      ...(outcome.error ? { error: outcome.error } : {}),
+      ...(outcome.httpStatus != null ? { httpStatus: outcome.httpStatus } : {}),
+      ...(outcome.edgeProvider ? { edgeProvider: outcome.edgeProvider } : {}),
+      ...(outcome.requestId ? { requestId: outcome.requestId } : {}),
+      ...(outcome.fallbackApplied != null ? { fallbackApplied: outcome.fallbackApplied } : {}),
+      ...(outcome.fallbackRate != null ? { fallbackRate: outcome.fallbackRate } : {}),
+    });
+  }
   if (
     outcome.status === "failed" &&
     outcome.fallbackCause === "failure_threshold" &&
@@ -303,11 +318,14 @@ async function probeOneProvider(provider: Provider): Promise<boolean> {
         fallbackRate: outcome.finalRate,
       });
       break;
-    default:
-      logger.warn("[UpstreamBillingProbe] probe failed", {
+    case "unsupported":
+      logger.warn("[UpstreamBillingProbe] upstream probe unsupported", {
         providerId: provider.id,
         status: outcome.status,
       });
+      break;
+    case "failed":
+      // syncAndTrackProviderUpstreamRate already logged the structured failure details.
       break;
   }
 

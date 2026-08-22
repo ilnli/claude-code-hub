@@ -50,5 +50,6 @@
   "syncRateSuccessDesc": "{name}: множитель апстрима {upstreamRate}, действующий множитель {finalRate}",
   "syncRateUnsupported": "Апстрим не поддерживает определение множителя",
   "syncRateUnsupportedDesc": "Апстрим провайдера {name} не реализует протокол определения sub2api, выполнен откат к множителю по умолчанию",
+  "syncRateEdgeBlockedDesc": "Cloudflare/WAF заблокировал или проверяет запрос к апстриму (HTTP {status}, CF-Ray {requestId}). Попросите администратора сайта добавить исходящий IP-адрес сервера CCH в белый список.",
   "syncRateFailed": "Не удалось синхронизировать множитель апстрима"
 }

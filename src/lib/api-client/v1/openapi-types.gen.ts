@@ -8116,8 +8116,16 @@ export interface operations {
                         upstreamRate?: number;
                         /** @description Effective cost multiplier after markup (status=synced/unsupported_restored). */
                         finalRate?: number;
+                        /** @description Stable failure reason code (status=failed only). */
+                        reason?: string;
                         /** @description Failure detail (status=failed only). */
                         error?: string;
+                        /** @description Upstream HTTP status (status=failed only). */
+                        httpStatus?: number;
+                        /** @description Detected edge security provider, such as cloudflare (status=failed only). */
+                        edgeProvider?: string;
+                        /** @description Safe upstream request identifier, such as CF-Ray (status=failed only). */
+                        requestId?: string;
                     };
                 };
             };
@@ -8322,8 +8330,16 @@ export interface operations {
                             upstreamRate?: number;
                             /** @description Effective cost multiplier after markup (status=synced/unsupported_restored). */
                             finalRate?: number;
+                            /** @description Stable failure reason code (status=failed only). */
+                            reason?: string;
                             /** @description Failure detail (status=failed only). */
                             error?: string;
+                            /** @description Upstream HTTP status (status=failed only). */
+                            httpStatus?: number;
+                            /** @description Detected edge security provider, such as cloudflare (status=failed only). */
+                            edgeProvider?: string;
+                            /** @description Safe upstream request identifier, such as CF-Ray (status=failed only). */
+                            requestId?: string;
                         }[];
                     };
                 };

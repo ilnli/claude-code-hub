@@ -50,5 +50,6 @@
   "syncRateSuccessDesc": "{name}：上游倍率 {upstreamRate}，生效倍率 {finalRate}",
   "syncRateUnsupported": "上游不支援倍率探測",
   "syncRateUnsupportedDesc": "{name} 的上游未實作 sub2api 探測協定，已回退為預設倍率",
+  "syncRateEdgeBlockedDesc": "上游請求遭 Cloudflare/WAF 攔截或質詢（HTTP {status}，CF-Ray {requestId}）。請聯絡站長將 CCH 伺服器出口 IP 加入白名單。",
   "syncRateFailed": "同步上游倍率失敗"
 }

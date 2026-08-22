@@ -245,7 +245,17 @@ export const ProviderUpstreamRateSyncResultSchema = z.object({
     .number()
     .optional()
     .describe("Effective cost multiplier after markup (status=synced/unsupported_restored)."),
+  reason: z.string().optional().describe("Stable failure reason code (status=failed only)."),
   error: z.string().optional().describe("Failure detail (status=failed only)."),
+  httpStatus: z.number().int().optional().describe("Upstream HTTP status (status=failed only)."),
+  edgeProvider: z
+    .string()
+    .optional()
+    .describe("Detected edge security provider, such as cloudflare (status=failed only)."),
+  requestId: z
+    .string()
+    .optional()
+    .describe("Safe upstream request identifier, such as CF-Ray (status=failed only)."),
 });
 
 export const ProviderUpstreamRateBatchSyncResponseSchema = z.object({

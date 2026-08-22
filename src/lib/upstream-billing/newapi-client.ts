@@ -2,6 +2,10 @@ import { z } from "zod";
 import { logger } from "@/lib/logger";
 import { createProxyAgentForProvider, type ProviderProxyConfig } from "@/lib/proxy-agent";
 import { buildNewapiBaseUrl } from "@/lib/upstream-billing/newapi-url";
+import {
+  inspectUpstreamResponse,
+  type UpstreamEdgeProvider,
+} from "@/lib/upstream-billing/response-diagnostics";
 import type { Provider } from "@/types/provider";
 
 /**
@@ -21,8 +25,6 @@ import type { Provider } from "@/types/provider";
  */
 
 const NEWAPI_PROBE_TIMEOUT_MS = 10_000;
-
-const MAX_UPSTREAM_ERROR_LENGTH = 500;
 
 // new-api model/log.go：消费日志类型值（其一注释明确 "don't use iota, avoid change"）
 const NEWAPI_LOG_TYPE_CONSUME = 2;
@@ -75,6 +77,7 @@ const newapiErrorEnvelopeSchema = z
 export type NewapiProbeFailureReason =
   | "unsupported" // 端点不存在（404）或 pricing 模块关闭/需登录（403）
   | "auth" // Provider sk 或 Dashboard PAT 被拒绝（HTTP 401/403）
+  | "edge_blocked" // Cloudflare/WAF 返回拦截页或 challenge
   | "rate_limited" // 触发 CriticalRateLimit（HTTP 429）
   | "http" // 其他非 2xx
   | "invalid" // 响应不是合法 JSON 或缺少必需字段
@@ -83,11 +86,25 @@ export type NewapiProbeFailureReason =
 
 export type NewapiRatioTableResult =
   | { ok: true; table: Record<string, number> }
-  | { ok: false; reason: NewapiProbeFailureReason; error?: string; status?: number };
+  | {
+      ok: false;
+      reason: NewapiProbeFailureReason;
+      error?: string;
+      status?: number;
+      edgeProvider?: UpstreamEdgeProvider;
+      requestId?: string;
+    };
 
 export type NewapiTokenGroupResult =
   | { ok: true; group: string | null }
-  | { ok: false; reason: NewapiProbeFailureReason; error?: string; status?: number };
+  | {
+      ok: false;
+      reason: NewapiProbeFailureReason;
+      error?: string;
+      status?: number;
+      edgeProvider?: UpstreamEdgeProvider;
+      requestId?: string;
+    };
 
 export type NewapiPatTestStage = "identity" | "pricing";
 
@@ -112,6 +129,8 @@ export type NewapiPatTestResult =
       reason: NewapiProbeFailureReason;
       error?: string;
       status?: number;
+      edgeProvider?: UpstreamEdgeProvider;
+      requestId?: string;
     };
 
 interface NewapiRatioTableOptions {
@@ -149,62 +168,25 @@ async function releaseResponseBody(response: Response): Promise<void> {
   }
 }
 
-function sanitizeUpstreamError(
-  value: string,
-  sensitiveValues: Array<string | null | undefined> = []
-): string | undefined {
-  let sanitized = Array.from(value, (character) => {
-    const code = character.charCodeAt(0);
-    return code < 32 || code === 127 ? " " : character;
-  })
-    .join("")
-    .replace(/\s+/g, " ")
-    .trim();
-  if (!sanitized) return undefined;
-
-  for (const sensitiveValue of sensitiveValues) {
-    const secret = sensitiveValue?.trim();
-    if (secret) sanitized = sanitized.replaceAll(secret, "[REDACTED]");
-  }
-  return sanitized.slice(0, MAX_UPSTREAM_ERROR_LENGTH);
+function edgeBlockedFailure(
+  status: number,
+  diagnostics: Awaited<ReturnType<typeof inspectUpstreamResponse>>
+) {
+  return {
+    ok: false as const,
+    reason: "edge_blocked" as const,
+    status,
+    error: diagnostics.error,
+    ...(diagnostics.edgeProvider ? { edgeProvider: diagnostics.edgeProvider } : {}),
+    ...(diagnostics.requestId ? { requestId: diagnostics.requestId } : {}),
+  };
 }
 
-function extractUpstreamError(
-  body: unknown,
-  sensitiveValues: Array<string | null | undefined> = []
-): string | undefined {
-  if (typeof body === "string") return sanitizeUpstreamError(body, sensitiveValues);
-
-  const parsed = newapiErrorEnvelopeSchema.safeParse(body);
-  if (!parsed.success) return undefined;
-
-  const nestedError =
-    typeof parsed.data.error === "string" ? parsed.data.error : parsed.data.error?.message;
-  const message = parsed.data.message || nestedError;
-  const detail =
-    parsed.data.code && message ? `${parsed.data.code}: ${message}` : parsed.data.code || message;
-  return detail ? sanitizeUpstreamError(detail, sensitiveValues) : undefined;
-}
-
-async function readUpstreamError(
-  response: Response,
-  sensitiveValues: Array<string | null | undefined> = []
-): Promise<string | undefined> {
-  try {
-    const bodyText = await response.text();
-    if (!bodyText) return undefined;
-    try {
-      return (
-        extractUpstreamError(JSON.parse(bodyText), sensitiveValues) ??
-        sanitizeUpstreamError(bodyText, sensitiveValues)
-      );
-    } catch {
-      return sanitizeUpstreamError(bodyText, sensitiveValues);
-    }
-  } catch {
-    await releaseResponseBody(response);
-    return undefined;
-  }
+function edgeMetadata(diagnostics: Awaited<ReturnType<typeof inspectUpstreamResponse>>) {
+  return {
+    ...(diagnostics.edgeProvider ? { edgeProvider: diagnostics.edgeProvider } : {}),
+    ...(diagnostics.requestId ? { requestId: diagnostics.requestId } : {}),
+  };
 }
 
 interface UndiciFetchOptions extends RequestInit {
@@ -328,36 +310,67 @@ export async function fetchNewapiRatioTable(
     return fetched;
   }
   const { response } = fetched;
+  const diagnostics = await inspectUpstreamResponse(response, [dashboardPat]);
+
+  if (diagnostics.edgeBlocked) {
+    return edgeBlockedFailure(response.status, diagnostics);
+  }
 
   if (!response.ok) {
     const status = response.status;
-    const error = await readUpstreamError(response, [dashboardPat]);
     if (status === 401 || (status === 403 && dashboardPat)) {
-      return { ok: false, reason: "auth", status, ...(error ? { error } : {}) };
+      return {
+        ok: false,
+        reason: "auth",
+        status,
+        ...(diagnostics.error ? { error: diagnostics.error } : {}),
+        ...edgeMetadata(diagnostics),
+      };
     }
     // pricing 模块关闭/需登录（403）与端点不存在（404）都意味着无法匿名取表
     if (status === 403 || status === 404) {
-      return { ok: false, reason: "unsupported", status, ...(error ? { error } : {}) };
+      return {
+        ok: false,
+        reason: "unsupported",
+        status,
+        ...(diagnostics.error ? { error: diagnostics.error } : {}),
+        ...edgeMetadata(diagnostics),
+      };
     }
     if (status === 429) {
-      return { ok: false, reason: "rate_limited", status, ...(error ? { error } : {}) };
+      return {
+        ok: false,
+        reason: "rate_limited",
+        status,
+        ...(diagnostics.error ? { error: diagnostics.error } : {}),
+        ...edgeMetadata(diagnostics),
+      };
     }
-    return { ok: false, reason: "http", status, error: error ?? `HTTP ${status}` };
+    return {
+      ok: false,
+      reason: "http",
+      status,
+      error: diagnostics.error ?? `HTTP ${status}`,
+      ...edgeMetadata(diagnostics),
+    };
   }
 
-  let body: unknown;
-  try {
-    body = await response.json();
-  } catch {
-    return { ok: false, reason: "invalid", error: "response is not valid JSON" };
+  if (!diagnostics.jsonParsed) {
+    return {
+      ok: false,
+      reason: "invalid",
+      error: diagnostics.error ?? "response is not valid JSON",
+      ...edgeMetadata(diagnostics),
+    };
   }
 
-  const parsed = pricingResponseSchema.safeParse(body);
+  const parsed = pricingResponseSchema.safeParse(diagnostics.body);
   if (!parsed.success) {
     return {
       ok: false,
       reason: "invalid",
-      error: extractUpstreamError(body, [dashboardPat]) ?? "missing group_ratio",
+      error: diagnostics.error ?? "missing group_ratio",
+      ...edgeMetadata(diagnostics),
     };
   }
 
@@ -429,35 +442,66 @@ export async function fetchNewapiTokenGroup(
     return fetched;
   }
   const { response } = fetched;
+  const diagnostics = await inspectUpstreamResponse(response, [provider.key]);
+
+  if (diagnostics.edgeBlocked) {
+    return edgeBlockedFailure(response.status, diagnostics);
+  }
 
   if (!response.ok) {
     const status = response.status;
-    const error = await readUpstreamError(response, [provider.key]);
     if (status === 401 || status === 403) {
-      return { ok: false, reason: "auth", status, ...(error ? { error } : {}) };
+      return {
+        ok: false,
+        reason: "auth",
+        status,
+        ...(diagnostics.error ? { error: diagnostics.error } : {}),
+        ...edgeMetadata(diagnostics),
+      };
     }
     if (status === 404) {
-      return { ok: false, reason: "unsupported", status, ...(error ? { error } : {}) };
+      return {
+        ok: false,
+        reason: "unsupported",
+        status,
+        ...(diagnostics.error ? { error: diagnostics.error } : {}),
+        ...edgeMetadata(diagnostics),
+      };
     }
     if (status === 429) {
-      return { ok: false, reason: "rate_limited", status, ...(error ? { error } : {}) };
+      return {
+        ok: false,
+        reason: "rate_limited",
+        status,
+        ...(diagnostics.error ? { error: diagnostics.error } : {}),
+        ...edgeMetadata(diagnostics),
+      };
     }
-    return { ok: false, reason: "http", status, error: error ?? `HTTP ${status}` };
+    return {
+      ok: false,
+      reason: "http",
+      status,
+      error: diagnostics.error ?? `HTTP ${status}`,
+      ...edgeMetadata(diagnostics),
+    };
   }
 
-  let body: unknown;
-  try {
-    body = await response.json();
-  } catch {
-    return { ok: false, reason: "invalid", error: "response is not valid JSON" };
+  if (!diagnostics.jsonParsed) {
+    return {
+      ok: false,
+      reason: "invalid",
+      error: diagnostics.error ?? "response is not valid JSON",
+      ...edgeMetadata(diagnostics),
+    };
   }
 
-  const parsed = tokenLogsResponseSchema.safeParse(body);
+  const parsed = tokenLogsResponseSchema.safeParse(diagnostics.body);
   if (!parsed.success) {
     return {
       ok: false,
       reason: "invalid",
-      error: extractUpstreamError(body, [provider.key]) ?? "missing log data",
+      error: diagnostics.error ?? "missing log data",
+      ...edgeMetadata(diagnostics),
     };
   }
   if (parsed.data.success !== true) {
@@ -465,9 +509,8 @@ export async function fetchNewapiTokenGroup(
     return {
       ok: false,
       reason: "auth",
-      error:
-        sanitizeUpstreamError(parsed.data.message ?? "token rejected", [provider.key]) ??
-        "token rejected",
+      error: diagnostics.error ?? "token rejected",
+      ...edgeMetadata(diagnostics),
     };
   }
 
@@ -516,11 +559,23 @@ export async function testNewapiDashboardPat(
   if (!fetched.ok) return { ...fetched, stage: "identity" };
 
   const { response } = fetched;
+  const diagnostics = await inspectUpstreamResponse(response, [dashboardPat]);
+
+  if (diagnostics.edgeBlocked) {
+    return { ...edgeBlockedFailure(response.status, diagnostics), stage: "identity" };
+  }
+
   if (!response.ok) {
     const status = response.status;
-    const error = await readUpstreamError(response, [dashboardPat]);
     if (status === 401 || status === 403) {
-      return { ok: false, stage: "identity", reason: "auth", status, ...(error ? { error } : {}) };
+      return {
+        ok: false,
+        stage: "identity",
+        reason: "auth",
+        status,
+        ...(diagnostics.error ? { error: diagnostics.error } : {}),
+        ...edgeMetadata(diagnostics),
+      };
     }
     if (status === 404) {
       return {
@@ -528,7 +583,8 @@ export async function testNewapiDashboardPat(
         stage: "identity",
         reason: "unsupported",
         status,
-        ...(error ? { error } : {}),
+        ...(diagnostics.error ? { error: diagnostics.error } : {}),
+        ...edgeMetadata(diagnostics),
       };
     }
     if (status === 429) {
@@ -537,7 +593,8 @@ export async function testNewapiDashboardPat(
         stage: "identity",
         reason: "rate_limited",
         status,
-        ...(error ? { error } : {}),
+        ...(diagnostics.error ? { error: diagnostics.error } : {}),
+        ...edgeMetadata(diagnostics),
       };
     }
     return {
@@ -545,29 +602,29 @@ export async function testNewapiDashboardPat(
       stage: "identity",
       reason: "http",
       status,
-      error: error ?? `HTTP ${status}`,
+      error: diagnostics.error ?? `HTTP ${status}`,
+      ...edgeMetadata(diagnostics),
     };
   }
 
-  let body: unknown;
-  try {
-    body = await response.json();
-  } catch {
+  if (!diagnostics.jsonParsed) {
     return {
       ok: false,
       stage: "identity",
       reason: "invalid",
-      error: "identity response is not valid JSON",
+      error: diagnostics.error ?? "identity response is not valid JSON",
+      ...edgeMetadata(diagnostics),
     };
   }
-  const identity = dashboardIdentityResponseSchema.safeParse(body);
+  const identity = dashboardIdentityResponseSchema.safeParse(diagnostics.body);
   if (!identity.success) {
-    const envelope = newapiErrorEnvelopeSchema.safeParse(body);
+    const envelope = newapiErrorEnvelopeSchema.safeParse(diagnostics.body);
     return {
       ok: false,
       stage: "identity",
       reason: envelope.success && envelope.data.success === false ? "auth" : "invalid",
-      error: extractUpstreamError(body, [dashboardPat]) ?? "identity response is invalid",
+      error: diagnostics.error ?? "identity response is invalid",
+      ...edgeMetadata(diagnostics),
     };
   }
   if (identity.data.data.id !== dashboardUserId) {

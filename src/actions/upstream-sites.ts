@@ -310,6 +310,8 @@ export async function testUpstreamSitePat(
           upstreamReason: result.reason,
           ...(result.status != null ? { upstreamStatus: result.status } : {}),
           ...(result.error ? { upstreamMessage: result.error } : {}),
+          ...(result.edgeProvider ? { edgeProvider: result.edgeProvider } : {}),
+          ...(result.requestId ? { requestId: result.requestId } : {}),
         }
       );
     }
