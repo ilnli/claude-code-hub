@@ -87,6 +87,7 @@ export async function saveSystemSettings(formData: {
   codexPriorityBillingSource?: CodexPriorityBillingSource;
   billNonSuccessfulRequests?: boolean;
   billHedgeLosers?: boolean;
+  legacyHedgeMaxInFlight?: number;
   discoveryEnabled?: boolean;
   discoveryConcurrency?: number;
   maxDiscoveryRounds?: number;
@@ -180,6 +181,7 @@ export async function saveSystemSettings(formData: {
       codexPriorityBillingSource: validated.codexPriorityBillingSource,
       billNonSuccessfulRequests: validated.billNonSuccessfulRequests,
       billHedgeLosers: validated.billHedgeLosers,
+      legacyHedgeMaxInFlight: validated.legacyHedgeMaxInFlight,
       discoveryEnabled: validated.discoveryEnabled,
       discoveryConcurrency: validated.discoveryConcurrency,
       maxDiscoveryRounds: validated.maxDiscoveryRounds,

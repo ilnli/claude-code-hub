@@ -20,7 +20,7 @@ const CONTEXT_LENGTH_PAYLOAD = {
 };
 
 describe("routing error classifier", () => {
-  it("preserves context_length_exceeded through a synthetic stream-gate 502", () => {
+  it("preserves context_length_exceeded through a synthetic stream-gate error", () => {
     const error = new StreamPrecommitError("gate_error", {
       family: "anthropic",
       providerId: 1,
@@ -37,7 +37,7 @@ describe("routing error classifier", () => {
       clientMessage: "Your input exceeds the context window of this model.",
       clientParam: "input",
       originalStatusCode: 200,
-      syntheticStatusCode: 502,
+      syntheticStatusCode: 400,
     });
   });
 

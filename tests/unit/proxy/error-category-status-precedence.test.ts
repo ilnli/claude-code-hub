@@ -30,6 +30,20 @@ vi.mock("@/repository/error-rules", () => ({
       createdAt: new Date(0),
       updatedAt: new Date(0),
     },
+    {
+      id: 19,
+      pattern: "cyber_policy|flagged for possible cybersecurity risk",
+      matchType: "regex",
+      category: "content_filter",
+      description: "OpenAI cyber policy violation (non-retryable)",
+      overrideResponse: null,
+      overrideStatusCode: 400,
+      isEnabled: true,
+      isDefault: true,
+      priority: 90,
+      createdAt: new Date(0),
+      updatedAt: new Date(0),
+    },
   ]),
 }));
 
@@ -157,6 +171,22 @@ describe("categorizeErrorAsync - upstream HTTP status precedence", () => {
       isSyntheticFake200: true,
     });
 
+    expect(await categorizeErrorAsync(error)).toBe(ErrorCategory.NON_RETRYABLE_CLIENT_ERROR);
+  });
+
+  it("should let stream gate error rules stop retries for cyber policy errors", async () => {
+    const error = new StreamPrecommitError("gate_error", {
+      family: "openai-responses",
+      providerId: 1,
+      providerName: "test-provider",
+      frameData: JSON.stringify({
+        type: "error",
+        code: "cyber_policy",
+        message: "This content was flagged for possible cybersecurity risk.",
+      }),
+    });
+
+    expect(error.statusCode).toBe(400);
     expect(await categorizeErrorAsync(error)).toBe(ErrorCategory.NON_RETRYABLE_CLIENT_ERROR);
   });
 

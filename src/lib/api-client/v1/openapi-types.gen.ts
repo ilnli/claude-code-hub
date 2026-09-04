@@ -17993,6 +17993,8 @@ export interface operations {
                         billNonSuccessfulRequests: boolean;
                         /** @description Whether streaming-hedge (provider racing) losers are kept alive, drained, and billed (their cost accumulates into the request total). */
                         billHedgeLosers: boolean;
+                        /** @description Maximum simultaneously active provider attempts for one legacy streaming hedge request (including the primary attempt). */
+                        legacyHedgeMaxInFlight: number;
                         /** @description Whether bounded streaming Discovery is enabled. */
                         discoveryEnabled: boolean;
                         /** @description Maximum number of normal Discovery attempts in the initial batch. */
@@ -18114,7 +18116,7 @@ export interface operations {
                         /** @description Public status aggregation interval in minutes. */
                         publicStatusAggregationIntervalMinutes: number;
                         /**
-                         * @description Stream content gate mode for ordinary requests: buffer until the first valid content frame and fail over on error or empty streams (enforce), observe divergence only (shadow), or disable (off). Replay owners always retain the pre-content safety gate.
+                         * @description Stream content gate mode for ordinary requests: buffer until the first valid content frame and fail over on error or empty streams (enforce), observe divergence only (shadow), or disable (off). Shadow and off deliver the first upstream byte immediately, including for replay owners; high-concurrency mode is treated as off.
                          * @enum {string}
                          */
                         streamGateMode: "off" | "shadow" | "enforce";
@@ -18293,6 +18295,8 @@ export interface operations {
                     billNonSuccessfulRequests?: boolean;
                     /** @description Whether streaming-hedge (provider racing) losers are kept alive, drained, and billed (their cost accumulates into the request total). */
                     billHedgeLosers?: boolean;
+                    /** @description Maximum simultaneously active provider attempts for one legacy streaming hedge request (including the primary attempt). */
+                    legacyHedgeMaxInFlight?: number;
                     /** @description Whether bounded streaming Discovery is enabled. */
                     discoveryEnabled?: boolean;
                     /** @description Maximum number of normal Discovery attempts in the initial batch. */
@@ -18411,7 +18415,7 @@ export interface operations {
                     /** @description Public status aggregation interval in minutes. */
                     publicStatusAggregationIntervalMinutes?: number;
                     /**
-                     * @description Stream content gate mode for ordinary requests: buffer until the first valid content frame and fail over on error or empty streams (enforce), observe divergence only (shadow), or disable (off). Replay owners always retain the pre-content safety gate.
+                     * @description Stream content gate mode for ordinary requests: buffer until the first valid content frame and fail over on error or empty streams (enforce), observe divergence only (shadow), or disable (off). Shadow and off deliver the first upstream byte immediately, including for replay owners; high-concurrency mode is treated as off.
                      * @enum {string}
                      */
                     streamGateMode?: "off" | "shadow" | "enforce";
@@ -18464,6 +18468,8 @@ export interface operations {
                         billNonSuccessfulRequests: boolean;
                         /** @description Whether streaming-hedge (provider racing) losers are kept alive, drained, and billed (their cost accumulates into the request total). */
                         billHedgeLosers: boolean;
+                        /** @description Maximum simultaneously active provider attempts for one legacy streaming hedge request (including the primary attempt). */
+                        legacyHedgeMaxInFlight: number;
                         /** @description Whether bounded streaming Discovery is enabled. */
                         discoveryEnabled: boolean;
                         /** @description Maximum number of normal Discovery attempts in the initial batch. */
@@ -18585,7 +18591,7 @@ export interface operations {
                         /** @description Public status aggregation interval in minutes. */
                         publicStatusAggregationIntervalMinutes: number;
                         /**
-                         * @description Stream content gate mode for ordinary requests: buffer until the first valid content frame and fail over on error or empty streams (enforce), observe divergence only (shadow), or disable (off). Replay owners always retain the pre-content safety gate.
+                         * @description Stream content gate mode for ordinary requests: buffer until the first valid content frame and fail over on error or empty streams (enforce), observe divergence only (shadow), or disable (off). Shadow and off deliver the first upstream byte immediately, including for replay owners; high-concurrency mode is treated as off.
                          * @enum {string}
                          */
                         streamGateMode: "off" | "shadow" | "enforce";

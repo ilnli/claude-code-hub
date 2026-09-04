@@ -106,6 +106,14 @@ export const SystemSettingsSchema = z
       .describe(
         "Whether streaming-hedge (provider racing) losers are kept alive, drained, and billed (their cost accumulates into the request total)."
       ),
+    legacyHedgeMaxInFlight: z
+      .number()
+      .int()
+      .min(1)
+      .max(4)
+      .describe(
+        "Maximum simultaneously active provider attempts for one legacy streaming hedge request (including the primary attempt)."
+      ),
     discoveryEnabled: z.boolean().describe("Whether bounded streaming Discovery is enabled."),
     discoveryConcurrency: z
       .number()
@@ -233,7 +241,7 @@ export const SystemSettingsSchema = z
     streamGateMode: z
       .enum(["off", "shadow", "enforce"])
       .describe(
-        "Stream content gate mode for ordinary requests: buffer until the first valid content frame and fail over on error or empty streams (enforce), observe divergence only (shadow), or disable (off). Replay owners always retain the pre-content safety gate."
+        "Stream content gate mode for ordinary requests: buffer until the first valid content frame and fail over on error or empty streams (enforce), observe divergence only (shadow), or disable (off). Shadow and off deliver the first upstream byte immediately, including for replay owners; high-concurrency mode is treated as off."
       ),
     semanticErrorRoutingMode: z
       .enum(["legacy", "shadow", "enforce"])
