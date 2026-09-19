@@ -3,6 +3,9 @@ import { isRawPassthroughEndpointPolicy } from "@/app/v1/_lib/proxy/endpoint-pol
 import { findSafeDatabaseError } from "@/drizzle/admitted-client";
 import { getCachedSystemSettings } from "@/lib/config";
 import { logger } from "@/lib/logger";
+import { isLocalCapacityError } from "@/lib/memory/governor";
+import { buildLocalCapacityResponse } from "@/lib/memory/http";
+import { withRequestMemoryLifetime } from "@/lib/memory/request-lifetime";
 import { ProxyStatusTracker } from "@/lib/proxy-status-tracker";
 import { SessionManager } from "@/lib/session-manager";
 import { SessionTracker } from "@/lib/session-tracker";
@@ -26,6 +29,10 @@ import { ProxyResponses } from "./proxy/responses";
 import { ProxySession } from "./proxy/session";
 
 export async function handleProxyRequest(c: Context): Promise<Response> {
+  return withRequestMemoryLifetime(() => handleOwnedProxyRequest(c));
+}
+
+async function handleOwnedProxyRequest(c: Context): Promise<Response> {
   let session: ProxySession | null = null;
   let cachedSystemSettings: Awaited<ReturnType<typeof getCachedSystemSettings>> | null = null;
   let acquiredConcurrencySessionId: string | null = null;
@@ -264,6 +271,7 @@ export async function handleProxyRequest(c: Context): Promise<Response> {
       await finalizeFailedRequest(session, response, error);
       return response;
     }
+    if (isLocalCapacityError(error)) return await buildLocalCapacityResponse();
 
     if (error instanceof ProxyError) {
       return ProxyResponses.buildError(error.statusCode, error.getClientSafeMessage());

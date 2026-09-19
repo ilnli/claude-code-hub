@@ -4,8 +4,10 @@ import { pipeline as streamPipeline } from "node:stream";
 import { createGunzip, constants as zlibConstants } from "node:zlib";
 import type { Dispatcher } from "undici";
 import { request as undiciRequest } from "undici";
+import { DiscoveryPrebuffer } from "@/app/v1/_lib/proxy/discovery-prebuffer";
 import { findDbPoolAdmissionError, findSafeDatabaseError } from "@/drizzle/admitted-client";
 import { applyAnthropicProviderOverridesWithAudit } from "@/lib/anthropic/provider-overrides";
+import { STORE_SCRATCH_BYTES } from "@/lib/body-store/byte-store";
 import {
   getCircuitState,
   getProviderHealthInfo,
@@ -23,7 +25,13 @@ import { PROVIDER_DEFAULTS, PROVIDER_LIMITS } from "@/lib/constants/provider.con
 import { PROTECTED_AUTH_HEADER_NAMES } from "@/lib/custom-headers";
 import { recordEndpointFailure, recordEndpointSuccess } from "@/lib/endpoint-circuit-breaker";
 import { applyGeminiGoogleSearchOverrideWithAudit } from "@/lib/gemini/provider-overrides";
+import { isLangfuseEnabled } from "@/lib/langfuse";
 import { logger } from "@/lib/logger";
+import { isLocalCapacityError } from "@/lib/memory/governor";
+import {
+  retainCurrentRequestMemory,
+  retainRequestMemoryUntil,
+} from "@/lib/memory/request-lifetime";
 import {
   DiscoveryRequestMetrics,
   recordDiscoveryControlEvent,
@@ -32,7 +40,11 @@ import {
   getEndpointFilterStats,
   getPreferredProviderEndpoints,
 } from "@/lib/provider-endpoints/endpoint-selector";
-import { getGlobalAgentPool, getProxyAgentForProvider } from "@/lib/proxy-agent";
+import {
+  fetchWithDispatcher,
+  getGlobalAgentPool,
+  getProxyAgentForProvider,
+} from "@/lib/proxy-agent";
 import {
   isHttp2TransportQuarantined,
   quarantineHttp2Transport,
@@ -68,10 +80,14 @@ import type {
   SpecialSetting,
 } from "@/types/special-settings";
 import type { SystemSettings } from "@/types/system-config";
-
 import { GeminiAuth } from "../gemini/auth";
 import { GEMINI_PROTOCOL } from "../gemini/protocol";
-import { HeaderProcessor, resolveAnthropicAuthHeaders } from "../headers";
+import {
+  applyOpencodeSessionHeader,
+  HeaderProcessor,
+  OPENCODE_SESSION_HEADER,
+  resolveAnthropicAuthHeaders,
+} from "../headers";
 import {
   evaluateResponsesWsEligibility,
   getResponsesWsSessionId,
@@ -93,6 +109,7 @@ import { deriveClientSafeUpstreamErrorMessage } from "./client-error-message";
 import { combineAbortSignals } from "./combine-abort-signals";
 import { acquireDetachedStreamLease } from "./detached-stream-budget";
 import { type DiscoveryAction, DiscoveryCoordinator } from "./discovery-coordinator";
+import { startDiscoveryLeaseHeartbeat } from "./discovery-lease-heartbeat";
 import { type DiscoveryProtocol, DiscoveryValidityParser } from "./discovery-validity";
 import { isStandardProxyEndpointPath } from "./endpoint-family-catalog";
 import { resolveEndpointPolicy, shouldEnforceStrictEndpointPoolPolicy } from "./endpoint-policy";
@@ -133,6 +150,7 @@ import {
   type GeminiFunctionIdRectifierTrigger,
   rectifyGeminiFunctionIds,
 } from "./gemini-function-id-rectifier";
+import { LocalAdmissionClock } from "./local-admission-clock";
 import { ModelRedirector } from "./model-redirector";
 import { nodeStreamToWebStreamSafe } from "./node-stream-to-web";
 import { ensureOpenAIChatStreamUsageOption } from "./openai-chat-usage-options";
@@ -148,6 +166,7 @@ import { abortReplayOwnership, releaseReplayOwnership } from "./replay/replay-sp
 import { isJsonResponseContentType, isMalformedJsonResponseBody } from "./response-content-type";
 import {
   finalizeHedgeLoserBilling,
+  isCodexResponsesStreamRequest,
   shouldForceCodexResponsesStreamHandling,
 } from "./response-handler";
 import { rememberRoutingErrorClassification } from "./routing-error-classifier";
@@ -161,6 +180,7 @@ import {
   getStreamGatePrebufferBudget,
   type StreamGatePrebufferLease,
 } from "./stream-gate/prebuffer-budget";
+import { prepareGateResponse, takePreparedGateLease } from "./stream-gate/prepared-gate";
 import {
   concatChunks,
   isRequestScopedGateFailure,
@@ -1050,18 +1070,20 @@ async function persistRequestAfterSnapshot(
     return;
   }
 
-  await SessionManager.storeSessionRequestPhaseSnapshot(
-    session.sessionId,
-    "after",
-    {
-      body: snapshot.body,
-      headers: snapshot.headers,
-      meta: snapshot.meta,
-    },
-    session.requestSequence
-  ).catch((err) => {
-    logger.error("Failed to store request after snapshot:", err);
-  });
+  await retainRequestMemoryUntil(
+    SessionManager.storeSessionRequestPhaseSnapshot(
+      session.sessionId,
+      "after",
+      {
+        body: snapshot.body,
+        headers: snapshot.headers,
+        meta: snapshot.meta,
+      },
+      session.requestSequence
+    ).catch((err) => {
+      logger.error("Failed to store request after snapshot:", err);
+    })
+  );
 }
 
 async function persistResponseBeforeSnapshot(
@@ -1072,18 +1094,20 @@ async function persistResponseBeforeSnapshot(
     return;
   }
 
-  await SessionManager.storeSessionResponsePhaseSnapshot(
-    session.sessionId,
-    "before",
-    {
-      headers: snapshot.headers,
-      meta: snapshot.meta,
-    },
-    session.requestSequence,
-    session.authState?.key?.id ?? session.messageContext?.key?.id ?? undefined
-  ).catch((err) => {
-    logger.error("Failed to store response before snapshot meta:", err);
-  });
+  await retainRequestMemoryUntil(
+    SessionManager.storeSessionResponsePhaseSnapshot(
+      session.sessionId,
+      "before",
+      {
+        headers: snapshot.headers,
+        meta: snapshot.meta,
+      },
+      session.requestSequence,
+      session.authState?.key?.id ?? session.messageContext?.key?.id ?? undefined
+    ).catch((err) => {
+      logger.error("Failed to store response before snapshot meta:", err);
+    })
+  );
 }
 
 type MatchedRuleDetails = NonNullable<
@@ -1761,7 +1785,8 @@ export class ProxyForwarder {
       const hedgePromise = ProxyForwarder.sendStreamingWithHedge(
         session,
         discoverySettings,
-        legacyHedgeMaxInFlight
+        legacyHedgeMaxInFlight,
+        requestStartedAt
       );
       void hedgePromise.catch(() => undefined);
       return await hedgePromise;
@@ -2088,6 +2113,8 @@ export class ProxyForwarder {
               attemptStartedAtMonotonic = performance.now();
               attemptFirstByteSeen = false;
             },
+            undefined,
+            undefined,
             explicitCompactionRemainingMs
           );
 
@@ -2165,6 +2192,7 @@ export class ProxyForwarder {
                     idleTimeoutMs: currentProvider.streamingIdleTimeoutMs,
                     captureCommitMarker: !session.isHighConcurrencyModeEnabled(),
                     prebufferBudget: getStreamGatePrebufferBudget(),
+                    prebufferLease: takePreparedGateLease(response),
                     onBudgetWaitStart: () => {
                       runtime.pauseResponseTimeout?.();
                       healthPausedAtMonotonic ??= performance.now();
@@ -2193,6 +2221,7 @@ export class ProxyForwarder {
                   // response-handler 不会接手该响应：本层负责清理计时器与 agent 引用
                   runtime.clearResponseTimeout?.();
                   runtime.releaseAgent?.();
+                  if (isLocalCapacityError(gate.error)) throw gate.error;
 
                   if (
                     gate.error instanceof StreamPrecommitError &&
@@ -2574,7 +2603,7 @@ export class ProxyForwarder {
           });
 
           // F3a 亲和写回（非流式成功；流式由 finalizeStream 的终态副作用负责）
-          void recordAffinityWinner(session, currentProvider.id);
+          void retainRequestMemoryUntil(recordAffinityWinner(session, currentProvider.id));
 
           logger.info("ProxyForwarder: Request successful", {
             providerId: currentProvider.id,
@@ -2719,6 +2748,7 @@ export class ProxyForwarder {
           if (databaseError) {
             errorCategory = ErrorCategory.LOCAL_OVERLOAD;
           }
+          if (errorCategory === ErrorCategory.LOCAL_OVERLOAD && !databaseError) throw lastError;
 
           // F3a：亲和提名的供应商发生供应商侧失败 -> 定向写墓碑（短 TTL 自愈防羊群）
           // request-scoped 的空完成不算供应商侧失败：写墓碑会让后续请求绕开健康的粘性供应商
@@ -2727,7 +2757,7 @@ export class ProxyForwarder {
               errorCategory === ErrorCategory.RESOURCE_NOT_FOUND) &&
             !isRequestScopedGateFailure(lastError)
           ) {
-            void tombstoneAffinityOnFailure(session, currentProvider.id);
+            void retainRequestMemoryUntil(tombstoneAffinityOnFailure(session, currentProvider.id));
           }
           const errorMessage =
             databaseError?.message ??
@@ -3556,6 +3586,54 @@ export class ProxyForwarder {
    * 实际转发请求
    */
   private static async doForward(
+    ...args: Parameters<typeof ProxyForwarder.doForwardPrepared>
+  ): Promise<Response> {
+    const [session, provider, , , , , externalSignal, , onLocalAdmissionWait] = args;
+    if (
+      !provider ||
+      !mapProviderTypeToFamily(provider.providerType) ||
+      !isStreamGatePrecommitActive(session.isHighConcurrencyModeEnabled())
+    ) {
+      return await ProxyForwarder.doForwardPrepared(...args);
+    }
+    const signals = [session.clientAbortSignal, externalSignal].filter(
+      (signal): signal is AbortSignal => Boolean(signal)
+    );
+    const signal = signals.length ? AbortSignal.any(signals) : undefined;
+    let lease: StreamGatePrebufferLease | null = null;
+    const preparedArgs: Parameters<typeof ProxyForwarder.doForwardPrepared> = [...args];
+    preparedArgs[9] = async (isStreaming) => {
+      if (
+        !isStreaming ||
+        (session.getEndpointPolicy().kind === "raw_passthrough" &&
+          !isCodexResponsesStreamRequest(session))
+      )
+        return;
+      onLocalAdmissionWait?.(true);
+      try {
+        lease = await getStreamGatePrebufferBudget().acquire(STORE_SCRATCH_BYTES, signal);
+      } finally {
+        onLocalAdmissionWait?.(false);
+      }
+    };
+    try {
+      const response = await ProxyForwarder.doForwardPrepared(...preparedArgs);
+      if (
+        !response.body ||
+        (!response.headers.get("content-type")?.toLowerCase().includes("text/event-stream") &&
+          !shouldForceCodexResponsesStreamHandling(session, response))
+      ) {
+        (lease as StreamGatePrebufferLease | null)?.release();
+        lease = null;
+      }
+      return lease ? prepareGateResponse(response, lease) : response;
+    } catch (error) {
+      (lease as StreamGatePrebufferLease | null)?.release();
+      throw error;
+    }
+  }
+
+  private static async doForwardPrepared(
     session: ProxySession,
     provider: typeof session.provider,
     baseUrl: string,
@@ -3564,11 +3642,14 @@ export class ProxyForwarder {
     deferDetailSnapshotPersistence: boolean = false,
     externalAbortSignal?: AbortSignal,
     onUpstreamDispatch?: () => void,
+    _onLocalAdmissionWait?: (waiting: boolean) => void,
+    onRequestPrepared?: (isStreaming: boolean) => Promise<void>,
     explicitCompactionRemainingMs?: number
   ): Promise<Response> {
     if (!provider) {
       throw new Error("Provider is required");
     }
+    const retainForwardedBody = session.shouldPersistSessionDebugArtifacts() || isLangfuseEnabled();
 
     const resolvedCacheTtl = resolveCacheTtlPreference(
       session.authState?.key?.cacheTtlPreference,
@@ -3691,7 +3772,7 @@ export class ProxyForwarder {
 
         const bodyString = JSON.stringify(bodyToSerialize);
         requestBody = bodyString;
-        session.forwardedRequestBody = bodyString;
+        session.forwardedRequestBody = retainForwardedBody ? bodyString : null;
       } else {
         // No body: still need streaming detection, auth, URL, headers
         const geminiPathname = session.requestUrl.pathname || "";
@@ -3988,7 +4069,7 @@ export class ProxyForwarder {
         ) {
           // Raw passthrough: preserve original request body bytes as-is
           requestBody = session.request.buffer;
-          session.forwardedRequestBody = session.request.log;
+          session.forwardedRequestBody = retainForwardedBody ? session.request.log : null;
 
           try {
             isStreaming = (session.request.message as Record<string, unknown>).stream === true;
@@ -4024,7 +4105,7 @@ export class ProxyForwarder {
           const serializedMultipart =
             await serializeOpenAIImageMultipartRequest(imageRequestMetadata);
           requestBody = serializedMultipart.body;
-          session.forwardedRequestBody = serializedMultipart.summary;
+          session.forwardedRequestBody = retainForwardedBody ? serializedMultipart.summary : null;
           isStreaming = serializedMultipart.isStreaming;
 
           if (serializedMultipart.contentType) {
@@ -4091,7 +4172,7 @@ export class ProxyForwarder {
 
           const bodyString = JSON.stringify(messageToSend);
           requestBody = bodyString;
-          session.forwardedRequestBody = bodyString;
+          session.forwardedRequestBody = retainForwardedBody ? bodyString : null;
           isStreaming = messageToSend.stream === true;
 
           if (process.env.NODE_ENV === "development") {
@@ -4176,6 +4257,21 @@ export class ProxyForwarder {
       ).catch((err) => logger.error("Failed to store explicit compaction upstream meta:", err));
     }
 
+    if (
+      requestBody !== undefined &&
+      !ProxyForwarder.getEndpointPolicy(session).bypassForwarderPreprocessing &&
+      processedHeaders.has("content-encoding")
+    ) {
+      const previousContentEncoding = processedHeaders.get("content-encoding");
+      processedHeaders.delete("content-encoding");
+      logger.debug("ProxyForwarder: Removed stale content-encoding from serialized request body", {
+        providerId: provider.id,
+        providerName: provider.name,
+        contentEncoding: previousContentEncoding,
+        path: session.requestUrl.pathname,
+      });
+    }
+
     if (session.shouldPersistSessionDebugArtifacts()) {
       const detailSnapshotSession = session as ProxySessionWithDetailSnapshotRuntime;
       detailSnapshotSession.detailSnapshotRequestAfter = {
@@ -4199,8 +4295,11 @@ export class ProxyForwarder {
     }
     const fetchWithDispatch = async (url: string, requestInit: UndiciFetchOptions) => {
       onUpstreamDispatch?.();
-      return await fetch(url, requestInit);
+      return await fetchWithDispatcher(url, requestInit);
     };
+
+    // 最终过滤/序列化后才知道实际是否请求流；准入仍早于超时计时和网络发送。
+    await onRequestPrepared?.(isStreaming);
 
     // ⭐ 双路超时控制（first-byte / total）
     // 注意：由于 undici fetch API 的限制，无法精确分离 DNS/TCP/TLS 连接阶段和响应头接收阶段
@@ -5438,7 +5537,8 @@ export class ProxyForwarder {
   private static async sendStreamingWithHedge(
     session: ProxySession,
     settings: SystemSettings,
-    maxInFlight: number
+    maxInFlight: number,
+    requestStartedAt: number
   ): Promise<Response> {
     const initialProvider = session.provider;
     if (!initialProvider) {
@@ -5460,7 +5560,20 @@ export class ProxyForwarder {
     let capabilityGapSeen = false;
     let nonCapabilityFailureSeen = false;
     const attempts = new Set<StreamingHedgeAttempt>();
+    const admissionControllers = new WeakMap<StreamingHedgeAttempt, AbortController>();
+    const admissionWaiters = new Set<StreamingHedgeAttempt>();
     const failedProviderIds: number[] = [];
+    // Legacy hedge is a single parallel wave. Round 1 (not 0) keeps the routing
+    // trace view from labelling every attempt as sticky.
+    const HEDGE_TRACE_ROUND = 1;
+    const hedgeMetrics = new DiscoveryRequestMetrics(
+      {
+        requestId: session.messageContext?.id ?? null,
+        sessionId: session.sessionId ?? "",
+        keyId: session.authState?.key?.id ?? 0,
+      },
+      requestStartedAt
+    );
 
     const noteRoutingFailure = (category: ErrorCategory) => {
       if (
@@ -5493,7 +5606,8 @@ export class ProxyForwarder {
       settled = true;
       const attemptedProviderIds = new Set(launchedProviderIds);
       if (session.provider?.id != null) attemptedProviderIds.add(session.provider.id);
-      await ProxyForwarder.clearSessionProviderBindings(session, attemptedProviderIds);
+      if (!isLocalCapacityError(error))
+        await ProxyForwarder.clearSessionProviderBindings(session, attemptedProviderIds);
       resolveResult?.({ error });
     };
 
@@ -5553,17 +5667,26 @@ export class ProxyForwarder {
       const drainTimeoutMs = getEnvConfig().HEDGE_LOSER_DRAIN_TIMEOUT_MS;
       const initialChunks = attempt.billingPrefixChunks ?? [];
       attempt.billingPrefixChunks = null;
+      const spooledPrefix = Boolean(gatePrebufferLease?.readPrefix);
+      const billingReader = spooledPrefix
+        ? ProxyForwarder.buildBufferedPrefixStream(
+            initialChunks,
+            reader,
+            gatePrebufferLease
+          ).getReader()
+        : reader;
 
+      const releaseRequestMemory = retainCurrentRequestMemory();
       void (async () => {
         // 若落败前已读走前缀，补入有界计量器，避免丢失 message_start usage。
         const drain = await drainLoserBillingEvidence({
-          reader,
-          initialChunks,
+          reader: billingReader,
+          initialChunks: spooledPrefix ? [] : initialChunks,
           providerType: attempt.provider.providerType,
           responseController: controller,
           stopReason: "hedge_loser_drain",
           timeoutMs: drainTimeoutMs,
-          onInitialChunksConsumed: () => gatePrebufferLease?.release(),
+          onInitialChunksConsumed: spooledPrefix ? undefined : () => gatePrebufferLease?.release(),
         });
         if (!drain.admitted) {
           logger.warn("ProxyForwarder: hedge loser drain rejected by shared budget", {
@@ -5596,9 +5719,61 @@ export class ProxyForwarder {
           });
         })
         .finally(() => {
+          releaseRequestMemory();
           gatePrebufferLease?.release();
           releaseAttemptAgent(attempt);
         });
+    };
+
+    const traceProvider = (attempt: StreamingHedgeAttempt) => ({
+      id: attempt.provider.id,
+      name: attempt.provider.name,
+      priority: attempt.provider.priority || 0,
+    });
+
+    const traceAttemptStarted = (attempt: StreamingHedgeAttempt) => {
+      hedgeMetrics.attemptStarted({
+        attemptId: attempt.attemptId,
+        providerId: attempt.provider.id,
+        round: HEDGE_TRACE_ROUND,
+        kind: "normal",
+      });
+      session.appendRoutingTraceEvent({
+        type: "attempt_started",
+        attemptId: attempt.attemptId,
+        attemptKind: "normal",
+        round: HEDGE_TRACE_ROUND,
+        provider: traceProvider(attempt),
+        activeAttemptCount: attempts.size,
+        configuredCap: maxInFlight,
+      });
+    };
+
+    const traceAttemptFinished = (
+      attempt: StreamingHedgeAttempt,
+      context: {
+        outcome: "winner" | "failed" | "cancelled" | "client_abort";
+        cancellationKind?: string;
+        statusCode?: number;
+        reason?: string;
+      }
+    ) => {
+      hedgeMetrics.attemptFinished(attempt.attemptId, {
+        providerId: attempt.provider.id,
+        outcome: context.outcome,
+        cancellationKind: context.cancellationKind ?? null,
+      });
+      session.appendRoutingTraceEvent({
+        type: "attempt_finished",
+        attemptId: attempt.attemptId,
+        attemptKind: "normal",
+        round: HEDGE_TRACE_ROUND,
+        provider: traceProvider(attempt),
+        outcome: context.outcome,
+        ...(context.cancellationKind ? { cancellationKind: context.cancellationKind } : {}),
+        ...(context.statusCode != null ? { statusCode: context.statusCode } : {}),
+        ...(context.reason ? { reason: context.reason } : {}),
+      });
     };
 
     const abortAttempt = (attempt: StreamingHedgeAttempt, reason: string) => {
@@ -5610,10 +5785,14 @@ export class ProxyForwarder {
       }
       attempts.delete(attempt);
       session.removeLiveActiveProvider(attempt.provider.id);
+      traceAttemptFinished(attempt, {
+        outcome: reason === "client_abort" ? "client_abort" : "cancelled",
+        cancellationKind: reason,
+      });
 
       // 竞速输家计费开启：仅标记 + 记录决策链，不取消连接、不释放 agent。
       // 实际的后台 drain 由 runAttempt 的 .then 流程发起（它独占 reader，避免并发读）。
-      if (reason === "hedge_loser" && attempt.billAsLoser) {
+      if (reason === "hedge_loser" && attempt.billAsLoser && !admissionWaiters.has(attempt)) {
         session.addProviderToChain(attempt.provider, {
           ...attempt.endpointAudit,
           reason: "hedge_loser_billed",
@@ -5627,6 +5806,7 @@ export class ProxyForwarder {
 
       // 因非竞速原因（client_abort / launch_failed 等）被取消：禁止后台计费，正常取消连接。
       attempt.billAsLoser = false;
+      admissionControllers.get(attempt)?.abort(new Error(reason));
       attempt.gatePrebufferLease?.release();
       attempt.gatePrebufferLease = null;
 
@@ -5847,6 +6027,8 @@ export class ProxyForwarder {
     };
 
     const runAttempt = (attempt: StreamingHedgeAttempt) => {
+      const admissionController = new AbortController();
+      admissionControllers.set(attempt, admissionController);
       const providerForRequest =
         attempt.firstByteTimeoutMs > 0 && maxInFlight > 1
           ? { ...attempt.provider, firstByteTimeoutStreamingMs: 0 }
@@ -5867,6 +6049,7 @@ export class ProxyForwarder {
       // remains gated by `attempt.dispatched` and is reset by the transport callback below, so
       // setup time can trigger a hedge without being eligible for provider-failure attribution.
       armAttemptThreshold(attempt);
+      const releaseRequestMemory = retainCurrentRequestMemory();
       void ProxyForwarder.doForward(
         attempt.session,
         providerForRequest,
@@ -5874,8 +6057,17 @@ export class ProxyForwarder {
         attempt.endpointAudit,
         attempt.requestAttemptCount,
         true,
-        undefined,
-        markUpstreamDispatch
+        admissionController.signal,
+        markUpstreamDispatch,
+        (waiting) => {
+          if (waiting) {
+            admissionWaiters.add(attempt);
+            pauseAttemptThreshold(attempt);
+          } else {
+            admissionWaiters.delete(attempt);
+            resumeAttemptThreshold(attempt);
+          }
+        }
       )
         .then(async (response) => {
           if (settled || winnerCommitted || attempt.settled) {
@@ -5970,6 +6162,7 @@ export class ProxyForwarder {
                   idleTimeoutMs: attempt.provider.streamingIdleTimeoutMs,
                   captureCommitMarker: !highConcurrencyMode,
                   prebufferBudget: getStreamGatePrebufferBudget(),
+                  prebufferLease: takePreparedGateLease(response),
                   onBudgetWaitStart: () => {
                     pauseAttemptThreshold(attempt);
                   },
@@ -6055,7 +6248,8 @@ export class ProxyForwarder {
           const normalizedError =
             attemptError instanceof Error ? attemptError : new Error(String(attemptError));
           await handleAttemptFailure(attempt, normalizedError);
-        });
+        })
+        .finally(releaseRequestMemory);
     };
 
     const handleAttemptFailure = async (attempt: StreamingHedgeAttempt, error: Error) => {
@@ -6097,7 +6291,7 @@ export class ProxyForwarder {
           errorCategory === ErrorCategory.RESOURCE_NOT_FOUND) &&
         !isRequestScopedGateFailure(error)
       ) {
-        void tombstoneAffinityOnFailure(session, attempt.provider.id);
+        void retainRequestMemoryUntil(tombstoneAffinityOnFailure(session, attempt.provider.id));
       }
       const statusCode = error instanceof ProxyError ? error.statusCode : undefined;
       const databaseError = findSafeDatabaseError(error);
@@ -6121,6 +6315,10 @@ export class ProxyForwarder {
           attempt.thresholdTimer = null;
         }
         attempts.delete(attempt);
+        traceAttemptFinished(attempt, {
+          outcome: "client_abort",
+          cancellationKind: "client_abort",
+        });
 
         session.addProviderToChain(attempt.provider, {
           ...attempt.endpointAudit,
@@ -6140,6 +6338,11 @@ export class ProxyForwarder {
       }
 
       if (errorCategory === ErrorCategory.LOCAL_OVERLOAD) {
+        if (isLocalCapacityError(error)) {
+          abortAllAttempts(undefined, "local_capacity_exceeded");
+          await settleFailure(error);
+          return;
+        }
         const admission = findDbPoolAdmissionError(error);
         const safeAdmissionMessage = admission?.message ?? "Database pool admission exceeded";
         logger.warn("ProxyForwarder: Local database admission rejected during hedge", {
@@ -6299,6 +6502,11 @@ export class ProxyForwarder {
             clearTimeout(attempt.thresholdTimer);
             attempt.thresholdTimer = null;
           }
+          traceAttemptFinished(attempt, {
+            outcome: "failed",
+            ...(statusCode != null ? { statusCode } : {}),
+            reason: "reactive_rectifier_retry",
+          });
           attempt.requestAttemptCount += 1;
           attempt.dispatched = false;
           attempt.startedAtMonotonic = 0;
@@ -6307,6 +6515,7 @@ export class ProxyForwarder {
           attempt.healthSettlementClaimed = false;
           attempt.healthOutcome = null;
           attempt.hedgeSaturationRecorded = false;
+          traceAttemptStarted(attempt);
           runAttempt(attempt);
           return;
         }
@@ -6335,6 +6544,11 @@ export class ProxyForwarder {
         attempt.thresholdTimer = null;
       }
       attempts.delete(attempt);
+      traceAttemptFinished(attempt, {
+        outcome: "failed",
+        ...(statusCode != null ? { statusCode } : {}),
+        reason: ErrorCategory[errorCategory]?.toLowerCase(),
+      });
       ProxyForwarder.markProviderFailed(session, failedProviderIds, attempt.provider.id);
 
       if (
@@ -6415,6 +6629,27 @@ export class ProxyForwarder {
 
       attempt.settled = true;
       attempts.delete(attempt);
+      traceAttemptFinished(attempt, {
+        outcome: "winner",
+        statusCode: attempt.response.status,
+      });
+      session.appendRoutingTraceEvent({
+        type: "winner_committed",
+        attemptId: attempt.attemptId,
+        attemptKind: "normal",
+        round: HEDGE_TRACE_ROUND,
+        provider: traceProvider(attempt),
+        statusCode: attempt.response.status,
+      });
+      session.setRoutingTraceSummary(
+        hedgeMetrics.snapshot({
+          outcome: "success",
+          statusCode: attempt.response.status,
+          winnerOrigin: "normal",
+          winnerProviderId: attempt.provider.id,
+          winnerRound: HEDGE_TRACE_ROUND,
+        })
+      );
 
       for (const activeAttempt of attempts) {
         getAttemptModelRedirect(activeAttempt);
@@ -6674,6 +6909,7 @@ export class ProxyForwarder {
 
       attempts.add(attempt);
       session.addLiveActiveProvider(provider);
+      traceAttemptStarted(attempt);
 
       // Record hedge participant launch in decision chain
       // (first provider is already recorded via initial_selection or session_reuse)
@@ -6795,6 +7031,16 @@ export class ProxyForwarder {
       await finishIfExhausted();
       const result = await resultPromise;
       if (result.error) {
+        session.setRoutingTraceSummary(
+          hedgeMetrics.snapshot({
+            outcome: lastErrorCategory === ErrorCategory.CLIENT_ABORT ? "client_abort" : "failed",
+            statusCode: isLocalCapacityError(result.error)
+              ? 429
+              : result.error instanceof ProxyError
+                ? result.error.statusCode
+                : 500,
+          })
+        );
         throw result.error;
       }
       return result.response as Response;
@@ -6824,6 +7070,7 @@ export class ProxyForwarder {
     const stickySlaMs = Math.max(1, settings.stickySlaMs ?? 20_000);
     const totalTimeoutMs = Math.max(1, settings.racingTotalTimeoutMs ?? 60_000);
     const racingDeadlineAt = requestStartedAt + totalTimeoutMs;
+    const admissionClock = new LocalAdmissionClock();
     const protocol = ProxyForwarder.discoveryProtocol(session);
     const rawCrossProviderFallbackEnabled = session.isRawCrossProviderFallbackEnabled();
     const discoveryPrecommitActive = isStreamGatePrecommitActive(
@@ -6853,8 +7100,8 @@ export class ProxyForwarder {
         /** Retained beside the primary fallback in the final round. */
         finalRescue: boolean;
         controller: AbortController;
-        parser: DiscoveryValidityParser;
-        chunks: BufferedByteChunks;
+        parser: DiscoveryValidityParser | null;
+        chunks: DiscoveryPrebuffer;
         pending: boolean;
         ready: boolean;
         round: number;
@@ -6882,9 +7129,9 @@ export class ProxyForwarder {
     let lastErrorCategory: ErrorCategory | null = null;
     let capabilityGapSeen = false;
     let nonCapabilityFailureSeen = false;
-    let totalTimer: NodeJS.Timeout | null = null;
-    let roundTimer: NodeJS.Timeout | null = null;
-    let stickyTimer: NodeJS.Timeout | null = null;
+    let stopLeaseHeartbeat = () => {};
+    let roundTimer: (() => void) | null = null;
+    let stickyTimer: (() => void) | null = null;
     let roundLaunchesInProgress = 0;
     let queuedRoundLaunchesPending = 0;
     let refillQueue: Promise<void> = Promise.resolve();
@@ -6994,7 +7241,7 @@ export class ProxyForwarder {
     };
     const clearRoundTimer = () => {
       if (roundTimer) {
-        clearTimeout(roundTimer);
+        roundTimer();
         roundTimer = null;
       }
     };
@@ -7131,46 +7378,52 @@ export class ProxyForwarder {
       const controller = attempt.responseController;
       const drainTimeoutMs = getEnvConfig().HEDGE_LOSER_DRAIN_TIMEOUT_MS;
 
+      const releaseRequestMemory = retainCurrentRequestMemory();
       void (async () => {
         // The validity parser may have consumed one or more chunks before the
         // loser was held. Replay those bytes so usage markers in the prefix
         // (for example Anthropic message_start) are available to billing.
-        const bufferedChunks = attempt.chunks.take();
-        const drain = await drainLoserBillingEvidence({
-          reader,
-          initialChunks: bufferedChunks,
-          providerType: attempt.provider.providerType,
-          responseController: controller,
-          stopReason: "discovery_loser_drain",
-          timeoutMs: drainTimeoutMs,
-        });
-        if (!drain.admitted) {
-          logger.warn("[Discovery] Loser drain rejected by shared budget", {
-            sessionId: attempt.session.sessionId ?? null,
-            providerId: attempt.provider.id,
-            providerName: attempt.provider.name,
-            reason: drain.reason,
+        const prefix = attempt.chunks.takeOwned();
+        try {
+          const drain = await drainLoserBillingEvidence({
+            reader,
+            initialChunks: prefix.chunks,
+            onInitialChunksConsumed: () => prefix.lease?.release(),
+            providerType: attempt.provider.providerType,
+            responseController: controller,
+            stopReason: "discovery_loser_drain",
+            timeoutMs: drainTimeoutMs,
           });
-          return;
-        }
+          if (!drain.admitted) {
+            logger.warn("[Discovery] Loser drain rejected by shared budget", {
+              sessionId: attempt.session.sessionId ?? null,
+              providerId: attempt.provider.id,
+              providerName: attempt.provider.name,
+              reason: drain.reason,
+            });
+            return;
+          }
 
-        // Discovery billing is intentionally stricter than the legacy helper's
-        // partial-usage safety net: a cancelled/failed drain is not a billable
-        // loser. This avoids charging a provider whose response was cut off by
-        // winner handoff or the drain cap.
-        if (drain.terminalSeen) {
-          await finalizeHedgeLoserBilling({
-            messageRequestId,
-            messageRequestCreatedAtMs: messageRequestCreatedAtMs ?? Date.now(),
-            loserSession: attempt.session,
-            provider: attempt.provider,
-            attemptNumber: attempt.sequence,
-            upstreamStatusCode: response.status,
-            allContent: drain.evidenceText,
-            drainComplete: true,
-            requireUsage: true,
-            billingContext: attempt.billingSnapshot ?? undefined,
-          });
+          // Discovery billing is intentionally stricter than the legacy helper's
+          // partial-usage safety net: a cancelled/failed drain is not a billable
+          // loser. This avoids charging a provider whose response was cut off by
+          // winner handoff or the drain cap.
+          if (drain.terminalSeen) {
+            await finalizeHedgeLoserBilling({
+              messageRequestId,
+              messageRequestCreatedAtMs: messageRequestCreatedAtMs ?? Date.now(),
+              loserSession: attempt.session,
+              provider: attempt.provider,
+              attemptNumber: attempt.sequence,
+              upstreamStatusCode: response.status,
+              allContent: drain.evidenceText,
+              drainComplete: true,
+              requireUsage: true,
+              billingContext: attempt.billingSnapshot ?? undefined,
+            });
+          }
+        } finally {
+          prefix.lease?.release();
         }
       })()
         .catch((billingError) => {
@@ -7182,6 +7435,7 @@ export class ProxyForwarder {
           });
         })
         .finally(() => {
+          releaseRequestMemory();
           releaseProviderRef(attempt);
           if (attempt.releaseAgent && !attempt.agentReleased) {
             attempt.agentReleased = true;
@@ -7253,6 +7507,7 @@ export class ProxyForwarder {
       }
       if (!preserveForLoserBilling) {
         releaseProviderRef(attempt);
+        attempt.parser = null;
         attempt.chunks.clear();
       }
       discoveryMetrics.attemptFinished(attempt.id, {
@@ -7330,7 +7585,7 @@ export class ProxyForwarder {
             ? DISCOVERY_TERMINAL_CLEANUP_MAX_MS
             : Math.min(
                 DISCOVERY_TERMINAL_CLEANUP_MAX_MS,
-                Math.max(0, racingDeadlineAt - Date.now())
+                Math.max(0, racingDeadlineAt - admissionClock.now())
               );
       if (maxWaitMs <= 0) return;
 
@@ -7363,9 +7618,10 @@ export class ProxyForwarder {
     ) => {
       if (settled) return;
       settled = true;
-      if (totalTimer) clearTimeout(totalTimer);
-      if (roundTimer) clearTimeout(roundTimer);
-      if (stickyTimer) clearTimeout(stickyTimer);
+      admissionClock.dispose();
+      stopLeaseHeartbeat();
+      if (roundTimer) roundTimer();
+      if (stickyTimer) stickyTimer();
       cancelSetupReservations(options.cancellationKind ?? "discovery_loser");
       cancelLosers(null, options.cancellationKind ?? "discovery_loser");
       // Sticky timeout owns its cooldown mutation. A terminal deadline/error or
@@ -7421,6 +7677,8 @@ export class ProxyForwarder {
       )
         return;
       committed = true;
+      admissionClock.dispose();
+      stopLeaseHeartbeat();
       winner = attempt;
       attempt.pending = false;
       // Snapshot the original-session billing context before an alternative
@@ -7455,9 +7713,8 @@ export class ProxyForwarder {
       // From this point ResponseHandler owns the reader and agent release.
       // No coordinator/timer path may cancel or release this attempt again.
       attempt.readerTransferred = true;
-      if (totalTimer) clearTimeout(totalTimer);
-      if (roundTimer) clearTimeout(roundTimer);
-      if (stickyTimer) clearTimeout(stickyTimer);
+      if (roundTimer) roundTimer();
+      if (stickyTimer) stickyTimer();
       cancelSetupReservations("discovery_loser");
       cancelLosers(attempt);
       discoveryMetrics.attemptFinished(attempt.id, {
@@ -7552,9 +7809,10 @@ export class ProxyForwarder {
         providerSessionRefRetainOnSuccess: attempt.providerSessionRefRetainOnSuccess,
       });
       leaseTransferred = true;
+      const prefix = attempt.chunks.takeOwned();
       resolveResult?.({
         response: new Response(
-          ProxyForwarder.buildBufferedPrefixStream(attempt.chunks.take(), attempt.reader),
+          ProxyForwarder.buildBufferedPrefixStream(prefix.chunks, attempt.reader, prefix.lease),
           {
             status: attempt.response.status,
             statusText: attempt.response.statusText,
@@ -7607,10 +7865,10 @@ export class ProxyForwarder {
     const scheduleRoundBoundary = (delayMs: number) => {
       clearRoundTimer();
       const epoch = coordinator.epochs;
-      const remainingMs = Math.max(0, racingDeadlineAt - Date.now());
-      roundTimer = setTimeout(
+      const remainingMs = Math.max(0, racingDeadlineAt - admissionClock.now());
+      roundTimer = admissionClock.schedule(
         () => {
-          if (Date.now() >= racingDeadlineAt) {
+          if (admissionClock.now() >= racingDeadlineAt) {
             void executeCoordinatorAction(coordinator.onDeadline(), "request_deadline").catch(
               (error) => logger.warn("[Discovery] Deadline action failed", { error })
             );
@@ -7836,7 +8094,7 @@ export class ProxyForwarder {
         parser: new DiscoveryValidityParser(
           mapProviderTypeToFamily(provider.providerType) ?? protocol
         ),
-        chunks: new BufferedByteChunks(),
+        chunks: new DiscoveryPrebuffer(),
         pending: true,
         ready: false,
         round: currentRound,
@@ -7889,8 +8147,8 @@ export class ProxyForwarder {
         kind: "normal" | "fallback";
         finalRescue: boolean;
         controller: AbortController;
-        parser: DiscoveryValidityParser;
-        chunks: BufferedByteChunks;
+        parser: DiscoveryValidityParser | null;
+        chunks: DiscoveryPrebuffer;
         pending: boolean;
         ready: boolean;
         round: number;
@@ -7944,6 +8202,23 @@ export class ProxyForwarder {
         },
       });
 
+      let resumeLocalAdmission: (() => void) | null = null;
+      const onLocalAdmissionWait = (waiting: boolean) => {
+        if (waiting) resumeLocalAdmission ??= admissionClock.pause();
+        else {
+          resumeLocalAdmission?.();
+          resumeLocalAdmission = null;
+        }
+      };
+      const awaitLocalAdmission = async <T>(operation: () => Promise<T>): Promise<T> => {
+        onLocalAdmissionWait(true);
+        try {
+          return await operation();
+        } finally {
+          onLocalAdmissionWait(false);
+        }
+      };
+      const releaseRequestMemory = retainCurrentRequestMemory();
       void ProxyForwarder.doForward(
         attempt.session,
         { ...provider, firstByteTimeoutStreamingMs: 0 },
@@ -7951,7 +8226,9 @@ export class ProxyForwarder {
         attempt.endpointAudit,
         attempt.requestAttemptCount,
         true,
-        controller.signal
+        controller.signal,
+        undefined,
+        onLocalAdmissionWait
       )
         .then(async (response) => {
           const runtime = attempt.session as ProxySessionWithAttemptRuntime;
@@ -7960,6 +8237,7 @@ export class ProxyForwarder {
           attempt.releaseAgent = runtime.releaseAgent ?? null;
           attempt.clearResponseTimeout?.();
           attempt.response = response;
+          attempt.chunks.attachLease(takePreparedGateLease(response));
           if (!attempt.pending || committed || settled) {
             if (response.body && !attempt.reader) attempt.reader = response.body.getReader();
             cleanupAttempt(attempt, attempt.cancellationKind);
@@ -7967,6 +8245,18 @@ export class ProxyForwarder {
           }
           if (!response.body)
             throw new EmptyResponseError(provider.id, provider.name, "empty_body");
+          if (discoveryPrecommitActive && !attempt.chunks.hasLease) {
+            // 非 SSE 的协议兼容响应也会进入 Discovery 解析；读取前补齐准入。
+            attempt.chunks.attachLease(
+              await awaitLocalAdmission(() =>
+                getStreamGatePrebufferBudget().acquire(STORE_SCRATCH_BYTES, controller.signal)
+              )
+            );
+          }
+          if (!attempt.pending || committed || settled) {
+            attempt.chunks.clear();
+            return;
+          }
           attempt.reader = response.body.getReader();
           while (!committed && !settled && attempt.pending) {
             const item = await attempt.reader.read();
@@ -7982,7 +8272,11 @@ export class ProxyForwarder {
             // 首字节时刻先挂在 attempt 上；DiscoveryValidityParser 的 ready 判定同样基于内容，
             // 不在此记录会让 discovery 模式的 TTFB 恒等于 TTFT。
             attempt.firstByteAt ??= Date.now();
-            const validity = discoveryPrecommitActive ? attempt.parser.push(item.value) : null;
+            await awaitLocalAdmission(() =>
+              attempt.chunks.reserveForParse(item.value, controller.signal)
+            );
+            if (attempt.readerTransferred || committed || settled || !attempt.pending) return;
+            const validity = discoveryPrecommitActive ? attempt.parser?.push(item.value) : null;
             // A single read can contain both deliverable content and the
             // protocol terminator. Terminal is only invalid when no content
             // was observed; otherwise the buffered candidate is complete.
@@ -8006,6 +8300,8 @@ export class ProxyForwarder {
               throw new ProxyError("Invalid upstream discovery response", 502);
             attempt.chunks.append(item.value);
             if (discoveryPrecommitActive && !validity?.ready) continue;
+            attempt.parser = null;
+            attempt.chunks.finishParsing();
             attempt.ready = true;
             session.appendRoutingTraceEvent({
               type: "attempt_ready",
@@ -8121,6 +8417,11 @@ export class ProxyForwarder {
           }
 
           if (lastErrorCategory === ErrorCategory.LOCAL_OVERLOAD) {
+            if (isLocalCapacityError(lastError)) {
+              cleanupAttempt(attempt, null, { statusCode: 429, reason: "local_overload" });
+              await settleFailure(lastError, { preserveBinding: true });
+              return;
+            }
             const admission = findDbPoolAdmissionError(lastError);
             const safeAdmissionMessage = admission?.message ?? "Database pool admission exceeded";
             session.addProviderToChain(provider, {
@@ -8219,7 +8520,7 @@ export class ProxyForwarder {
             if (stickyProbeActive && provider.id === initialProvider.id) {
               stickyProbeActive = false;
               if (stickyTimer) {
-                clearTimeout(stickyTimer);
+                stickyTimer();
                 stickyTimer = null;
               }
               coordinator.removeAttempt(id);
@@ -8354,7 +8655,7 @@ export class ProxyForwarder {
               if (stickyProbeActive && provider.id === initialProvider.id) {
                 stickyProbeActive = false;
                 if (stickyTimer) {
-                  clearTimeout(stickyTimer);
+                  stickyTimer();
                   stickyTimer = null;
                 }
                 coordinator.removeAttempt(id);
@@ -8463,7 +8764,7 @@ export class ProxyForwarder {
           if (failedStickyProbe) {
             stickyProbeActive = false;
             if (stickyTimer) {
-              clearTimeout(stickyTimer);
+              stickyTimer();
               stickyTimer = null;
             }
             await clearCapturedStickyBinding(0);
@@ -8522,7 +8823,8 @@ export class ProxyForwarder {
             providerId: provider.id,
             error,
           });
-        });
+        })
+        .finally(releaseRequestMemory);
       return true;
     };
 
@@ -9012,7 +9314,7 @@ export class ProxyForwarder {
 
     const cleanupAbort = bindClientAbortListener(session.clientAbortSignal, () => {
       if (settled || committed) return;
-      if (stickyTimer) clearTimeout(stickyTimer);
+      if (stickyTimer) stickyTimer();
       coordinator.cancelRequest();
       cancelSetupReservations("client_abort");
       void settleFailure(new ProxyError("Request aborted by client", 499, undefined, true), {
@@ -9021,14 +9323,38 @@ export class ProxyForwarder {
       }).catch((error) => logger.warn("[Discovery] Client abort cleanup failed", { error }));
     });
 
-    totalTimer = setTimeout(
+    stopLeaseHeartbeat = startDiscoveryLeaseHeartbeat({
+      ttlMs: (lease.ttlSeconds + DISCOVERY_LEASE_HANDOFF_GRACE_SECONDS) * 1000,
+      renew: () =>
+        retainRequestMemoryUntil(
+          (async () => {
+            const result = await SessionManager.renewSessionDiscoveryLease(
+              lease.sessionId,
+              lease.keyId,
+              lease.ownerToken,
+              lease.ttlSeconds + DISCOVERY_LEASE_HANDOFF_GRACE_SECONDS
+            );
+            return result.status === "renewed";
+          })()
+        ),
+      onLost: () => {
+        if (settled || committed) return;
+        bindingWriteAllowed = false;
+        coordinator.cancelRequest();
+        void settleFailure(ProxyForwarder.buildAllProvidersUnavailableError(null), {
+          preserveBinding: true,
+        }).catch((error) => logger.warn("[Discovery] Lease ownership lost", { error }));
+      },
+    });
+
+    admissionClock.schedule(
       () => {
         if (settled || committed) return;
         void executeCoordinatorAction(coordinator.onDeadline(), "request_deadline").catch((error) =>
           logger.warn("[Discovery] Deadline action failed", { error })
         );
       },
-      Math.max(0, racingDeadlineAt - Date.now())
+      Math.max(0, racingDeadlineAt - admissionClock.now())
     );
 
     const orchestrate = async () => {
@@ -9049,10 +9375,10 @@ export class ProxyForwarder {
           coordinator.startDiscoveryAfterSticky();
           await launchNextRound(concurrency, true);
         } else {
-          stickyTimer = setTimeout(
+          stickyTimer = admissionClock.schedule(
             () => {
               if (!stickyProbeActive || settled || committed) return;
-              if (Date.now() >= racingDeadlineAt) {
+              if (admissionClock.now() >= racingDeadlineAt) {
                 void executeCoordinatorAction(coordinator.onDeadline(), "request_deadline").catch(
                   (error) => logger.warn("[Discovery] Deadline action failed", { error })
                 );
@@ -9120,7 +9446,7 @@ export class ProxyForwarder {
                 );
               }
             },
-            Math.min(stickySlaMs, Math.max(0, racingDeadlineAt - Date.now()))
+            Math.min(stickySlaMs, Math.max(0, racingDeadlineAt - admissionClock.now()))
           );
         }
       } else {
@@ -9131,20 +9457,21 @@ export class ProxyForwarder {
       }
     };
 
-    void orchestrate().catch(async (error) => {
-      const normalized = error instanceof Error ? error : new Error(String(error));
-      await settleFailure(ProxyForwarder.resolveHedgeTerminalError(normalized, null));
-    });
+    void retainRequestMemoryUntil(
+      orchestrate().catch(async (error) => {
+        const normalized = error instanceof Error ? error : new Error(String(error));
+        await settleFailure(ProxyForwarder.resolveHedgeTerminalError(normalized, null));
+      })
+    );
 
     try {
       const result = await resultPromise;
       if (result.error) throw result.error;
       return result.response as Response;
     } finally {
+      admissionClock.dispose();
+      stopLeaseHeartbeat();
       cleanupAbort();
-      if (totalTimer) clearTimeout(totalTimer);
-      clearRoundTimer();
-      if (stickyTimer) clearTimeout(stickyTimer);
       if (!leaseTransferred) {
         void SessionManager.releaseSessionDiscoveryLease(
           lease.sessionId,
@@ -9328,14 +9655,17 @@ export class ProxyForwarder {
       providersSnapshot: Provider[] | null;
     };
 
-    shadowState.request = {
-      ...session.request,
-      // attempt 改写采用顶层 copy-on-write；发送前的私有参数过滤会生成独立深拷贝。
-      message: { ...session.request.message },
-      // 原始请求字节只读；shadow 共享底层 buffer，任何改写都必须整体替换属性。
-      buffer: session.request.buffer,
-      imageRequestMetadata: cloneOpenAIImageRequestMetadata(session.request.imageRequestMetadata),
-    };
+    // 复制描述符不会触发惰性日志 getter；每个 shadow 的显式日志覆盖也相互独立。
+    shadowState.request = Object.create(
+      Object.getPrototypeOf(session.request),
+      Object.getOwnPropertyDescriptors(session.request)
+    );
+    // attempt 改写采用顶层 copy-on-write；发送前的私有参数过滤会生成独立深拷贝。
+    shadowState.request.message = { ...session.request.message };
+    // 原始字节共享只读 buffer，改写必须整体替换属性。
+    shadowState.request.imageRequestMetadata = cloneOpenAIImageRequestMetadata(
+      session.request.imageRequestMetadata
+    );
     shadow.requestUrl = new URL(session.requestUrl.toString());
     shadowState.headers = new Headers(session.headers);
     shadowState.originalHeaders = new Headers(sourceState.originalHeaders);
@@ -9363,7 +9693,8 @@ export class ProxyForwarder {
   private static syncWinningAttemptSession(target: ProxySession, source: ProxySession): void {
     target.request.message = source.request.message;
     target.request.buffer = source.request.buffer;
-    target.request.log = source.request.log;
+    const logDescriptor = Object.getOwnPropertyDescriptor(source.request, "log");
+    if (logDescriptor) Object.defineProperty(target.request, "log", logDescriptor);
     target.request.note = source.request.note;
     target.request.model = source.request.model;
     target.request.imageRequestMetadata = cloneOpenAIImageRequestMetadata(
@@ -9638,6 +9969,20 @@ export class ProxyForwarder {
     return new ReadableStream<Uint8Array>(
       {
         async pull(controller) {
+          if (prebufferLease?.readPrefix && !leaseReleased) {
+            try {
+              const chunk = await prebufferLease.readPrefix();
+              if (chunk) {
+                controller.enqueue(chunk);
+                return;
+              }
+            } catch (error) {
+              releasePrefix();
+              void reader.cancel(error).catch(() => undefined);
+              controller.error(error);
+              return;
+            }
+          }
           if (prefixIndex < prefixChunks.length) {
             const chunk = prefixChunks[prefixIndex];
             prefixChunks[prefixIndex] = EMPTY_PREFIX_CHUNK;
@@ -9743,6 +10088,16 @@ export class ProxyForwarder {
     if (session.getCacheTtlResolved && session.getCacheTtlResolved() === "1h") {
       overrides["anthropic-beta"] = mergeAnthropicCacheTtlBetaFlag(
         session.headers.get("anthropic-beta")
+      );
+    }
+
+    // OpenCode Zen 强制要求 x-opencode-session；客户端或 provider 自定义头已经带上时不覆盖。
+    // hedge/discovery 的影子会话会清空 sessionId，改用 upstreamSessionSeed 保持与父请求同一个值。
+    if (!session.headers.has(OPENCODE_SESSION_HEADER)) {
+      applyOpencodeSessionHeader(
+        overrides,
+        upstreamBaseUrl,
+        session.sessionId ?? session.upstreamSessionSeed
       );
     }
 

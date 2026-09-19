@@ -261,7 +261,7 @@ export const EnvSchema = z.object({
   STREAM_GATE_GLOBAL_PREBUFFER_BYTE_CAP: z.coerce
     .number()
     .int()
-    .min(2 * 1024)
+    .min(128 * 1024)
     .max(2 * 1024 * 1024 * 1024)
     .default(256 * 1024 * 1024),
   // 请求分离 + Replay：客户端断开后上游继续引流缓存，相同请求体重发续传
@@ -298,6 +298,9 @@ export const EnvSchema = z.object({
   LANGFUSE_BASE_URL: z.string().default("https://cloud.langfuse.com"),
   LANGFUSE_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(1.0),
   LANGFUSE_DEBUG: z.string().default("false").transform(booleanTransform),
+  // v5 first-class attributes; consumed by LangfuseSpanProcessor
+  LANGFUSE_TRACING_ENVIRONMENT: z.string().optional(),
+  LANGFUSE_RELEASE: z.string().optional(),
 
   // IP 归属地查询服务
   // 默认使用官方托管服务；可通过 IP_GEO_API_URL 自托管
@@ -311,14 +314,6 @@ export const EnvSchema = z.object({
       code: "custom",
       path: ["DETACHED_STREAM_METERING_RESERVE_BYTES"],
       message: "DETACHED_STREAM_METERING_RESERVE_BYTES cannot exceed DETACHED_STREAM_BUDGET_BYTES",
-    });
-  }
-  if (env.STREAM_GATE_GLOBAL_PREBUFFER_BYTE_CAP < env.STREAM_GATE_PREBUFFER_BYTE_CAP * 4) {
-    context.addIssue({
-      code: "custom",
-      path: ["STREAM_GATE_GLOBAL_PREBUFFER_BYTE_CAP"],
-      message:
-        "STREAM_GATE_GLOBAL_PREBUFFER_BYTE_CAP must be at least four times STREAM_GATE_PREBUFFER_BYTE_CAP",
     });
   }
 });

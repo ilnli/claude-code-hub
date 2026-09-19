@@ -10,6 +10,7 @@ import { isDbPoolAdmissionError } from "@/drizzle/admitted-client";
 import { getEnvConfig } from "@/lib/config/env.schema";
 import { type ErrorDetectionResult, errorRuleDetector } from "@/lib/error-rule-detector";
 import { logger } from "@/lib/logger";
+import { isLocalCapacityError } from "@/lib/memory/governor";
 import { getCachedProxyRuntimeSettings } from "@/lib/system-settings/proxy-runtime";
 import { redactJsonString } from "@/lib/utils/message-redaction";
 import { sanitizeErrorTextForDetail } from "@/lib/utils/upstream-error-detection";
@@ -1035,7 +1036,7 @@ export async function categorizeErrorAsync(error: Error): Promise<ErrorCategory>
 
   // 本地 DB admission 过载。Drizzle 会把底层错误包在 cause 中，
   // 必须在网络/规则分类前识别，避免重试上游或惩罚 Provider/endpoint circuit。
-  if (isDbPoolAdmissionError(error)) {
+  if (isDbPoolAdmissionError(error) || isLocalCapacityError(error)) {
     return ErrorCategory.LOCAL_OVERLOAD;
   }
 
