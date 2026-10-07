@@ -598,6 +598,13 @@
         "desc": "該請求由 Replay 快取直接服務（相同請求正在進行或已完成），未發起上游供應商呼叫，不產生費用。",
         "replayId": "Replay ID",
         "sourceRequestId": "來源請求"
+      },
+      "diagnosticExport": {
+        "copy": "複製診斷資訊",
+        "download": "匯出 JSON",
+        "copied": "請求診斷資訊已複製",
+        "copyFailed": "複製失敗，請嘗試匯出 JSON",
+        "exportFailed": "請求診斷資訊匯出失敗"
       }
     },
     "providerChain": {

@@ -43,6 +43,7 @@ import { ProviderChainPopover } from "./provider-chain-popover";
 import { ThinkingEffortDisplay } from "./thinking-effort-display";
 
 interface UsageLogsTableProps {
+  canExportDiagnostics?: boolean;
   logs: UsageLogRow[];
   total: number;
   page: number;
@@ -56,6 +57,7 @@ interface UsageLogsTableProps {
 }
 
 export function UsageLogsTable({
+  canExportDiagnostics = false,
   logs,
   total,
   page,
@@ -666,6 +668,8 @@ export function UsageLogsTable({
                     </TableCell>
                     <TableCell>
                       <ErrorDetailsDialog
+                        canExportDiagnostics={canExportDiagnostics}
+                        createdAt={log.createdAt}
                         statusCode={log.statusCode}
                         errorMessage={log.errorMessage}
                         providerChain={log.providerChain}

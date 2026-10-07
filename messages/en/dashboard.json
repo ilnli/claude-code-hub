@@ -598,6 +598,13 @@
         "desc": "This request was served from the replay cache (identical request already in flight or completed). No upstream provider call was made and no cost was incurred.",
         "replayId": "Replay ID",
         "sourceRequestId": "Source request"
+      },
+      "diagnosticExport": {
+        "copy": "Copy diagnostics",
+        "download": "Export JSON",
+        "copied": "Request diagnostics copied",
+        "copyFailed": "Copy failed. Try exporting JSON.",
+        "exportFailed": "Could not export request diagnostics"
       }
     },
     "providerChain": {

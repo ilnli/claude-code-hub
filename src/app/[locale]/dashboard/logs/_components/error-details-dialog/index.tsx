@@ -16,8 +16,11 @@ import type { RoutingTraceV1 } from "@/types/routing-trace";
 import type { SpecialSetting } from "@/types/special-settings";
 import type { BillingModelSource } from "@/types/system-config";
 import { LogicTraceTab, PerformanceTab, SummaryTab } from "./components";
+import { RequestDiagnosticActions } from "./components/RequestDiagnosticActions";
 
 interface ErrorDetailsDialogProps {
+  canExportDiagnostics?: boolean;
+  createdAt?: Date | string | null;
   statusCode: number | null;
   errorMessage: string | null;
   publicErrorCode?: PublicErrorCode | null;
@@ -79,6 +82,8 @@ interface ErrorDetailsDialogProps {
 type TabValue = "summary" | "logic-trace" | "performance";
 
 export function ErrorDetailsDialog({
+  canExportDiagnostics = false,
+  createdAt,
   statusCode,
   errorMessage,
   publicErrorCode,
@@ -325,6 +330,11 @@ export function ErrorDetailsDialog({
               </Badge>
             )}
           </SheetTitle>
+          {canExportDiagnostics && (
+            <RequestDiagnosticActions
+              details={{ ...sharedProps, createdAt, publicErrorCode, publicErrorMessage }}
+            />
+          )}
         </SheetHeader>
 
         <div className="pb-8">

@@ -598,6 +598,13 @@
         "desc": "该请求由 Replay 缓存直接服务（相同请求正在进行或已完成），未发起上游供应商调用，不产生费用。",
         "replayId": "Replay ID",
         "sourceRequestId": "源请求"
+      },
+      "diagnosticExport": {
+        "copy": "复制诊断信息",
+        "download": "导出 JSON",
+        "copied": "请求诊断信息已复制",
+        "copyFailed": "复制失败，请尝试导出 JSON",
+        "exportFailed": "请求诊断信息导出失败"
       }
     },
     "providerChain": {

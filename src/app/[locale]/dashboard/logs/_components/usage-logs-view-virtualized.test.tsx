@@ -15,6 +15,7 @@ const searchParamMocks = vi.hoisted(() => ({
 }));
 
 const filterPropMocks = vi.hoisted(() => ({
+  canExportDiagnostics: undefined as boolean | undefined,
   panel: undefined as UsageLogFilters | undefined,
   table: undefined as UsageLogFilters | undefined,
   controls: undefined as UsageLogFilters | undefined,
@@ -90,8 +91,15 @@ vi.mock("./usage-logs-stats-panel", () => ({
 }));
 
 vi.mock("./virtualized-logs-table", () => ({
-  VirtualizedLogsTable: ({ filters }: { filters: UsageLogFilters }) => {
+  VirtualizedLogsTable: ({
+    filters,
+    canExportDiagnostics,
+  }: {
+    filters: UsageLogFilters;
+    canExportDiagnostics?: boolean;
+  }) => {
     filterPropMocks.table = filters;
+    filterPropMocks.canExportDiagnostics = canExportDiagnostics;
     return <div data-testid="virtualized-logs-table" />;
   },
 }));
@@ -150,7 +158,7 @@ vi.mock("./usage-logs-filters", () => ({
 
 import { UsageLogsViewVirtualized } from "./usage-logs-view-virtualized";
 
-function renderUsageLogsView() {
+function renderUsageLogsView(isAdmin = true) {
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
@@ -158,7 +166,7 @@ function renderUsageLogsView() {
   act(() => {
     root.render(
       <UsageLogsViewVirtualized
-        isAdmin={true}
+        isAdmin={isAdmin}
         userId={1}
         providers={[]}
         initialKeys={[]}
@@ -198,7 +206,14 @@ describe("UsageLogsViewVirtualized filter navigation", () => {
     filterPropMocks.panel = undefined;
     filterPropMocks.table = undefined;
     filterPropMocks.controls = undefined;
+    filterPropMocks.canExportDiagnostics = undefined;
     document.body.innerHTML = "";
+  });
+
+  it.each([true, false])("only grants diagnostic export to admins: %s", (isAdmin) => {
+    const { unmount } = renderUsageLogsView(isAdmin);
+    expect(filterPropMocks.canExportDiagnostics).toBe(isAdmin);
+    unmount();
   });
 
   it("applies every logs filter through the locale-aware dashboard route", () => {

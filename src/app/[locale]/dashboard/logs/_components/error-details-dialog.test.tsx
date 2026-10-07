@@ -225,6 +225,7 @@ const messages = {
         routingTrace: dashboardMessages.logs.details.routingTrace,
         modelAudit: dashboardMessages.logs.details.modelAudit,
         title: "Request Details",
+        diagnosticExport: dashboardMessages.logs.details.diagnosticExport,
         inProgress: "In progress",
         statusTitle: "Status: {status}",
         unknown: "Unknown",
@@ -458,6 +459,27 @@ function click(element: Element | null) {
 }
 
 describe("error-details-dialog layout", () => {
+  test.each([true, false, undefined])(
+    "diagnostic export visibility follows admin permission %s",
+    (allowed) => {
+      const { container, unmount } = renderClientWithIntl(
+        <ErrorDetailsDialog
+          externalOpen
+          canExportDiagnostics={allowed}
+          requestId={901}
+          statusCode={500}
+          errorMessage="Client aborted request"
+          providerChain={null}
+          sessionId={null}
+        />
+      );
+      expect(container.querySelectorAll("[data-request-diagnostic-action]")).toHaveLength(
+        allowed ? 2 : 0
+      );
+      unmount();
+    }
+  );
+
   test("uses the physical source when checking messages for a prefix Session request", async () => {
     const { unmount } = renderClientWithIntl(
       <ErrorDetailsDialog

@@ -388,6 +388,7 @@ function UsageLogsViewContent({
         {/* Table */}
         <div className="rounded-lg border border-border/60 overflow-hidden">
           <VirtualizedLogsTable
+            canExportDiagnostics={isAdmin}
             filters={filters}
             currencyCode={resolvedCurrencyCode}
             billingModelSource={resolvedBillingModelSource}
@@ -476,6 +477,7 @@ function UsageLogsViewContent({
 
           <div className="flex-1 p-4">
             <VirtualizedLogsTable
+              canExportDiagnostics={isAdmin}
               filters={filters}
               currencyCode={resolvedCurrencyCode}
               billingModelSource={resolvedBillingModelSource}

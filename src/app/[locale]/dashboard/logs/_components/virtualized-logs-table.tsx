@@ -141,6 +141,7 @@ function LiveProviderStack({ providers }: { providers: Array<{ id: number; name:
 }
 
 interface VirtualizedLogsTableProps {
+  canExportDiagnostics?: boolean;
   filters: VirtualizedLogsTableFilters;
   currencyCode?: CurrencyCode;
   billingModelSource?: BillingModelSource;
@@ -164,6 +165,7 @@ interface VirtualizedLogsTableProps {
 }
 
 export function VirtualizedLogsTable({
+  canExportDiagnostics = false,
   filters,
   currencyCode = "USD",
   billingModelSource = "original",
@@ -1364,6 +1366,8 @@ export function VirtualizedLogsTable({
                         <StatusBadgeOnly statusCode={log.statusCode} />
                       ) : (
                         <ErrorDetailsDialog
+                          canExportDiagnostics={canExportDiagnostics}
+                          createdAt={log.createdAt}
                           statusCode={log.statusCode}
                           errorMessage={log.errorMessage}
                           publicErrorCode={log.publicErrorCode}
