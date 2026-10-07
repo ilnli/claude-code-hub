@@ -592,6 +592,66 @@ describe("F1 stream content gate x ProxyForwarder paths", () => {
       envControl.streamGateMode = "enforce";
     });
 
+    test("serial client abort before content persists 499 instead of 500", async () => {
+      const actual = await vi.importActual<typeof import("@/app/v1/_lib/proxy/errors")>(
+        "@/app/v1/_lib/proxy/errors"
+      );
+      mocks.categorizeErrorAsync.mockImplementation(actual.categorizeErrorAsync);
+      const { ProxyErrorHandler } = await import("@/app/v1/_lib/proxy/error-handler");
+      const { errorRuleDetector } = await import("@/lib/error-rule-detector");
+      vi.spyOn(errorRuleDetector, "detectAsync").mockResolvedValue({ matched: false });
+      const messages = await import("@/repository/message");
+      const persist = vi.spyOn(messages, "updateMessageRequestDetailsDurably").mockResolvedValue();
+      const abort = new AbortController();
+      const session = createSession(abort.signal);
+      session.setProvider(createProvider());
+      vi.spyOn(session, "closeLiveObservability").mockResolvedValue();
+      const reading = Promise.withResolvers<void>();
+      const upstream = new ReadableStream<Uint8Array>(
+        {
+          start(controller) {
+            abort.signal.addEventListener("abort", () => controller.error(abort.signal.reason), {
+              once: true,
+            });
+          },
+          pull() {
+            reading.resolve();
+            return new Promise<void>(() => {});
+          },
+        },
+        { highWaterMark: 0 }
+      );
+      spyOnDoForward().mockResolvedValueOnce(
+        new Response(upstream, {
+          headers: { "content-type": "text/event-stream" },
+        })
+      );
+
+      const responsePromise = ProxyForwarder.send(session).catch((error) => {
+        session.setMessageContext({
+          id: 901,
+          user: { id: 42 },
+        } as NonNullable<ProxySession["messageContext"]>);
+        return ProxyErrorHandler.handle(session, error);
+      });
+      await reading.promise;
+      abort.abort();
+      const response = await responsePromise;
+
+      expect(session.getProviderChain()).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            reason: "client_abort",
+            errorMessage: "Client aborted request",
+          }),
+        ])
+      );
+      expect(persist).toHaveBeenCalledWith(901, expect.objectContaining({ statusCode: 499 }));
+      expect(response.status).toBe(499);
+      expect(mocks.recordFailure).not.toHaveBeenCalled();
+      expect(mocks.pickRandomProviderWithExclusion).not.toHaveBeenCalled();
+    });
+
     test.each([0, 1000])(
       "首字节竞速阈值 %s：本地等待 20 秒，不发上游、不切换或惩罚供应商",
       async (threshold) => {

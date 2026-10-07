@@ -2921,7 +2921,9 @@ export class ProxyForwarder {
               },
             });
 
-            throw lastError;
+            throw lastError instanceof ProxyError
+              ? lastError
+              : new ProxyError("Request aborted by client", 499, undefined, true);
           }
 
           if (databaseError) {
