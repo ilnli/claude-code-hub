@@ -5,6 +5,7 @@ import {
   type MemoryGovernor,
   type MemoryLease,
 } from "@/lib/memory/governor";
+import { attachRequestMemory } from "@/lib/memory/request-lifetime";
 
 const DEFAULT_STREAM_GATE_GLOBAL_PREBUFFER_BYTE_CAP = 256 * 1024 * 1024;
 
@@ -31,6 +32,15 @@ type PendingAcquire = {
 };
 
 /**
+ * 显式 release 仍是主路径；请求作用域结束（或宽限到期）是兜底，
+ * 覆盖已提交前缀流被丢弃、既未读完也未取消的情况。release 幂等。
+ */
+function backstop(lease: StreamGatePrebufferLease): StreamGatePrebufferLease {
+  attachRequestMemory(lease);
+  return lease;
+}
+
+/**
  * 流门禁的进程级共享预算。
  *
  * 发起上游前预留小额工作集，前缀按实际占用增长。首次准入最多等待 20 秒，
@@ -45,7 +55,10 @@ export class StreamGatePrebufferBudget {
   constructor(
     private readonly resolveLimit: () => number,
     private readonly governor?: MemoryGovernor
-  ) {}
+  ) {
+    // 内存准入关闭时子限额变为不限，已在队列中的请求需要立即放行。
+    governor?.onEnabledChange(() => this.drainWaiters());
+  }
 
   async acquire(reservedBytes: number, signal?: AbortSignal): Promise<StreamGatePrebufferLease> {
     const started = performance.now();
@@ -56,14 +69,15 @@ export class StreamGatePrebufferBudget {
       shared = await this.governor?.acquire(
         reservedBytes,
         signal,
-        Math.max(0, 20000 - (performance.now() - started))
+        Math.max(0, 20000 - (performance.now() - started)),
+        "gate"
       );
     } catch (error) {
       local.release();
       throw error;
     }
-    if (!shared) return local;
-    return {
+    if (!shared) return backstop(local);
+    return backstop({
       get reservedBytes() {
         return local.reservedBytes;
       },
@@ -97,7 +111,7 @@ export class StreamGatePrebufferBudget {
         local.release();
         shared.release();
       },
-    };
+    });
   }
 
   private acquireLocal(
@@ -263,12 +277,14 @@ export function getStreamGatePrebufferBudget(): StreamGatePrebufferBudget {
   const globalState = globalThis as typeof globalThis & {
     [STREAM_GATE_PREBUFFER_BUDGET_SYMBOL]?: StreamGatePrebufferBudget;
   };
+  const governor = getMemoryGovernor();
+  // 门控子限额属于内存准入；准入关闭时不限额，排队者在下一次归还时全部放行。
   globalState[STREAM_GATE_PREBUFFER_BUDGET_SYMBOL] ??= new StreamGatePrebufferBudget(
     () =>
-      process.env.STREAM_GATE_GLOBAL_PREBUFFER_BYTE_CAP
+      governor.enabled && process.env.STREAM_GATE_GLOBAL_PREBUFFER_BYTE_CAP
         ? resolveStreamGateGlobalPrebufferByteCap()
         : Number.MAX_SAFE_INTEGER,
-    getMemoryGovernor()
+    governor
   );
   return globalState[STREAM_GATE_PREBUFFER_BUDGET_SYMBOL];
 }

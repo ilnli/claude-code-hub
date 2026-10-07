@@ -215,6 +215,8 @@ export async function createProvider(providerData: CreateProviderData): Promise<
     name: providerData.name,
     url: providerData.url,
     key: providerData.key,
+    newApiAccessToken: providerData.new_api_access_token ?? null,
+    newApiUserId: providerData.new_api_user_id ?? null,
     isEnabled: providerData.is_enabled,
     weight: providerData.weight,
     priority: providerData.priority,
@@ -323,6 +325,8 @@ export async function createProvider(providerData: CreateProviderData): Promise<
         name: providers.name,
         url: providers.url,
         key: providers.key,
+        newApiAccessToken: providers.newApiAccessToken,
+        newApiUserId: providers.newApiUserId,
         providerVendorId: providers.providerVendorId,
         upstreamSiteId: providers.upstreamSiteId,
         isEnabled: providers.isEnabled,
@@ -423,6 +427,8 @@ export async function findProviderList(
       name: providers.name,
       url: providers.url,
       key: providers.key,
+      newApiAccessToken: providers.newApiAccessToken,
+      newApiUserId: providers.newApiUserId,
       providerVendorId: providers.providerVendorId,
       upstreamSiteId: providers.upstreamSiteId,
       isEnabled: providers.isEnabled,
@@ -524,6 +530,8 @@ export async function findAllProvidersFresh(): Promise<Provider[]> {
       name: providers.name,
       url: providers.url,
       key: providers.key,
+      newApiAccessToken: providers.newApiAccessToken,
+      newApiUserId: providers.newApiUserId,
       providerVendorId: providers.providerVendorId,
       isEnabled: providers.isEnabled,
       weight: providers.weight,
@@ -628,6 +636,8 @@ export async function findProviderById(id: number): Promise<Provider | null> {
       name: providers.name,
       url: providers.url,
       key: providers.key,
+      newApiAccessToken: providers.newApiAccessToken,
+      newApiUserId: providers.newApiUserId,
       providerVendorId: providers.providerVendorId,
       isEnabled: providers.isEnabled,
       weight: providers.weight,
@@ -723,6 +733,10 @@ export async function updateProvider(
   if (providerData.name !== undefined) dbData.name = providerData.name;
   if (providerData.url !== undefined) dbData.url = providerData.url;
   if (providerData.key !== undefined) dbData.key = providerData.key;
+  if (providerData.new_api_access_token !== undefined)
+    dbData.newApiAccessToken = providerData.new_api_access_token;
+  if (providerData.new_api_user_id !== undefined)
+    dbData.newApiUserId = providerData.new_api_user_id;
   if (providerData.is_enabled !== undefined) dbData.isEnabled = providerData.is_enabled;
   if (providerData.weight !== undefined) dbData.weight = providerData.weight;
   if (providerData.priority !== undefined) dbData.priority = providerData.priority;
@@ -920,6 +934,8 @@ export async function updateProvider(
         name: providers.name,
         url: providers.url,
         key: providers.key,
+        newApiAccessToken: providers.newApiAccessToken,
+        newApiUserId: providers.newApiUserId,
         providerVendorId: providers.providerVendorId,
         upstreamSiteId: providers.upstreamSiteId,
         isEnabled: providers.isEnabled,
@@ -1290,6 +1306,9 @@ export interface BatchProviderUpdates {
   // MCP
   mcpPassthroughType?: string;
   mcpPassthroughUrl?: string | null;
+  // 余额查询凭证（单个编辑撤销时恢复）
+  newApiAccessToken?: string | null;
+  newApiUserId?: number | null;
 }
 
 type ProviderBatchUpdatedRow = {
@@ -1547,6 +1566,12 @@ export async function updateProvidersBatch(
   }
   if (updates.mcpPassthroughUrl !== undefined) {
     setClauses.mcpPassthroughUrl = updates.mcpPassthroughUrl;
+  }
+  if (updates.newApiAccessToken !== undefined) {
+    setClauses.newApiAccessToken = updates.newApiAccessToken;
+  }
+  if (updates.newApiUserId !== undefined) {
+    setClauses.newApiUserId = updates.newApiUserId;
   }
 
   if (Object.keys(setClauses).length === 1) {

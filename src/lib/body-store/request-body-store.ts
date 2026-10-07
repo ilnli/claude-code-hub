@@ -36,6 +36,8 @@ export async function loadRequestBody(
   originalByteLength: number;
   encoding: string | null;
   lease: MemoryLease;
+  /** 调用方完成解析后应把 lease 收缩到该值。 */
+  retainedBytes: number;
 }> {
   const governor = getMemoryGovernor();
   const started = performance.now();
@@ -47,7 +49,8 @@ export async function loadRequestBody(
   const rawLease = await governor.acquire(
     STORE_SCRATCH_BYTES * (compressed ? 2 : 1),
     request.signal,
-    remaining()
+    remaining(),
+    "body_read"
   );
   let decodedLease: MemoryLease | null = null;
   let materializedLease: MemoryLease | null = null;
@@ -60,7 +63,7 @@ export async function loadRequestBody(
       // There is no async boundary between returning this portion and taking it
       // as an independent lease, so no competing request can claim it.
       rawLease.shrinkTo(STORE_SCRATCH_BYTES);
-      decodedLease = governor.tryLease(STORE_SCRATCH_BYTES);
+      decodedLease = governor.tryLease(STORE_SCRATCH_BYTES, "body_decode");
       if (!decodedLease) throw new LocalCapacityError();
     }
     const reader = request.body?.getReader();
@@ -174,7 +177,7 @@ export async function loadRequestBody(
     governor.observe("body_decode", performance.now() - decodeStarted, source.byteLength);
     const materializeStarted = performance.now();
     // 完整过滤、重写仍需要对象。其短期物化由独立租约约束，不给每个小请求预占 100 MiB。
-    materializedLease = governor.tryLease(estimate.capacityBytes);
+    materializedLease = governor.tryLease(estimate.capacityBytes, "body_materialize");
     if (!materializedLease) {
       await source.releaseMemoryForAdmission();
       // The parked store holds no memory while queued. Its next disk read has
@@ -182,7 +185,8 @@ export async function loadRequestBody(
       materializedLease = await governor.acquire(
         estimate.capacityBytes + STORE_SCRATCH_BYTES,
         request.signal,
-        remaining()
+        remaining(),
+        "body_materialize"
       );
       // Return scratch to the store's independent owner before starting I/O.
       // A timed-out read can outlive materialization and must keep its scratch
@@ -191,7 +195,10 @@ export async function loadRequestBody(
       source.restoreMemoryAfterAdmission();
     }
     const heap = getHeapStatistics();
-    if (estimate.capacityBytes > (heap.heap_size_limit - heap.used_heap_size) * 0.5) {
+    if (
+      governor.enabled &&
+      estimate.capacityBytes > (heap.heap_size_limit - heap.used_heap_size) * 0.5
+    ) {
       throw new LocalCapacityError();
     }
     const buffer = await source.arrayBuffer();
@@ -199,7 +206,7 @@ export async function loadRequestBody(
     governor.observe("body_materialize", performance.now() - materializeStarted, source.byteLength);
     const lease = materializedLease;
     materializedLease = null;
-    return { buffer, encoding, originalByteLength, lease };
+    return { buffer, encoding, originalByteLength, lease, retainedBytes: estimate.retainedBytes };
   } finally {
     await Promise.allSettled([
       raw.dispose(() => rawLease.release()),

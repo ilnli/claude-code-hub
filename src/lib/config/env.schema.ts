@@ -123,6 +123,9 @@ export const EnvSchema = z.object({
   // 原因: Boolean("false") === true (任何非空字符串都是 truthy)
   // 正确做法: 使用 transform 显式处理 "false" 和 "0" 字符串
   AUTO_MIGRATE: z.string().default("true").transform(booleanTransform),
+  // 迁移时并发建索引的锁等待与单条语句上限；大表或长事务较多时调高，超时会终止启动
+  MIGRATION_INDEX_LOCK_TIMEOUT_MS: z.coerce.number().int().min(1000).default(5_000),
+  MIGRATION_INDEX_STATEMENT_TIMEOUT_MS: z.coerce.number().int().min(60_000).default(900_000),
   PORT: z.coerce.number().default(23000),
   REDIS_URL: z.string().optional(),
   REDIS_TLS_REJECT_UNAUTHORIZED: z.string().default("true").transform(booleanTransform),
@@ -228,6 +231,10 @@ export const EnvSchema = z.object({
   // 竞速输家计费：后台 drain 竞速输家响应体以拿回 token 用量时的最大等待时长（毫秒）。
   // 超时后主动断开该输家连接，仅用已收到的内容尝试计费（通常计不出 -> 跳过）。
   HEDGE_LOSER_DRAIN_TIMEOUT_MS: z.coerce.number().int().min(1000).default(120_000),
+
+  // 响应结束后后台消费者继续持有请求内存的最长宽限（毫秒）。超时后强制归还租约并记录
+  // 卡住的所有者标签；实际宽限不会短于 HEDGE_LOSER_DRAIN_TIMEOUT_MS + 30 秒。
+  REQUEST_MEMORY_BACKGROUND_GRACE_MS: z.coerce.number().int().min(1000).default(150_000),
 
   // 客户端断线后的 detached stream 使用进程级带权预算；内置 cluster 会先分摊容器总预算。
   DETACHED_STREAM_MAX_CONCURRENCY: z.coerce.number().int().min(1).max(4096).default(64),

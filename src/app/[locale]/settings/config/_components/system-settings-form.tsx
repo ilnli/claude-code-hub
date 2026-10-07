@@ -12,6 +12,7 @@ import {
   Gauge,
   Globe,
   MapPin,
+  MemoryStick,
   Network,
   Pencil,
   Repeat,
@@ -95,6 +96,7 @@ interface SystemSettingsFormProps {
     | "enableHttp2"
     | "enableOpenaiResponsesWebsocket"
     | "enableHighConcurrencyMode"
+    | "enableMemoryAdmission"
     | "interceptAnthropicWarmupRequests"
     | "enableThinkingSignatureRectifier"
     | "enableBillingHeaderRectifier"
@@ -199,6 +201,9 @@ export function SystemSettingsForm({
   );
   const [enableHighConcurrencyMode, setEnableHighConcurrencyMode] = useState(
     initialSettings.enableHighConcurrencyMode
+  );
+  const [enableMemoryAdmission, setEnableMemoryAdmission] = useState(
+    initialSettings.enableMemoryAdmission
   );
   const [interceptAnthropicWarmupRequests, setInterceptAnthropicWarmupRequests] = useState(
     initialSettings.interceptAnthropicWarmupRequests
@@ -429,6 +434,7 @@ export function SystemSettingsForm({
         enableHttp2,
         enableOpenaiResponsesWebsocket,
         enableHighConcurrencyMode,
+        enableMemoryAdmission,
         interceptAnthropicWarmupRequests,
         enableThinkingSignatureRectifier,
         enableBillingHeaderRectifier,
@@ -493,6 +499,7 @@ export function SystemSettingsForm({
         setEnableHttp2(result.data.enableHttp2);
         setEnableOpenaiResponsesWebsocket(result.data.enableOpenaiResponsesWebsocket);
         setEnableHighConcurrencyMode(result.data.enableHighConcurrencyMode);
+        setEnableMemoryAdmission(result.data.enableMemoryAdmission);
         setInterceptAnthropicWarmupRequests(result.data.interceptAnthropicWarmupRequests);
         setEnableThinkingSignatureRectifier(result.data.enableThinkingSignatureRectifier);
         setEnableBillingHeaderRectifier(result.data.enableBillingHeaderRectifier);
@@ -1015,6 +1022,28 @@ export function SystemSettingsForm({
             id="enable-high-concurrency-mode"
             checked={enableHighConcurrencyMode}
             onCheckedChange={(checked) => setEnableHighConcurrencyMode(checked)}
+            disabled={isPending}
+          />
+        </div>
+
+        {/* Memory Admission */}
+        <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 flex items-center justify-between hover:bg-white/[0.04] transition-colors">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-violet-500/10 text-violet-400 shrink-0">
+              <MemoryStick className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-foreground">{t("enableMemoryAdmission")}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {t("enableMemoryAdmissionDesc")}
+              </p>
+            </div>
+          </div>
+          <Switch
+            id="enable-memory-admission"
+            aria-label={t("enableMemoryAdmission")}
+            checked={enableMemoryAdmission}
+            onCheckedChange={(checked) => setEnableMemoryAdmission(checked)}
             disabled={isPending}
           />
         </div>

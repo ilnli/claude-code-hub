@@ -9,5 +9,6 @@
   "urlRequired": "プロバイダー URL を入力してください",
   "invalidWebsiteUrl": "有効な公式サイト URL を入力してください",
   "updateFailed": "プロバイダーの更新に失敗しました",
-  "weightAdjustmentDetachConfirm": "この Provider は有効なルール「{ruleName}」に属しています。手動ウェイトを保存するとルールから削除されます。続行しますか？"
+  "weightAdjustmentDetachConfirm": "この Provider は有効なルール「{ruleName}」に属しています。手動ウェイトを保存するとルールから削除されます。続行しますか？",
+  "invalidNewApiUserId": "ユーザー ID は正の整数で入力してください"
 }

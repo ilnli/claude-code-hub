@@ -298,9 +298,10 @@ describe("SystemSettings：数据库缺列时的保存兜底", () => {
     vi.useFakeTimers();
     vi.setSystemTime(now);
 
-    // 前五次 select 仍包含缺失的新列；第六次累计剥离到权重调整间隔后命中。
+    // 前六次 select 仍包含缺失的新列；第七次累计剥离到权重调整间隔后命中。
     const selectMock = vi
       .fn()
+      .mockReturnValueOnce(createRejectedThenableQuery({ code: "42703" }))
       .mockReturnValueOnce(createRejectedThenableQuery({ code: "42703" }))
       .mockReturnValueOnce(createRejectedThenableQuery({ code: "42703" }))
       .mockReturnValueOnce(createRejectedThenableQuery({ code: "42703" }))
@@ -338,24 +339,21 @@ describe("SystemSettings：数据库缺列时的保存兜底", () => {
     const result = await getSystemSettings();
 
     // 降级读取成功（未抛错），缺失列由 transformer 落默认值。
-    expect(selectMock).toHaveBeenCalledTimes(6);
+    expect(selectMock).toHaveBeenCalledTimes(7);
     expect(result.siteTitle).toBe("CC Hub");
     expect(result.enableHttp2).toBe(true);
     expect(result.affinityIgnoreClientSessionId).toBe(true);
     expect(result.streamGateMode).toBe("enforce");
     expect(result.semanticErrorRoutingMode).toBe("shadow");
+    expect(result.enableMemoryAdmission).toBe(false);
 
-    // 新列按引入顺序从外向内累计剥离：Replay TTL、初始化标记、语义路由模式、权重调整间隔。
-    const secondSelection = selectMock.mock.calls[1]?.[0] as Record<string, unknown>;
-    expect(secondSelection).not.toHaveProperty("legacyHedgeMaxInFlight");
-    expect(secondSelection).toHaveProperty("replayCacheTtlMinutes");
-    expect(secondSelection).toHaveProperty("clientVersionPolicyInitialized");
-    expect(secondSelection).toHaveProperty("semanticErrorRoutingMode");
-    expect(secondSelection).toHaveProperty("providerWeightAdjustmentIntervalMinutes");
-
+    // 新列累计剥离：内存准入、对冲并发、Replay TTL、初始化标记、语义路由模式、权重调整间隔。
+    const memoryFallbackSelection = selectMock.mock.calls[1]?.[0] as Record<string, unknown>;
+    expect(memoryFallbackSelection).not.toHaveProperty("enableMemoryAdmission");
+    expect(memoryFallbackSelection).toHaveProperty("legacyHedgeMaxInFlight");
     const thirdSelection = selectMock.mock.calls[2]?.[0] as Record<string, unknown>;
     expect(thirdSelection).not.toHaveProperty("legacyHedgeMaxInFlight");
-    expect(thirdSelection).not.toHaveProperty("replayCacheTtlMinutes");
+    expect(thirdSelection).toHaveProperty("replayCacheTtlMinutes");
     expect(thirdSelection).toHaveProperty("clientVersionPolicyInitialized");
     expect(thirdSelection).toHaveProperty("semanticErrorRoutingMode");
     expect(thirdSelection).toHaveProperty("providerWeightAdjustmentIntervalMinutes");
@@ -363,7 +361,7 @@ describe("SystemSettings：数据库缺列时的保存兜底", () => {
     const fourthSelection = selectMock.mock.calls[3]?.[0] as Record<string, unknown>;
     expect(fourthSelection).not.toHaveProperty("legacyHedgeMaxInFlight");
     expect(fourthSelection).not.toHaveProperty("replayCacheTtlMinutes");
-    expect(fourthSelection).not.toHaveProperty("clientVersionPolicyInitialized");
+    expect(fourthSelection).toHaveProperty("clientVersionPolicyInitialized");
     expect(fourthSelection).toHaveProperty("semanticErrorRoutingMode");
     expect(fourthSelection).toHaveProperty("providerWeightAdjustmentIntervalMinutes");
 
@@ -371,7 +369,7 @@ describe("SystemSettings：数据库缺列时的保存兜底", () => {
     expect(fifthSelection).not.toHaveProperty("legacyHedgeMaxInFlight");
     expect(fifthSelection).not.toHaveProperty("replayCacheTtlMinutes");
     expect(fifthSelection).not.toHaveProperty("clientVersionPolicyInitialized");
-    expect(fifthSelection).not.toHaveProperty("semanticErrorRoutingMode");
+    expect(fifthSelection).toHaveProperty("semanticErrorRoutingMode");
     expect(fifthSelection).toHaveProperty("providerWeightAdjustmentIntervalMinutes");
 
     const sixthSelection = selectMock.mock.calls[5]?.[0] as Record<string, unknown>;
@@ -379,17 +377,24 @@ describe("SystemSettings：数据库缺列时的保存兜底", () => {
     expect(sixthSelection).not.toHaveProperty("replayCacheTtlMinutes");
     expect(sixthSelection).not.toHaveProperty("clientVersionPolicyInitialized");
     expect(sixthSelection).not.toHaveProperty("semanticErrorRoutingMode");
-    expect(sixthSelection).not.toHaveProperty("providerWeightAdjustmentIntervalMinutes");
-    expect(sixthSelection).toHaveProperty("upstreamBillingProbeIntervalMinutes");
-    expect(sixthSelection).toHaveProperty("upstreamBillingProbeEnabled");
-    expect(sixthSelection).toHaveProperty("cacheEffectivenessEnabled");
-    expect(sixthSelection).toHaveProperty("replayEnabled");
-    expect(sixthSelection).toHaveProperty("affinityIgnoreClientSessionId");
-    expect(sixthSelection).toHaveProperty("streamGateMode");
-    expect(sixthSelection).toHaveProperty("stickyTimeoutCooldownMs");
-    expect(sixthSelection).toHaveProperty("racingTotalTimeoutMs");
-    expect(sixthSelection).toHaveProperty("enableGeminiFunctionIdRectifier");
-    expect(sixthSelection).toHaveProperty("enableThinkingEffortConflictRectifier");
+    expect(sixthSelection).toHaveProperty("providerWeightAdjustmentIntervalMinutes");
+
+    const seventhSelection = selectMock.mock.calls[6]?.[0] as Record<string, unknown>;
+    expect(seventhSelection).not.toHaveProperty("legacyHedgeMaxInFlight");
+    expect(seventhSelection).not.toHaveProperty("replayCacheTtlMinutes");
+    expect(seventhSelection).not.toHaveProperty("clientVersionPolicyInitialized");
+    expect(seventhSelection).not.toHaveProperty("semanticErrorRoutingMode");
+    expect(seventhSelection).not.toHaveProperty("providerWeightAdjustmentIntervalMinutes");
+    expect(seventhSelection).toHaveProperty("upstreamBillingProbeIntervalMinutes");
+    expect(seventhSelection).toHaveProperty("upstreamBillingProbeEnabled");
+    expect(seventhSelection).toHaveProperty("cacheEffectivenessEnabled");
+    expect(seventhSelection).toHaveProperty("replayEnabled");
+    expect(seventhSelection).toHaveProperty("affinityIgnoreClientSessionId");
+    expect(seventhSelection).toHaveProperty("streamGateMode");
+    expect(seventhSelection).toHaveProperty("stickyTimeoutCooldownMs");
+    expect(seventhSelection).toHaveProperty("racingTotalTimeoutMs");
+    expect(seventhSelection).toHaveProperty("enableGeminiFunctionIdRectifier");
+    expect(seventhSelection).toHaveProperty("enableThinkingEffortConflictRectifier");
 
     vi.useRealTimers();
   });
