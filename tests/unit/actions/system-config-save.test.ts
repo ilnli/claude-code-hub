@@ -117,6 +117,27 @@ describe("saveSystemSettings", () => {
     });
   });
 
+  it("saves and clears global mappings and invalidates cached proxy settings", async () => {
+    for (const globalModelRedirects of [
+      [
+        {
+          matchType: "exact" as const,
+          source: "client",
+          target: "upstream",
+          excludedProviderIds: [7],
+        },
+      ],
+      [],
+    ]) {
+      const result = await saveSystemSettings({ globalModelRedirects });
+      expect(result.ok).toBe(true);
+      expect(updateSystemSettingsMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({ globalModelRedirects })
+      );
+    }
+    expect(invalidateSystemSettingsCacheMock).toHaveBeenCalledTimes(2);
+  });
+
   it("should return error when user is not admin", async () => {
     getSessionMock.mockResolvedValue({ user: { id: 1, role: "user" } });
 

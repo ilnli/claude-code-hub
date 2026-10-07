@@ -1,4 +1,5 @@
 import type { Numeric } from "decimal.js-light";
+import type { ModelMappingStep, ModelMappingStopReason } from "@/lib/model-mapping";
 import type { CacheTtlApplied } from "./cache";
 import type { HedgeLoserBilling } from "./cost-breakdown";
 import type { ProviderType } from "./provider";
@@ -116,6 +117,8 @@ export interface ProviderChainItem {
     originalModel: string; // 用户请求的模型（计费依据）
     redirectedModel: string; // 实际转发的模型
     billingModel: string; // 计费模型（通常等于 originalModel）
+    steps?: ModelMappingStep[];
+    stopReason?: ModelMappingStopReason;
     matchedRule?: {
       matchType: "exact" | "prefix" | "suffix" | "contains" | "regex";
       source: string;

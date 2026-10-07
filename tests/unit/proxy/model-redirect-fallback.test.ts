@@ -16,6 +16,7 @@ import { describe, expect, test, vi } from "vitest";
 import { resolveEndpointPolicy } from "@/app/v1/_lib/proxy/endpoint-policy";
 import { ModelRedirector } from "@/app/v1/_lib/proxy/model-redirector";
 import { ProxySession } from "@/app/v1/_lib/proxy/session";
+import type { GlobalModelRedirectRule } from "@/types/model-mapping";
 import type { Provider } from "@/types/provider";
 
 vi.mock("@/lib/logger", () => ({
@@ -134,6 +135,97 @@ function createSession(initialModel: string): ProxySession {
   });
   return session as ProxySession;
 }
+
+describe("Global model mapping during forwarding", () => {
+  const rules: GlobalModelRedirectRule[] = [
+    { matchType: "exact", source: "A", target: "B", excludedProviderIds: [] },
+    { matchType: "exact", source: "B", target: "C", excludedProviderIds: [2] },
+  ];
+
+  test("writes the final model to the request and retains original billing and chain audit", () => {
+    const session = createSession("A");
+    const provider = createProvider();
+    session.setProvider(provider);
+
+    expect(ModelRedirector.apply(session, provider, rules)).toBe(true);
+    expect(session.request.model).toBe("C");
+    expect(session.request.message.model).toBe("C");
+    expect(JSON.parse(new TextDecoder().decode(session.request.buffer)).model).toBe("C");
+    expect(session.getOriginalModel()).toBe("A");
+    expect(session.getCurrentModelRedirect(provider.id)).toMatchObject({
+      originalModel: "A",
+      redirectedModel: "C",
+      billingModel: "A",
+      steps: [
+        { source: "global", inputModel: "A", outputModel: "B" },
+        { source: "global", inputModel: "B", outputModel: "C" },
+      ],
+    });
+  });
+
+  test("fallback re-evaluates globals from the original model using the new provider exclusions", () => {
+    const session = createSession("A");
+    const first = createProvider();
+    const second = createProvider({ id: 2 });
+    session.setProvider(first);
+    ModelRedirector.apply(session, first, rules);
+    session.setProvider(second);
+
+    expect(ModelRedirector.apply(session, second, rules)).toBe(true);
+    expect(session.request.model).toBe("B");
+    expect(session.getOriginalModel()).toBe("A");
+
+    const excludedRules = rules.map((rule) => ({ ...rule, excludedProviderIds: [2] }));
+    expect(ModelRedirector.apply(session, second, excludedRules)).toBe(false);
+    expect(session.request.model).toBe("A");
+    expect(session.getCurrentModelRedirect(second.id)).toBeUndefined();
+  });
+
+  test("provider mapping remains authoritative over global chains", () => {
+    const session = createSession("A");
+    const provider = createProvider({
+      modelRedirects: [
+        { matchType: "exact", source: "A", target: "D" },
+        { matchType: "exact", source: "D", target: "E" },
+      ],
+    });
+    session.setProvider(provider);
+    ModelRedirector.apply(session, provider, rules);
+    expect(session.request.model).toBe("D");
+    expect(session.getCurrentModelRedirect(provider.id)?.steps).toMatchObject([
+      { source: "provider", inputModel: "A", outputModel: "D" },
+    ]);
+    expect(ModelRedirector.getRedirectedModel("A", provider, rules)).toBe("D");
+  });
+
+  test("updates Gemini paths with the final global target literally", () => {
+    const session = createSession("A");
+    session.requestUrl = new URL("https://example.com/v1beta/models/A:generateContent?alt=sse");
+    const provider = createProvider({ providerType: "gemini" });
+    session.setProvider(provider);
+    ModelRedirector.apply(session, provider, [
+      ...rules,
+      { matchType: "exact", source: "C", target: "final-$&", excludedProviderIds: [] },
+    ]);
+    expect(session.requestUrl.pathname).toBe("/v1beta/models/final-$&:generateContent");
+    expect(session.requestUrl.search).toBe("?alt=sse");
+  });
+
+  test("records cycle termination so a bad rule set is diagnosable", () => {
+    const session = createSession("A");
+    const provider = createProvider();
+    session.setProvider(provider);
+    ModelRedirector.apply(session, provider, [
+      rules[0],
+      { matchType: "exact", source: "B", target: "A", excludedProviderIds: [] },
+    ]);
+    expect(session.request.model).toBe("B");
+    expect(session.getCurrentModelRedirect(provider.id)?.stopReason).toBe("cycle");
+    expect(ModelRedirector.hasRedirect("A", provider, rules)).toBe(true);
+    expect(ModelRedirector.hasRedirect("Z", provider, rules)).toBe(false);
+    expect(ModelRedirector.getRedirectedModel("A", provider, rules)).toBe("C");
+  });
+});
 
 describe("Model redirect across provider fallback", () => {
   const REQUESTED_MODEL = "claude-3-5-sonnet-20241022";

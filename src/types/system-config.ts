@@ -1,5 +1,6 @@
 import type { CurrencyCode } from "@/lib/utils";
 import type { IpExtractionConfig } from "@/types/ip-extraction";
+import type { GlobalModelRedirectRule } from "@/types/model-mapping";
 
 // 计费模型来源: 'original' (重定向前) | 'redirected' (重定向后)
 export type BillingModelSource = "original" | "redirected";
@@ -29,6 +30,7 @@ export interface FakeStreamingWhitelistEntry {
 export const DEFAULT_FAKE_STREAMING_WHITELIST: ReadonlyArray<FakeStreamingWhitelistEntry> = [];
 
 export interface SystemSettings {
+  globalModelRedirects: GlobalModelRedirectRule[];
   id: number;
   siteTitle: string;
   allowGlobalUsageView: boolean;
@@ -200,6 +202,7 @@ export interface SystemSettings {
 }
 
 export interface UpdateSystemSettingsInput {
+  globalModelRedirects?: GlobalModelRedirectRule[];
   // 所有字段均为可选，支持部分更新
   siteTitle?: string;
   allowGlobalUsageView?: boolean;

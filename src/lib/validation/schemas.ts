@@ -23,6 +23,7 @@ import {
   DISCOVERY_SETTINGS_INVALID_ERROR_CODE,
   DISCOVERY_WINDOW_INVALID_ERROR_CODE,
 } from "@/lib/validation/discovery-settings";
+import { GlobalModelRedirectRulesSchema } from "@/lib/validation/global-model-redirects";
 import {
   REPLAY_CACHE_TTL_INVALID_ERROR_CODE,
   REPLAY_CACHE_TTL_MINUTES_MAX,
@@ -1198,6 +1199,7 @@ export const UpdateSystemSettingsSchema = z
     // 非对话端点跨供应商 fallback（可选）
     allowNonConversationEndpointProviderFallback: z.boolean().optional(),
     // Fake 流式输出白名单（可选）。空数组表示显式禁用；缺省 → 使用默认四个图像生成模型。
+    globalModelRedirects: GlobalModelRedirectRulesSchema.optional(),
     fakeStreamingWhitelist: z
       .array(
         z.object({

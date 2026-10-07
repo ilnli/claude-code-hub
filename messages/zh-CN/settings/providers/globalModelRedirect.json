@@ -1,0 +1,33 @@
+{
+  "title": "全局模型映射",
+  "description": "供应商映射优先，命中一次后即停止；否则按顺序匹配全局规则，将每次结果继续映射，直到无规则命中。",
+  "loading": "正在加载规则…",
+  "retry": "重试",
+  "loadFailed": "加载模型映射失败。",
+  "saveFailed": "保存模型映射失败。",
+  "saved": "全局模型映射已保存。",
+  "save": "保存",
+  "cancel": "取消",
+  "previewTitle": "映射预览",
+  "previewDescription": "根据当前草稿预览指定供应商的映射过程，包括供应商自身的映射。",
+  "model": "请求模型",
+  "provider": "供应商",
+  "noProviders": "未找到供应商。",
+  "result": "最终模型：",
+  "providerRule": "供应商规则 #{index}",
+  "globalRule": "全局规则 #{index}",
+  "excludedProviders": "排除的供应商",
+  "excludedCount": "已排除 {count} 个供应商",
+  "allProviders": "所有供应商",
+  "searchProviders": "搜索供应商",
+  "clearExclusions": "清空排除项",
+  "exclusionsHint": "适用于所有供应商（包括未来新增的供应商），此处选中的供应商除外。",
+  "stopReasons": {
+    "no_match": "没有后续命中的规则。",
+    "provider_rule": "已命中供应商规则，跳过全局规则。",
+    "unchanged": "命中的规则未改变模型。",
+    "cycle": "检测到循环，保留最后一个安全模型。",
+    "step_limit": "达到映射步数上限，保留最后一个安全模型。",
+    "model_length_limit": "达到模型长度上限，保留最后一个安全模型。"
+  }
+}

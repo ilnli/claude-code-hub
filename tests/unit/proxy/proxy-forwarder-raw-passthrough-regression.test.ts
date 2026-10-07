@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { GlobalModelRedirectRule } from "@/types/model-mapping";
 
 const mocks = vi.hoisted(() => ({
   isHttp2Enabled: vi.fn(async () => false),
   getCachedSystemSettings: vi.fn(async () => ({
     enableClaudeMetadataUserIdInjection: false,
     enableBillingHeaderRectifier: false,
+    globalModelRedirects: [] as GlobalModelRedirectRule[],
   })),
   getProxyAgentForProvider: vi.fn(async () => null),
   getGlobalAgentPool: vi.fn(() => ({
@@ -165,6 +167,53 @@ describe("ProxyForwarder raw passthrough regression", () => {
     });
     mocks.tryResponsesWebsocketUpstream.mockReset();
   });
+
+  it.each([false, true])(
+    "loads global mappings only for preprocessed requests (raw=%s)",
+    async (raw) => {
+      const originalBody = '{"model":"gpt-5.5","input":[]}';
+      const session = createRawPassthroughSession(originalBody);
+      if (!raw) {
+        const endpointPolicy = resolveEndpointPolicy("/v1/responses");
+        Object.assign(session, {
+          requestUrl: new URL("https://proxy.example.com/v1/responses"),
+          endpointPolicy,
+          getEndpointPolicy: vi.fn(() => endpointPolicy),
+        });
+      }
+      mocks.getCachedSystemSettings.mockResolvedValue({
+        enableClaudeMetadataUserIdInjection: false,
+        enableBillingHeaderRectifier: false,
+        globalModelRedirects: [
+          {
+            matchType: "exact",
+            source: "gpt-5.5",
+            target: "intermediate",
+            excludedProviderIds: [],
+          },
+          { matchType: "exact", source: "intermediate", target: "final", excludedProviderIds: [] },
+        ],
+      });
+      let forwardedBody: BodyInit | undefined;
+      vi.spyOn(ProxyForwarder as any, "fetchWithoutAutoDecode").mockImplementationOnce(
+        async (_url: string, init: RequestInit) => {
+          forwardedBody = init.body ?? undefined;
+          return new Response("{}", { headers: { "content-type": "application/json" } });
+        }
+      );
+      const { doForward } = ProxyForwarder as unknown as {
+        doForward: (
+          session: ProxySession,
+          provider: Provider,
+          baseUrl: string
+        ) => Promise<Response>;
+      };
+      const provider = createProvider();
+      await doForward(session, provider, provider.url);
+      expect(JSON.parse(readBodyText(forwardedBody)!).model).toBe(raw ? "gpt-5.5" : "final");
+      expect(session.getOriginalModel()).toBe("gpt-5.5");
+    }
+  );
 
   it("raw passthrough 应优先保留原始请求体字节，而不是重新 JSON.stringify", async () => {
     const originalBody = '{\n  "model": "gpt-5.5",\n  "input": [1, 2, 3]\n}\n';

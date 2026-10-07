@@ -3,9 +3,11 @@ import { getTranslations } from "next-intl/server";
 import { getProviders } from "@/actions/providers";
 import { AutoSortPriorityDialog } from "@/app/[locale]/settings/providers/_components/auto-sort-priority-dialog";
 import { DispatchSimulatorDialog } from "@/app/[locale]/settings/providers/_components/dispatch-simulator-dialog";
+import { GlobalModelRedirectRulesDialog } from "@/app/[locale]/settings/providers/_components/global-model-redirect-rules-dialog";
 import { ProviderManagerLoader } from "@/app/[locale]/settings/providers/_components/provider-manager-loader";
 import { ReclusterVendorsDialog } from "@/app/[locale]/settings/providers/_components/recluster-vendors-dialog";
 import { SchedulingRulesDialog } from "@/app/[locale]/settings/providers/_components/scheduling-rules-dialog";
+import { WeightAdjustmentRulesDialog } from "@/app/[locale]/settings/providers/_components/weight-adjustment-rules-dialog";
 import { Section } from "@/components/section";
 import { Button } from "@/components/ui/button";
 import { Link, redirect } from "@/i18n/routing";
@@ -54,6 +56,8 @@ export default async function DashboardProvidersPage({
             <AutoSortPriorityDialog />
             <ReclusterVendorsDialog />
             <SchedulingRulesDialog />
+            <WeightAdjustmentRulesDialog providers={providers} />
+            <GlobalModelRedirectRulesDialog providers={providers} />
             <DispatchSimulatorDialog providers={providers} />
           </>
         }

@@ -10,7 +10,7 @@ import {
   X,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import safeRegex from "safe-regex";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,9 @@ interface ModelRedirectEditorProps {
   value: ProviderModelRedirectRule[];
   onChange: (value: ProviderModelRedirectRule[]) => void;
   disabled?: boolean;
+  allowDuplicateRules?: boolean;
+  getRuleKey?: (rule: ProviderModelRedirectRule) => string;
+  renderRuleDetails?: (rule: ProviderModelRedirectRule, index: number) => ReactNode;
 }
 
 const DEFAULT_RULE: ProviderModelRedirectRule = {
@@ -41,6 +44,7 @@ const DEFAULT_RULE: ProviderModelRedirectRule = {
 
 function normalizeRule(rule: ProviderModelRedirectRule): ProviderModelRedirectRule {
   return {
+    ...rule,
     matchType: rule.matchType,
     source: rule.source.trim(),
     target: rule.target.trim(),
@@ -56,6 +60,9 @@ export function ModelRedirectEditor({
   value,
   onChange,
   disabled = false,
+  renderRuleDetails,
+  allowDuplicateRules = false,
+  getRuleKey = getRuleIdentity,
 }: ModelRedirectEditorProps) {
   const t = useTranslations("settings.providers.form.modelRedirect");
   const [newRule, setNewRule] = useState<ProviderModelRedirectRule>(DEFAULT_RULE);
@@ -118,7 +125,7 @@ export function ModelRedirectEditor({
         return t("regexUnsafe");
       }
     }
-    if (hasDuplicateRule(normalized, ignoreRuleKey)) {
+    if (!allowDuplicateRules && hasDuplicateRule(normalized, ignoreRuleKey)) {
       return t("alreadyExists", {
         model: `${normalized.matchType}:${normalized.source}`,
       });
@@ -145,7 +152,7 @@ export function ModelRedirectEditor({
   };
 
   const handleRemove = (ruleKey: string) => {
-    onChange(redirects.filter((rule) => getRuleIdentity(rule) !== ruleKey));
+    onChange(redirects.filter((rule) => getRuleKey(rule) !== ruleKey));
     if (editingRuleKey === ruleKey) {
       setEditingRuleKey(null);
       setEditRule(DEFAULT_RULE);
@@ -154,7 +161,7 @@ export function ModelRedirectEditor({
   };
 
   const handleMove = (ruleKey: string, direction: -1 | 1) => {
-    const index = redirects.findIndex((rule) => getRuleIdentity(rule) === ruleKey);
+    const index = redirects.findIndex((rule) => getRuleKey(rule) === ruleKey);
     if (index < 0) return;
 
     const nextIndex = index + direction;
@@ -169,7 +176,7 @@ export function ModelRedirectEditor({
   };
 
   const handleStartEdit = (rule: ProviderModelRedirectRule) => {
-    setEditingRuleKey(getRuleIdentity(rule));
+    setEditingRuleKey(getRuleKey(rule));
     setEditRule(normalizeRule(rule));
     setError(null);
   };
@@ -188,7 +195,7 @@ export function ModelRedirectEditor({
       return;
     }
 
-    const currentIndex = redirects.findIndex((rule) => getRuleIdentity(rule) === originalRuleKey);
+    const currentIndex = redirects.findIndex((rule) => getRuleKey(rule) === originalRuleKey);
     if (currentIndex < 0) {
       setError(t("ruleMoved"));
       return;
@@ -230,7 +237,7 @@ export function ModelRedirectEditor({
 
           <div className="space-y-1">
             {redirects.map((rule, index) => {
-              const ruleKey = getRuleIdentity(rule);
+              const ruleKey = getRuleKey(rule);
               const isEditing = editingRuleKey === ruleKey;
 
               return (
@@ -404,6 +411,7 @@ export function ModelRedirectEditor({
                       </div>
                     </div>
                   )}
+                  {!isEditing && renderRuleDetails?.(rule, index)}
                 </div>
               );
             })}

@@ -1,0 +1,1 @@
+ALTER TABLE "system_settings" ADD COLUMN "global_model_redirects" jsonb DEFAULT '[]'::jsonb NOT NULL;

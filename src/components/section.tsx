@@ -146,7 +146,7 @@ export function Section({
                 )}
               </div>
             </div>
-            {actions && <div className="flex flex-wrap items-center gap-2 shrink-0">{actions}</div>}
+            {actions && <div className="flex min-w-0 flex-wrap items-center gap-2">{actions}</div>}
           </div>
         )}
         {children}

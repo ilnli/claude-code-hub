@@ -265,4 +265,41 @@ describe("ModelRedirectEditor", () => {
 
     unmount();
   });
+  test("preserves per-rule metadata when editing and exposes its details slot", async () => {
+    const onChange = vi.fn();
+    const { unmount } = render(
+      <NextIntlClientProvider locale="en" messages={loadMessages()} timeZone="UTC">
+        <ModelRedirectEditor
+          value={[
+            {
+              matchType: "exact",
+              source: "a",
+              target: "b",
+              excludedProviderIds: [7],
+            } as ProviderModelRedirectRule,
+          ]}
+          onChange={onChange}
+          renderRuleDetails={(_rule, index) => <span>Scope {index + 1}</span>}
+        />
+      </NextIntlClientProvider>
+    );
+    expect(document.body.textContent).toContain("Scope 1");
+    await act(async () => {
+      document.querySelector<HTMLButtonElement>('[data-redirect-edit="exact:a"]')?.click();
+    });
+    await act(async () => {
+      const input = document.querySelector<HTMLInputElement>(
+        '[data-redirect-edit-target="exact:a"]'
+      )!;
+      input.value = "c";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      document.querySelector<HTMLButtonElement>('[data-redirect-save="exact:a"]')?.click();
+    });
+    expect(onChange).toHaveBeenCalledWith([
+      { matchType: "exact", source: "a", target: "c", excludedProviderIds: [7] },
+    ]);
+    unmount();
+  });
 });

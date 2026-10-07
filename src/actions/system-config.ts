@@ -28,6 +28,7 @@ import {
 import { UpdateSystemSettingsSchema } from "@/lib/validation/schemas";
 import { getSystemSettings, updateSystemSettings } from "@/repository/system-config";
 import type { IpExtractionConfig } from "@/types/ip-extraction";
+import type { GlobalModelRedirectRule } from "@/types/model-mapping";
 import type {
   CodexPriorityBillingSource,
   FakeStreamingWhitelistEntry,
@@ -117,6 +118,7 @@ export async function saveSystemSettings(formData: {
   enableResponseInputRectifier?: boolean;
   allowNonConversationEndpointProviderFallback?: boolean;
   fakeStreamingWhitelist?: FakeStreamingWhitelistEntry[];
+  globalModelRedirects?: GlobalModelRedirectRule[];
   streamGateMode?: StreamGateSettingMode;
   semanticErrorRoutingMode?: SemanticErrorRoutingMode;
   affinityIgnoreClientSessionId?: boolean;
@@ -175,6 +177,7 @@ export async function saveSystemSettings(formData: {
       };
     }
     const settingsUpdate: UpdateSystemSettingsInput = {
+      globalModelRedirects: validated.globalModelRedirects,
       siteTitle: validated.siteTitle?.trim(),
       allowGlobalUsageView: validated.allowGlobalUsageView,
       currencyDisplay: validated.currencyDisplay,

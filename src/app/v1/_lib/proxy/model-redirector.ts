@@ -1,10 +1,6 @@
 import { logger } from "@/lib/logger";
-import {
-  findMatchingProviderModelRedirectRule,
-  getProviderModelRedirectTarget,
-  hasProviderModelRedirectRules,
-  resolveProviderModelRedirectTarget,
-} from "@/lib/provider-model-redirects";
+import { resolveModelMapping } from "@/lib/model-mapping";
+import type { GlobalModelRedirectRule } from "@/types/model-mapping";
 import type { Provider } from "@/types/provider";
 import { isOpenAIImageMultipartRequest, setOpenAIImageMultipartModel } from "./openai-image-compat";
 import type { ProxySession } from "./session";
@@ -24,19 +20,13 @@ export class ModelRedirector {
    * @param provider - 目标供应商
    * @returns 是否进行了重定向
    */
-  static apply(session: ProxySession, provider: Provider): boolean {
+  static apply(
+    session: ProxySession,
+    provider: Provider,
+    globalRules: ReadonlyArray<GlobalModelRedirectRule> = []
+  ): boolean {
     // 获取真正的原始模型（用户请求的模型，不是上一个供应商重定向后的模型）
     const trueOriginalModel = session.getOriginalModel() || session.request.model;
-
-    // 检查是否配置了模型重定向
-    if (!hasProviderModelRedirectRules(provider.modelRedirects)) {
-      session.clearCurrentModelRedirect();
-      // 如果新供应商没有重定向配置，且之前发生过重定向，需要重置
-      if (session.isModelRedirected() && trueOriginalModel) {
-        ModelRedirector.resetToOriginal(session, trueOriginalModel, provider);
-      }
-      return false;
-    }
 
     // 获取原始模型名称
     const originalModel = trueOriginalModel;
@@ -48,11 +38,21 @@ export class ModelRedirector {
       return false;
     }
 
-    // 检查是否有该模型的重定向配置
-    const matchedRule = findMatchingProviderModelRedirectRule(
-      originalModel,
-      provider.modelRedirects
-    );
+    const mapping = resolveModelMapping(originalModel, provider, globalRules);
+    if (
+      mapping.stopReason === "cycle" ||
+      mapping.stopReason === "step_limit" ||
+      mapping.stopReason === "model_length_limit"
+    ) {
+      logger.warn("[ModelRedirector] Global model mapping stopped at a safety limit", {
+        providerId: provider.id,
+        originalModel,
+        redirectedModel: mapping.redirectedModel,
+        stopReason: mapping.stopReason,
+        steps: mapping.steps,
+      });
+    }
+    const matchedRule = mapping.steps[0]?.rule;
     if (!matchedRule) {
       session.clearCurrentModelRedirect();
       // 如果新供应商对此模型没有重定向规则，且之前发生过重定向，需要重置
@@ -68,7 +68,7 @@ export class ModelRedirector {
       return false;
     }
 
-    const redirectedModel = resolveProviderModelRedirectTarget(originalModel, matchedRule);
+    const redirectedModel = mapping.redirectedModel;
 
     // 执行重定向
     logger.info("[ModelRedirector] Model redirected", {
@@ -76,6 +76,8 @@ export class ModelRedirector {
       redirectedModel,
       matchType: matchedRule.matchType,
       matchedSource: matchedRule.source,
+      steps: mapping.steps,
+      stopReason: mapping.stopReason,
       providerId: provider.id,
       providerName: provider.name,
       providerType: provider.providerType,
@@ -139,6 +141,8 @@ export class ModelRedirector {
       originalModel,
       redirectedModel,
       billingModel: originalModel,
+      steps: mapping.steps,
+      stopReason: mapping.stopReason,
       matchedRule: {
         matchType: matchedRule.matchType,
         source: matchedRule.source,
@@ -167,12 +171,12 @@ export class ModelRedirector {
    * @param provider - 供应商
    * @returns 重定向后的模型名称（如果没有重定向则返回原始名称）
    */
-  static getRedirectedModel(originalModel: string, provider: Provider): string {
-    if (!provider.modelRedirects || !originalModel) {
-      return originalModel;
-    }
-
-    return getProviderModelRedirectTarget(originalModel, provider.modelRedirects);
+  static getRedirectedModel(
+    originalModel: string,
+    provider: Provider,
+    globalRules: ReadonlyArray<GlobalModelRedirectRule> = []
+  ): string {
+    return resolveModelMapping(originalModel, provider, globalRules).redirectedModel;
   }
 
   /**
@@ -182,8 +186,12 @@ export class ModelRedirector {
    * @param provider - 供应商
    * @returns 是否配置了重定向
    */
-  static hasRedirect(model: string, provider: Provider): boolean {
-    return !!findMatchingProviderModelRedirectRule(model, provider.modelRedirects);
+  static hasRedirect(
+    model: string,
+    provider: Provider,
+    globalRules: ReadonlyArray<GlobalModelRedirectRule> = []
+  ): boolean {
+    return resolveModelMapping(model, provider, globalRules).steps.length > 0;
   }
 
   /**

@@ -4,6 +4,7 @@ import {
   DISCOVERY_FIELD_LIMITS,
   DISCOVERY_SETTINGS_INVALID_ERROR_CODE,
 } from "@/lib/validation/discovery-settings";
+import { GlobalModelRedirectRulesSchema } from "@/lib/validation/global-model-redirects";
 import {
   REPLAY_CACHE_TTL_MINUTES_MAX,
   REPLAY_CACHE_TTL_MINUTES_MIN,
@@ -208,6 +209,9 @@ export const SystemSettingsSchema = z
     allowNonConversationEndpointProviderFallback: z
       .boolean()
       .describe("Whether non-conversation endpoints may fall back across providers."),
+    globalModelRedirects: GlobalModelRedirectRulesSchema.describe(
+      "Ordered global model mapping rules. Each rule applies to all providers except excludedProviderIds. Provider mappings take precedence."
+    ),
     fakeStreamingWhitelist: z
       .array(FakeStreamingWhitelistEntrySchema)
       .describe("Fake streaming model whitelist."),

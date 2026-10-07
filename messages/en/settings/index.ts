@@ -19,6 +19,7 @@ import providersBatchEdit from "./providers/batchEdit.json";
 import providersBatchTest from "./providers/batchTest.json";
 import providersDispatchSimulator from "./providers/dispatchSimulator.json";
 import providersFilter from "./providers/filter.json";
+import providersGlobalModelRedirect from "./providers/globalModelRedirect.json";
 import providersGuide from "./providers/guide.json";
 import providersInlineEdit from "./providers/inlineEdit.json";
 import providersList from "./providers/list.json";
@@ -94,6 +95,7 @@ const providers = {
   dispatchSimulator: providersDispatchSimulator,
   filter: providersFilter,
   form: providersForm,
+  globalModelRedirect: providersGlobalModelRedirect,
   guide: providersGuide,
   inlineEdit: providersInlineEdit,
   list: providersList,

@@ -41,6 +41,7 @@ vi.mock("@/lib/redis/pubsub", () => ({
 
 function createSettings(overrides: Partial<SystemSettings> = {}): SystemSettings {
   const base: SystemSettings = {
+    globalModelRedirects: [],
     id: 1,
     siteTitle: "CC Hub",
     allowGlobalUsageView: false,
@@ -132,6 +133,11 @@ afterEach(() => {
 });
 
 describe("SystemSettingsCache", () => {
+  test("uses no global mappings when the initial settings read fails", async () => {
+    getSystemSettingsMock.mockRejectedValue(new Error("database unavailable"));
+    const { getCachedSystemSettings } = await loadCache();
+    expect((await getCachedSystemSettings()).globalModelRedirects).toEqual([]);
+  });
   test("首次调用应从数据库获取并缓存；TTL 内再次调用应直接返回缓存", async () => {
     getSystemSettingsMock.mockResolvedValueOnce(createSettings({ id: 101 }));
     const { getCachedSystemSettings } = await loadCache();
@@ -238,7 +244,12 @@ describe("SystemSettingsCache", () => {
   );
 
   test("invalidateSystemSettingsCache 应清空缓存并触发下一次重新获取", async () => {
-    const settingsA = createSettings({ id: 401 });
+    const settingsA = createSettings({
+      id: 401,
+      globalModelRedirects: [
+        { matchType: "exact", source: "client", target: "upstream", excludedProviderIds: [7] },
+      ],
+    });
     const settingsB = createSettings({ id: 402 });
     getSystemSettingsMock.mockResolvedValueOnce(settingsA).mockResolvedValueOnce(settingsB);
 
@@ -253,6 +264,7 @@ describe("SystemSettingsCache", () => {
     );
 
     expect(await getCachedSystemSettings()).toBe(settingsB);
+    expect((await getCachedSystemSettings()).globalModelRedirects).toEqual([]);
     expect(getSystemSettingsMock).toHaveBeenCalledTimes(2);
   });
 

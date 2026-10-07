@@ -1,0 +1,33 @@
+{
+  "title": "全域模型映射",
+  "description": "供應商映射優先，命中一次後即停止；否則依序比對全域規則，將每次結果繼續映射，直到沒有規則命中。",
+  "loading": "正在載入規則…",
+  "retry": "重試",
+  "loadFailed": "載入模型映射失敗。",
+  "saveFailed": "儲存模型映射失敗。",
+  "saved": "全域模型映射已儲存。",
+  "save": "儲存",
+  "cancel": "取消",
+  "previewTitle": "映射預覽",
+  "previewDescription": "根據目前草稿預覽指定供應商的映射過程，包括供應商本身的映射。",
+  "model": "請求模型",
+  "provider": "供應商",
+  "noProviders": "找不到供應商。",
+  "result": "最終模型：",
+  "providerRule": "供應商規則 #{index}",
+  "globalRule": "全域規則 #{index}",
+  "excludedProviders": "排除的供應商",
+  "excludedCount": "已排除 {count} 個供應商",
+  "allProviders": "所有供應商",
+  "searchProviders": "搜尋供應商",
+  "clearExclusions": "清除排除項目",
+  "exclusionsHint": "適用於所有供應商（包括未來新增的供應商），此處選取的供應商除外。",
+  "stopReasons": {
+    "no_match": "沒有後續命中的規則。",
+    "provider_rule": "已命中供應商規則，略過全域規則。",
+    "unchanged": "命中的規則未變更模型。",
+    "cycle": "偵測到循環，保留最後一個安全模型。",
+    "step_limit": "達到映射步數上限，保留最後一個安全模型。",
+    "model_length_limit": "達到模型長度上限，保留最後一個安全模型。"
+  }
+}

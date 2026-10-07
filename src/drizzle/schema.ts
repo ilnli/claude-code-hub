@@ -19,6 +19,7 @@ import { relations, sql } from 'drizzle-orm';
 import type { SpecialSetting } from '@/types/special-settings';
 import type { HedgeLoserBilling, StoredCostBreakdown } from '@/types/cost-breakdown';
 import type { ResponseFixerConfig } from '@/types/system-config';
+import type { GlobalModelRedirectRule } from "@/types/model-mapping";
 import type { AllowedModelRuleInput, ProviderModelRedirectRule, ProviderType } from "@/types/provider";
 import type { FilterOperation } from "@/lib/request-filter-types";
 import type { IpExtractionConfig } from "@/types/ip-extraction";
@@ -1239,6 +1240,7 @@ export const systemSettings = pgTable('system_settings', {
 
   // Fake 流式输出白名单（缺省 NULL → transformer 落 DEFAULT_FAKE_STREAMING_WHITELIST；
   // 显式 [] → 表示禁用 fake streaming）
+  globalModelRedirects: jsonb('global_model_redirects').$type<GlobalModelRedirectRule[]>().notNull().default([]),
   fakeStreamingWhitelist: jsonb('fake_streaming_whitelist').$type<
     Array<{ model: string; groupTags: string[] }>
   >(),

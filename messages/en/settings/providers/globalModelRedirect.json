@@ -1,0 +1,33 @@
+{
+  "title": "Global model mappings",
+  "description": "Provider mappings take priority and stop after one match. Otherwise, global rules run in order and keep mapping each result until no rule matches.",
+  "loading": "Loading rules…",
+  "retry": "Retry",
+  "loadFailed": "Could not load model mappings.",
+  "saveFailed": "Could not save model mappings.",
+  "saved": "Global model mappings saved.",
+  "save": "Save",
+  "cancel": "Cancel",
+  "previewTitle": "Mapping preview",
+  "previewDescription": "Preview the current draft for a provider, including its own mappings.",
+  "model": "Requested model",
+  "provider": "Provider",
+  "noProviders": "No providers found.",
+  "result": "Final model:",
+  "providerRule": "Provider rule #{index}",
+  "globalRule": "Global rule #{index}",
+  "excludedProviders": "Excluded providers",
+  "excludedCount": "Excluded providers: {count}",
+  "allProviders": "All providers",
+  "searchProviders": "Search providers",
+  "clearExclusions": "Clear exclusions",
+  "exclusionsHint": "Applies to all providers, including future providers, except those selected here.",
+  "stopReasons": {
+    "no_match": "No further matching rule.",
+    "provider_rule": "Provider rule matched; global rules skipped.",
+    "unchanged": "The matched rule leaves the model unchanged.",
+    "cycle": "Cycle detected; kept the last safe model.",
+    "step_limit": "Mapping step limit reached; kept the last safe model.",
+    "model_length_limit": "Model length limit reached; kept the last safe model."
+  }
+}

@@ -36,6 +36,7 @@ const userSession = {
 } as AuthSession;
 
 const settings: SystemSettings = {
+  globalModelRedirects: [],
   id: 1,
   siteTitle: "CC Hub",
   allowGlobalUsageView: true,
@@ -138,6 +139,75 @@ describe("v1 system config endpoints", () => {
       upstreamBillingProbeEnabled: true,
       upstreamBillingProbeIntervalMinutes: 15,
     });
+  });
+
+  test("saves, reads, and clears ordered global mappings for administrators", async () => {
+    const globalModelRedirects = [
+      {
+        matchType: "regex",
+        source: "^client-(.*)$",
+        target: "upstream-$1",
+        excludedProviderIds: [2],
+      },
+    ];
+    saveSystemSettingsMock.mockResolvedValueOnce({
+      ok: true,
+      data: { ...settings, globalModelRedirects },
+    });
+    const updated = await callV1Route({
+      method: "PUT",
+      pathname: "/api/v1/system/settings",
+      headers: { Authorization: "Bearer admin-token" },
+      body: { globalModelRedirects },
+    });
+    expect(updated.response.status).toBe(200);
+    expect(updated.json).toMatchObject({ globalModelRedirects });
+    expect(saveSystemSettingsMock).toHaveBeenCalledWith({ globalModelRedirects });
+    fetchSystemSettingsMock.mockResolvedValueOnce({
+      ok: true,
+      data: { ...settings, globalModelRedirects },
+    });
+    const read = await callV1Route({
+      method: "GET",
+      pathname: "/api/v1/system/settings",
+      headers: { Authorization: "Bearer admin-token" },
+    });
+    expect(read.json).toMatchObject({ globalModelRedirects });
+    const cleared = await callV1Route({
+      method: "PUT",
+      pathname: "/api/v1/system/settings",
+      headers: { Authorization: "Bearer admin-token" },
+      body: { globalModelRedirects: [] },
+    });
+    expect(cleared.response.status).toBe(200);
+    expect(saveSystemSettingsMock).toHaveBeenLastCalledWith({ globalModelRedirects: [] });
+  });
+
+  test("rejects global mapping updates from non-admins", async () => {
+    validateAuthTokenMock.mockResolvedValue(userSession);
+    const result = await callV1Route({
+      method: "PUT",
+      pathname: "/api/v1/system/settings",
+      headers: { Authorization: "Bearer user-token" },
+      body: { globalModelRedirects: [] },
+    });
+    expect(result.response.status).toBe(403);
+    expect(saveSystemSettingsMock).not.toHaveBeenCalled();
+  });
+
+  test("rejects invalid global exclusions before saving", async () => {
+    const result = await callV1Route({
+      method: "PUT",
+      pathname: "/api/v1/system/settings",
+      headers: { Authorization: "Bearer admin-token" },
+      body: {
+        globalModelRedirects: [
+          { matchType: "exact", source: "client", target: "upstream", excludedProviderIds: [0] },
+        ],
+      },
+    });
+    expect(result.response.status).toBe(400);
+    expect(saveSystemSettingsMock).not.toHaveBeenCalled();
   });
 
   test("returns the server timezone as a read endpoint", async () => {

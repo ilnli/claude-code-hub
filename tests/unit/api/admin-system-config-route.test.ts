@@ -49,6 +49,24 @@ describe("POST /api/admin/system-config", () => {
     });
   });
 
+  it("forwards global mapping updates through the legacy adapter", async () => {
+    const { POST } = await import("@/app/api/admin/system-config/route");
+    const globalModelRedirects = [
+      { matchType: "exact", source: "client", target: "upstream", excludedProviderIds: [5] },
+    ];
+    const response = await POST(
+      new Request("http://localhost/api/admin/system-config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ globalModelRedirects }),
+      })
+    );
+    expect(response.status).toBe(200);
+    expect(mocks.updateSystemSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ globalModelRedirects })
+    );
+  });
+
   it("persists upstream billing probe settings", async () => {
     const { POST } = await import("@/app/api/admin/system-config/route");
     const response = await POST(

@@ -8,6 +8,7 @@ import { getSession } from "@/lib/auth";
 import { SettingsPageHeader } from "../_components/settings-page-header";
 import { AutoSortPriorityDialog } from "./_components/auto-sort-priority-dialog";
 import { DispatchSimulatorDialog } from "./_components/dispatch-simulator-dialog";
+import { GlobalModelRedirectRulesDialog } from "./_components/global-model-redirect-rules-dialog";
 import { ProviderManagerLoader } from "./_components/provider-manager-loader";
 import { ReclusterVendorsDialog } from "./_components/recluster-vendors-dialog";
 import { SchedulingRulesDialog } from "./_components/scheduling-rules-dialog";
@@ -43,6 +44,7 @@ export default async function SettingsProvidersPage({
             <AutoSortPriorityDialog />
             <ReclusterVendorsDialog />
             <SchedulingRulesDialog />
+            <GlobalModelRedirectRulesDialog providers={providers} />
             <WeightAdjustmentRulesDialog providers={providers} />
             <DispatchSimulatorDialog providers={providers} />
           </>

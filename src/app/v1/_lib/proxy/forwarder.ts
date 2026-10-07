@@ -3699,7 +3699,8 @@ export class ProxyForwarder {
 
     // Apply model redirect (if configured) - skip for raw passthrough endpoints
     if (!ProxyForwarder.getEndpointPolicy(session).bypassForwarderPreprocessing) {
-      const wasRedirected = ModelRedirector.apply(session, provider);
+      const settings = await getCachedSystemSettings();
+      const wasRedirected = ModelRedirector.apply(session, provider, settings.globalModelRedirects);
       if (wasRedirected) {
         logger.debug("ProxyForwarder: Model redirected", {
           providerId: provider.id,

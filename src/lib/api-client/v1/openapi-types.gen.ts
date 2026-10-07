@@ -18535,6 +18535,15 @@ export interface operations {
                         enableResponseInputRectifier: boolean;
                         /** @description Whether non-conversation endpoints may fall back across providers. */
                         allowNonConversationEndpointProviderFallback: boolean;
+                        /** @description Ordered global model mapping rules. Each rule applies to all providers except excludedProviderIds. Provider mappings take precedence. */
+                        globalModelRedirects: {
+                            /** @enum {string} */
+                            matchType: "exact" | "prefix" | "suffix" | "contains" | "regex";
+                            source: string;
+                            target: string;
+                            /** @default [] */
+                            excludedProviderIds: number[];
+                        }[];
                         /** @description Fake streaming model whitelist. */
                         fakeStreamingWhitelist: {
                             /** @description Exact model id eligible for fake streaming. */
@@ -18837,6 +18846,15 @@ export interface operations {
                     enableResponseInputRectifier?: boolean;
                     /** @description Whether non-conversation endpoints may fall back across providers. */
                     allowNonConversationEndpointProviderFallback?: boolean;
+                    /** @description Ordered global model mapping rules. Each rule applies to all providers except excludedProviderIds. Provider mappings take precedence. */
+                    globalModelRedirects?: {
+                        /** @enum {string} */
+                        matchType: "exact" | "prefix" | "suffix" | "contains" | "regex";
+                        source: string;
+                        target: string;
+                        /** @default [] */
+                        excludedProviderIds?: number[];
+                    }[];
                     /** @description Fake streaming model whitelist. */
                     fakeStreamingWhitelist?: {
                         /** @description Exact model id eligible for fake streaming. */
@@ -19014,6 +19032,15 @@ export interface operations {
                         enableResponseInputRectifier: boolean;
                         /** @description Whether non-conversation endpoints may fall back across providers. */
                         allowNonConversationEndpointProviderFallback: boolean;
+                        /** @description Ordered global model mapping rules. Each rule applies to all providers except excludedProviderIds. Provider mappings take precedence. */
+                        globalModelRedirects: {
+                            /** @enum {string} */
+                            matchType: "exact" | "prefix" | "suffix" | "contains" | "regex";
+                            source: string;
+                            target: string;
+                            /** @default [] */
+                            excludedProviderIds: number[];
+                        }[];
                         /** @description Fake streaming model whitelist. */
                         fakeStreamingWhitelist: {
                             /** @description Exact model id eligible for fake streaming. */
