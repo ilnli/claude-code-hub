@@ -29,5 +29,8 @@
     "cycle": "检测到循环，保留最后一个安全模型。",
     "step_limit": "达到映射步数上限，保留最后一个安全模型。",
     "model_length_limit": "达到模型长度上限，保留最后一个安全模型。"
-  }
+  },
+  "matchAfterMapping": "使用映射后的模型匹配供应商白名单",
+  "matchAfterMappingDescription": "默认关闭。开启后，供应商模型白名单使用最终映射结果进行匹配；用户模型权限仍按原始请求模型校验。",
+  "providerMatchingModel": "供应商白名单匹配模型："
 }

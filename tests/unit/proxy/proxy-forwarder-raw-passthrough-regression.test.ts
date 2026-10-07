@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { GlobalModelRedirectRule } from "@/types/model-mapping";
+import { createModelMappingContext } from "@/lib/model-mapping";
 
 const mocks = vi.hoisted(() => ({
   isHttp2Enabled: vi.fn(async () => false),
@@ -166,6 +167,51 @@ describe("ProxyForwarder raw passthrough regression", () => {
       eligible: false,
     });
     mocks.tryResponsesWebsocketUpstream.mockReset();
+  });
+
+  it("forwards with the mapping snapshot used by selection even after settings change", async () => {
+    const session = createRawPassthroughSession('{"model":"gpt-5.5","input":[]}');
+    const endpointPolicy = resolveEndpointPolicy("/v1/responses");
+    Object.assign(session, {
+      requestUrl: new URL("https://proxy.example.com/v1/responses"),
+      endpointPolicy,
+      getEndpointPolicy: () => endpointPolicy,
+      modelMappingContext: Promise.resolve(
+        createModelMappingContext({
+          matchProviderModelsAfterMapping: true,
+          globalModelRedirects: [
+            {
+              matchType: "exact",
+              source: "gpt-5.5",
+              target: "selected-model",
+              excludedProviderIds: [],
+            },
+          ],
+        })
+      ),
+    });
+    mocks.getCachedSystemSettings.mockResolvedValue({
+      enableClaudeMetadataUserIdInjection: false,
+      enableBillingHeaderRectifier: false,
+      globalModelRedirects: [
+        {
+          matchType: "exact",
+          source: "gpt-5.5",
+          target: "new-settings-model",
+          excludedProviderIds: [],
+        },
+      ],
+    });
+    let forwardedBody: BodyInit | undefined;
+    vi.spyOn(ProxyForwarder as any, "fetchWithoutAutoDecode").mockImplementationOnce(
+      async (_url: string, init: RequestInit) => {
+        forwardedBody = init.body ?? undefined;
+        return new Response("{}", { headers: { "content-type": "application/json" } });
+      }
+    );
+    const provider = createProvider();
+    await (ProxyForwarder as any).doForward(session, provider, provider.url);
+    expect(JSON.parse(readBodyText(forwardedBody)!).model).toBe("selected-model");
   });
 
   it.each([false, true])(

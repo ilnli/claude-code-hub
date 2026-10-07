@@ -30,6 +30,7 @@ export interface FakeStreamingWhitelistEntry {
 export const DEFAULT_FAKE_STREAMING_WHITELIST: ReadonlyArray<FakeStreamingWhitelistEntry> = [];
 
 export interface SystemSettings {
+  matchProviderModelsAfterMapping: boolean;
   globalModelRedirects: GlobalModelRedirectRule[];
   id: number;
   siteTitle: string;
@@ -202,6 +203,7 @@ export interface SystemSettings {
 }
 
 export interface UpdateSystemSettingsInput {
+  matchProviderModelsAfterMapping?: boolean;
   globalModelRedirects?: GlobalModelRedirectRule[];
   // 所有字段均为可选，支持部分更新
   siteTitle?: string;

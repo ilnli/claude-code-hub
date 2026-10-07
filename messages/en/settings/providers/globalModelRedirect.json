@@ -29,5 +29,8 @@
     "cycle": "Cycle detected; kept the last safe model.",
     "step_limit": "Mapping step limit reached; kept the last safe model.",
     "model_length_limit": "Model length limit reached; kept the last safe model."
-  }
+  },
+  "matchAfterMapping": "Match provider whitelist after mapping",
+  "matchAfterMappingDescription": "Off by default. When enabled, provider model whitelists use the final mapped model. User model permissions still use the requested model.",
+  "providerMatchingModel": "Provider whitelist checks:"
 }

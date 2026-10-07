@@ -209,6 +209,11 @@ export const SystemSettingsSchema = z
     allowNonConversationEndpointProviderFallback: z
       .boolean()
       .describe("Whether non-conversation endpoints may fall back across providers."),
+    matchProviderModelsAfterMapping: z
+      .boolean()
+      .describe(
+        "Whether provider model whitelists match the final mapped model. Defaults to false; user model permissions still use the requested model."
+      ),
     globalModelRedirects: GlobalModelRedirectRulesSchema.describe(
       "Ordered global model mapping rules. Each rule applies to all providers except excludedProviderIds. Provider mappings take precedence."
     ),

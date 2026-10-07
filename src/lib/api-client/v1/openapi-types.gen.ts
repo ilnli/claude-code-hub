@@ -18535,6 +18535,8 @@ export interface operations {
                         enableResponseInputRectifier: boolean;
                         /** @description Whether non-conversation endpoints may fall back across providers. */
                         allowNonConversationEndpointProviderFallback: boolean;
+                        /** @description Whether provider model whitelists match the final mapped model. Defaults to false; user model permissions still use the requested model. */
+                        matchProviderModelsAfterMapping: boolean;
                         /** @description Ordered global model mapping rules. Each rule applies to all providers except excludedProviderIds. Provider mappings take precedence. */
                         globalModelRedirects: {
                             /** @enum {string} */
@@ -18846,6 +18848,8 @@ export interface operations {
                     enableResponseInputRectifier?: boolean;
                     /** @description Whether non-conversation endpoints may fall back across providers. */
                     allowNonConversationEndpointProviderFallback?: boolean;
+                    /** @description Whether provider model whitelists match the final mapped model. Defaults to false; user model permissions still use the requested model. */
+                    matchProviderModelsAfterMapping?: boolean;
                     /** @description Ordered global model mapping rules. Each rule applies to all providers except excludedProviderIds. Provider mappings take precedence. */
                     globalModelRedirects?: {
                         /** @enum {string} */
@@ -19032,6 +19036,8 @@ export interface operations {
                         enableResponseInputRectifier: boolean;
                         /** @description Whether non-conversation endpoints may fall back across providers. */
                         allowNonConversationEndpointProviderFallback: boolean;
+                        /** @description Whether provider model whitelists match the final mapped model. Defaults to false; user model permissions still use the requested model. */
+                        matchProviderModelsAfterMapping: boolean;
                         /** @description Ordered global model mapping rules. Each rule applies to all providers except excludedProviderIds. Provider mappings take precedence. */
                         globalModelRedirects: {
                             /** @enum {string} */

@@ -7,6 +7,7 @@ import {
 import { loadRequestBody, retainRequestMemory } from "@/lib/body-store/request-body-store";
 import { logger } from "@/lib/logger";
 import { onRequestMemoryForcedEnd, retainRequestMemoryUntil } from "@/lib/memory/request-lifetime";
+import type { ModelMappingContext } from "@/lib/model-mapping";
 import {
   deleteLiveChain,
   type LiveProviderSnapshot,
@@ -313,6 +314,9 @@ export class ProxySession {
    * 用于保证故障迁移期间数据一致性（避免同一请求多次调用返回不同结果）。
    */
   private providersSnapshot: Provider[] | null = null;
+
+  // Selection and forwarding share the same settings snapshot and mapping results.
+  modelMappingContext?: Promise<ModelMappingContext>;
 
   // 本请求已通过 Provider 并发检查获得的引用。tracked=true 表示这次
   // acquire 同时创建了 Provider Session 基线；Sticky CAS 成功时只有

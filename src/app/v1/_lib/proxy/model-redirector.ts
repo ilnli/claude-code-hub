@@ -1,5 +1,5 @@
 import { logger } from "@/lib/logger";
-import { resolveModelMapping } from "@/lib/model-mapping";
+import { type ModelMappingContext, resolveModelMapping } from "@/lib/model-mapping";
 import type { GlobalModelRedirectRule } from "@/types/model-mapping";
 import type { Provider } from "@/types/provider";
 import { isOpenAIImageMultipartRequest, setOpenAIImageMultipartModel } from "./openai-image-compat";
@@ -23,7 +23,7 @@ export class ModelRedirector {
   static apply(
     session: ProxySession,
     provider: Provider,
-    globalRules: ReadonlyArray<GlobalModelRedirectRule> = []
+    rulesOrContext: ReadonlyArray<GlobalModelRedirectRule> | ModelMappingContext = []
   ): boolean {
     // 获取真正的原始模型（用户请求的模型，不是上一个供应商重定向后的模型）
     const trueOriginalModel = session.getOriginalModel() || session.request.model;
@@ -38,7 +38,10 @@ export class ModelRedirector {
       return false;
     }
 
-    const mapping = resolveModelMapping(originalModel, provider, globalRules);
+    const mapping =
+      "resolve" in rulesOrContext
+        ? rulesOrContext.resolve(provider, originalModel)
+        : resolveModelMapping(originalModel, provider, rulesOrContext);
     if (
       mapping.stopReason === "cycle" ||
       mapping.stopReason === "step_limit" ||

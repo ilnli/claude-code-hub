@@ -118,6 +118,7 @@ export async function saveSystemSettings(formData: {
   enableResponseInputRectifier?: boolean;
   allowNonConversationEndpointProviderFallback?: boolean;
   fakeStreamingWhitelist?: FakeStreamingWhitelistEntry[];
+  matchProviderModelsAfterMapping?: boolean;
   globalModelRedirects?: GlobalModelRedirectRule[];
   streamGateMode?: StreamGateSettingMode;
   semanticErrorRoutingMode?: SemanticErrorRoutingMode;
@@ -177,6 +178,7 @@ export async function saveSystemSettings(formData: {
       };
     }
     const settingsUpdate: UpdateSystemSettingsInput = {
+      matchProviderModelsAfterMapping: validated.matchProviderModelsAfterMapping,
       globalModelRedirects: validated.globalModelRedirects,
       siteTitle: validated.siteTitle?.trim(),
       allowGlobalUsageView: validated.allowGlobalUsageView,

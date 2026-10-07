@@ -1199,6 +1199,7 @@ export const UpdateSystemSettingsSchema = z
     // 非对话端点跨供应商 fallback（可选）
     allowNonConversationEndpointProviderFallback: z.boolean().optional(),
     // Fake 流式输出白名单（可选）。空数组表示显式禁用；缺省 → 使用默认四个图像生成模型。
+    matchProviderModelsAfterMapping: z.boolean().optional(),
     globalModelRedirects: GlobalModelRedirectRulesSchema.optional(),
     fakeStreamingWhitelist: z
       .array(

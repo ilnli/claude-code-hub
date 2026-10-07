@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import { createModelMappingContext } from "@/lib/model-mapping";
 import type { Provider } from "@/types/provider";
 
 // ── Mocks (shared by findReusable and pickRandomProvider tests) ──
@@ -71,6 +72,85 @@ function createProvider(overrides: Partial<Provider> = {}): Provider {
     ...overrides,
   } as unknown as Provider;
 }
+
+describe("mapped provider allowlist matching", () => {
+  const globalModelRedirects = [
+    { matchType: "exact" as const, source: "A", target: "B", excludedProviderIds: [] },
+    { matchType: "exact" as const, source: "B", target: "C", excludedProviderIds: [2] },
+  ];
+
+  test.each([
+    { enabled: false, allowed: "A", expected: true },
+    { enabled: false, allowed: "C", expected: false },
+    { enabled: true, allowed: "A", expected: false },
+    { enabled: true, allowed: "B", expected: false },
+    { enabled: true, allowed: "C", expected: true },
+  ])("matches only the selected model basis: %j", async ({ enabled, allowed, expected }) => {
+    const { providerSupportsModel } = await import("@/app/v1/_lib/proxy/provider-selector");
+    const context = createModelMappingContext({
+      globalModelRedirects,
+      matchProviderModelsAfterMapping: enabled,
+    });
+    expect(providerSupportsModel(createProvider({ allowedModels: [allowed] }), "A", context)).toBe(
+      expected
+    );
+  });
+
+  test("respects supplier precedence, exclusions, whitelist patterns and unrestricted providers", async () => {
+    const { providerSupportsModel } = await import("@/app/v1/_lib/proxy/provider-selector");
+    const context = createModelMappingContext({
+      globalModelRedirects,
+      matchProviderModelsAfterMapping: true,
+    });
+    const override = createProvider({
+      allowedModels: [{ matchType: "prefix", pattern: "actual-" }],
+      modelRedirects: [{ matchType: "exact", source: "A", target: "actual-model" }],
+    });
+    expect(providerSupportsModel(override, "A", context)).toBe(true);
+    expect(
+      providerSupportsModel(createProvider({ id: 2, allowedModels: ["B"] }), "A", context)
+    ).toBe(true);
+    expect(
+      providerSupportsModel(createProvider({ id: 2, allowedModels: ["C"] }), "A", context)
+    ).toBe(false);
+    expect(providerSupportsModel(createProvider({ allowedModels: [] }), "A", context)).toBe(true);
+  });
+
+  test.each(["pickRandomProvider", "findReusable", "validateAffinityCandidate"])(
+    "%s uses mapped whitelist matching and preserves the original request model",
+    async (method) => {
+      const { ProxyProviderResolver } = await import("@/app/v1/_lib/proxy/provider-selector");
+      const provider = createProvider({ id: 88, providerType: "claude", allowedModels: ["C"] });
+      sessionManagerMocks.SessionManager.getSessionProvider.mockResolvedValue(88);
+      providerRepositoryMocks.findProviderById.mockResolvedValue(provider);
+      vi.spyOn(ProxyProviderResolver as any, "filterByLimits").mockImplementation(
+        async (...args: unknown[]) => args[0]
+      );
+      const session = {
+        originalFormat: "claude",
+        authState: null,
+        sessionId: "mapped-session",
+        shouldReuseProvider: () => true,
+        getProvidersSnapshot: async () => [provider],
+        getOriginalModel: () => "A",
+        getCurrentModel: () => "A",
+        clientRequestsContext1m: () => false,
+        modelMappingContext: Promise.resolve(
+          createModelMappingContext({
+            globalModelRedirects,
+            matchProviderModelsAfterMapping: true,
+          })
+        ),
+      };
+      const outcome = await (ProxyProviderResolver as any)[method](
+        session,
+        method === "validateAffinityCandidate" ? 88 : []
+      );
+      expect(method === "pickRandomProvider" ? outcome.provider?.id : outcome?.id).toBe(88);
+      expect(session.getOriginalModel()).toBe("A");
+    }
+  );
+});
 
 // ══════════════════════════════════════════════════════════════════
 // Part 1: Direct unit tests for providerSupportsModel (table-driven)

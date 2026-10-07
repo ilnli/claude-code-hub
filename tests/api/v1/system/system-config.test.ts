@@ -36,6 +36,7 @@ const userSession = {
 } as AuthSession;
 
 const settings: SystemSettings = {
+  matchProviderModelsAfterMapping: false,
   globalModelRedirects: [],
   id: 1,
   siteTitle: "CC Hub",
@@ -183,13 +184,31 @@ describe("v1 system config endpoints", () => {
     expect(saveSystemSettingsMock).toHaveBeenLastCalledWith({ globalModelRedirects: [] });
   });
 
+  test.each([true, false])("accepts the provider whitelist matching switch %s", async (enabled) => {
+    saveSystemSettingsMock.mockResolvedValueOnce({
+      ok: true,
+      data: { ...settings, matchProviderModelsAfterMapping: enabled },
+    });
+    const result = await callV1Route({
+      method: "PUT",
+      pathname: "/api/v1/system/settings",
+      headers: { Authorization: "Bearer admin-token" },
+      body: { matchProviderModelsAfterMapping: enabled },
+    });
+    expect(result.response.status).toBe(200);
+    expect(result.json).toMatchObject({ matchProviderModelsAfterMapping: enabled });
+    expect(saveSystemSettingsMock).toHaveBeenCalledWith({
+      matchProviderModelsAfterMapping: enabled,
+    });
+  });
+
   test("rejects global mapping updates from non-admins", async () => {
     validateAuthTokenMock.mockResolvedValue(userSession);
     const result = await callV1Route({
       method: "PUT",
       pathname: "/api/v1/system/settings",
       headers: { Authorization: "Bearer user-token" },
-      body: { globalModelRedirects: [] },
+      body: { globalModelRedirects: [], matchProviderModelsAfterMapping: true },
     });
     expect(result.response.status).toBe(403);
     expect(saveSystemSettingsMock).not.toHaveBeenCalled();

@@ -29,5 +29,8 @@
     "cycle": "偵測到循環，保留最後一個安全模型。",
     "step_limit": "達到映射步數上限，保留最後一個安全模型。",
     "model_length_limit": "達到模型長度上限，保留最後一個安全模型。"
-  }
+  },
+  "matchAfterMapping": "使用映射後的模型比對供應商白名單",
+  "matchAfterMappingDescription": "預設關閉。開啟後，供應商模型白名單使用最終映射結果進行比對；使用者模型權限仍依原始請求模型驗證。",
+  "providerMatchingModel": "供應商白名單比對模型："
 }

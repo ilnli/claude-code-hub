@@ -58,12 +58,12 @@ describe("POST /api/admin/system-config", () => {
       new Request("http://localhost/api/admin/system-config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ globalModelRedirects }),
+        body: JSON.stringify({ globalModelRedirects, matchProviderModelsAfterMapping: true }),
       })
     );
     expect(response.status).toBe(200);
     expect(mocks.updateSystemSettings).toHaveBeenCalledWith(
-      expect.objectContaining({ globalModelRedirects })
+      expect.objectContaining({ globalModelRedirects, matchProviderModelsAfterMapping: true })
     );
   });
 

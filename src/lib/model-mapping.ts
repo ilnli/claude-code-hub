@@ -32,6 +32,43 @@ export interface ModelMappingResult {
   stopReason: ModelMappingStopReason;
 }
 
+type MappingProvider = Pick<Provider, "id" | "modelRedirects">;
+
+export interface ModelMappingContext {
+  readonly matchProviderModelsAfterMapping: boolean;
+  resolve(provider: MappingProvider, model: string): ModelMappingResult;
+}
+
+/** One settings snapshot and one cached resolution per provider for a request. */
+export function createModelMappingContext(
+  settings: {
+    globalModelRedirects?: ReadonlyArray<GlobalModelRedirectRule>;
+    matchProviderModelsAfterMapping?: boolean;
+  },
+  applyMappings = true
+): ModelMappingContext {
+  const globalRules = settings.globalModelRedirects ?? [];
+  const cache = new WeakMap<MappingProvider, ModelMappingResult>();
+  return {
+    matchProviderModelsAfterMapping:
+      applyMappings && settings.matchProviderModelsAfterMapping === true,
+    resolve(provider, model) {
+      const cached = cache.get(provider);
+      if (cached?.originalModel === model) return cached;
+      const result = applyMappings
+        ? resolveModelMapping(model, provider, globalRules)
+        : {
+            originalModel: model,
+            redirectedModel: model,
+            steps: [],
+            stopReason: "no_match" as const,
+          };
+      cache.set(provider, result);
+      return result;
+    },
+  };
+}
+
 export function resolveModelMapping(
   model: string,
   provider: Pick<Provider, "id" | "modelRedirects">,

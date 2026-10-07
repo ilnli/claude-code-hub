@@ -151,6 +151,7 @@ import {
   rectifyGeminiFunctionIds,
 } from "./gemini-function-id-rectifier";
 import { LocalAdmissionClock } from "./local-admission-clock";
+import { getRequestModelMappingContext } from "./model-mapping-context";
 import { ModelRedirector } from "./model-redirector";
 import { nodeStreamToWebStreamSafe } from "./node-stream-to-web";
 import { ensureOpenAIChatStreamUsageOption } from "./openai-chat-usage-options";
@@ -3699,8 +3700,8 @@ export class ProxyForwarder {
 
     // Apply model redirect (if configured) - skip for raw passthrough endpoints
     if (!ProxyForwarder.getEndpointPolicy(session).bypassForwarderPreprocessing) {
-      const settings = await getCachedSystemSettings();
-      const wasRedirected = ModelRedirector.apply(session, provider, settings.globalModelRedirects);
+      const mappingContext = await getRequestModelMappingContext(session);
+      const wasRedirected = ModelRedirector.apply(session, provider, mappingContext);
       if (wasRedirected) {
         logger.debug("ProxyForwarder: Model redirected", {
           providerId: provider.id,

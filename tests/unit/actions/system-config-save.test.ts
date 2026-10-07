@@ -138,6 +138,18 @@ describe("saveSystemSettings", () => {
     expect(invalidateSystemSettingsCacheMock).toHaveBeenCalledTimes(2);
   });
 
+  it.each([true, false])(
+    "saves provider whitelist matching switch %s and invalidates the cache",
+    async (enabled) => {
+      const result = await saveSystemSettings({ matchProviderModelsAfterMapping: enabled });
+      expect(result.ok).toBe(true);
+      expect(updateSystemSettingsMock).toHaveBeenCalledWith(
+        expect.objectContaining({ matchProviderModelsAfterMapping: enabled })
+      );
+      expect(invalidateSystemSettingsCacheMock).toHaveBeenCalledTimes(1);
+    }
+  );
+
   it("should return error when user is not admin", async () => {
     getSessionMock.mockResolvedValue({ user: { id: 1, role: "user" } });
 

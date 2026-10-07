@@ -1240,6 +1240,7 @@ export const systemSettings = pgTable('system_settings', {
 
   // Fake 流式输出白名单（缺省 NULL → transformer 落 DEFAULT_FAKE_STREAMING_WHITELIST；
   // 显式 [] → 表示禁用 fake streaming）
+  matchProviderModelsAfterMapping: boolean('match_provider_models_after_mapping').notNull().default(false),
   globalModelRedirects: jsonb('global_model_redirects').$type<GlobalModelRedirectRule[]>().notNull().default([]),
   fakeStreamingWhitelist: jsonb('fake_streaming_whitelist').$type<
     Array<{ model: string; groupTags: string[] }>

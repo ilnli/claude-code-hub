@@ -3,6 +3,7 @@ import { getCircuitState, isCircuitOpen } from "@/lib/circuit-breaker";
 import { getEnvConfig } from "@/lib/config/env.schema";
 import { PROVIDER_GROUP } from "@/lib/constants/provider.constants";
 import { logger } from "@/lib/logger";
+import type { ModelMappingContext } from "@/lib/model-mapping";
 import { RateLimitService } from "@/lib/rate-limit";
 import { buildPublicSessionIdentity, buildScopeTag } from "@/lib/request-identity";
 import { SessionManager } from "@/lib/session-manager";
@@ -33,6 +34,7 @@ import {
 } from "./affinity/fingerprint";
 import { isClientAllowedDetailed } from "./client-detector";
 import type { ClientFormat } from "./format-mapper";
+import { getRequestModelMappingContext } from "./model-mapping-context";
 import { ProxyResponses } from "./responses";
 import type { ProxySession } from "./session";
 
@@ -126,8 +128,8 @@ async function resolveGroupCostMultiplierForProvider(session: ProxySession): Pro
  *
  * 核心逻辑（统一所有供应商类型）：
  * 1. 未设置 allowedModels（null 或空数组）：接受任意模型（格式兼容性由 checkFormatProviderTypeCompatibility 保证）
- * 2. 设置了 allowedModels：仅当原始请求模型命中 allowedModels 时才支持
- * 3. modelRedirects 仅在供应商已被选中后用于改写上游模型，不参与调度放行
+ * 2. 默认以原始请求模型匹配 allowedModels；开启映射后匹配时使用该供应商的最终映射模型。
+ * 3. 匹配只计算模型名称，实际请求改写仍在供应商选中后执行。
  *
  * 注意：allowedModels 是声明性列表（用户可填写任意字符串），用于调度器匹配，不是真实模型校验。
  * 格式兼容性（如 claude 格式请求只路由到 claude 类型供应商）由 checkFormatProviderTypeCompatibility 独立保证。
@@ -136,14 +138,20 @@ async function resolveGroupCostMultiplierForProvider(session: ProxySession): Pro
  * @param requestedModel - 用户请求的模型名称
  * @returns 是否支持该模型（用于调度器筛选）
  */
-function providerSupportsModel(provider: Provider, requestedModel: string): boolean {
+function providerSupportsModel(
+  provider: Provider,
+  requestedModel: string,
+  mappingContext?: ModelMappingContext
+): boolean {
   // 1. 未设置 allowedModels（null 或空数组）：接受任意模型
   if (!provider.allowedModels || provider.allowedModels.length === 0) {
     return true;
   }
 
-  // 2. 设置了 allowedModels：只按原始请求模型做白名单匹配
-  return matchesAllowedModelRules(requestedModel, provider.allowedModels);
+  const matchedModel = mappingContext?.matchProviderModelsAfterMapping
+    ? mappingContext.resolve(provider, requestedModel).redirectedModel
+    : requestedModel;
+  return matchesAllowedModelRules(matchedModel, provider.allowedModels);
 }
 
 /**
@@ -748,7 +756,11 @@ export class ProxyProviderResolver {
       return null;
     }
     const requestedModel = session.getOriginalModel();
-    if (requestedModel && !providerSupportsModel(provider, requestedModel)) return null;
+    if (
+      requestedModel &&
+      !providerSupportsModel(provider, requestedModel, await getRequestModelMappingContext(session))
+    )
+      return null;
 
     const clientResult = isClientAllowedDetailed(
       session,
@@ -940,13 +952,19 @@ export class ProxyProviderResolver {
 
     // 检查模型支持
     const requestedModel = session.getOriginalModel();
-    if (requestedModel && !providerSupportsModel(provider, requestedModel)) {
+    const mappingContext = requestedModel
+      ? await getRequestModelMappingContext(session)
+      : undefined;
+    if (requestedModel && !providerSupportsModel(provider, requestedModel, mappingContext)) {
       logger.debug("ProviderSelector: Session provider does not support requested model", {
         sessionId: session.sessionId,
         providerId: provider.id,
         providerName: provider.name,
         providerType: provider.providerType,
         requestedModel,
+        matchedModel: mappingContext?.matchProviderModelsAfterMapping
+          ? mappingContext.resolve(provider, requestedModel).redirectedModel
+          : requestedModel,
         allowedModels: provider.allowedModels,
       });
 
@@ -1109,6 +1127,9 @@ export class ProxyProviderResolver {
     // 如果没有 session，回退到 findAllProviders（内部已使用缓存）
     const allProviders = session ? await session.getProvidersSnapshot() : await findAllProviders();
     const requestedModel = session?.getOriginalModel() || "";
+    const mappingContext = requestedModel
+      ? await getRequestModelMappingContext(session)
+      : undefined;
 
     // === Step 1: 分组预过滤（静默，用户只能看到自己分组内的供应商）===
     const effectiveGroupPick = getEffectiveProviderGroup(session);
@@ -1255,7 +1276,7 @@ export class ProxyProviderResolver {
         return true;
       }
 
-      return providerSupportsModel(provider, requestedModel);
+      return providerSupportsModel(provider, requestedModel, mappingContext);
     });
 
     context.enabledProviders = enabledProviders.length;
@@ -1289,9 +1310,12 @@ export class ProxyProviderResolver {
         ) {
           reason = "format_type_mismatch";
           details = `原始格式 ${session.originalFormat} 与供应商类型 ${p.providerType} 不兼容`;
-        } else if (requestedModel && !providerSupportsModel(p, requestedModel)) {
+        } else if (requestedModel && !providerSupportsModel(p, requestedModel, mappingContext)) {
           reason = "model_not_allowed";
-          details = `不支持模型 ${requestedModel}`;
+          const matchedModel = mappingContext?.matchProviderModelsAfterMapping
+            ? mappingContext.resolve(p, requestedModel).redirectedModel
+            : requestedModel;
+          details = `不支持模型 ${matchedModel}`;
         }
 
         context.filteredProviders?.push({

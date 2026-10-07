@@ -7,6 +7,7 @@ import type { UpdateSystemSettingsInput } from "@/types/system-config";
 
 // 近代新增列（最新在前），降级链按引入顺序逐层累计剥离。
 const RECENT_COLUMNS = [
+  "matchProviderModelsAfterMapping",
   "globalModelRedirects",
   "enableMemoryAdmission",
   "legacyHedgeMaxInFlight",
@@ -38,6 +39,7 @@ const RECENT_COLUMNS = [
 
 // 全量字段集（61 列）。
 const FULL_COLUMNS = [
+  "matchProviderModelsAfterMapping",
   "globalModelRedirects",
   "enableMemoryAdmission",
   "replayCacheTtlMinutes",
@@ -107,6 +109,7 @@ const FULL_COLUMNS = [
 // 历史世代字段集（冻结）：passThrough 世代之前的 schema 没有以下五列，
 // 但仍包含 enableThinkingEffortConflictRectifier / allowNonConversationEndpointProviderFallback。
 const PASS_THROUGH_ERA_OMIT = [
+  "matchProviderModelsAfterMapping",
   "globalModelRedirects",
   "clientVersionPolicyInitialized",
   "legacyHedgeMaxInFlight",

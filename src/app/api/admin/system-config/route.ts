@@ -78,6 +78,7 @@ export async function POST(req: Request) {
 
     // 更新系统设置
     const updated = await updateSystemSettings({
+      matchProviderModelsAfterMapping: validated.matchProviderModelsAfterMapping,
       globalModelRedirects: validated.globalModelRedirects,
       siteTitle: validated.siteTitle?.trim(),
       allowGlobalUsageView: validated.allowGlobalUsageView,

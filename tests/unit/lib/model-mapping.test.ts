@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { resolveModelMapping } from "@/lib/model-mapping";
+import { createModelMappingContext, resolveModelMapping } from "@/lib/model-mapping";
 import type { GlobalModelRedirectRule } from "@/types/model-mapping";
 import type { Provider } from "@/types/provider";
 
@@ -14,6 +14,44 @@ const rule = (
   target,
   excludedProviderIds: [],
   ...overrides,
+});
+
+describe("request model mapping context", () => {
+  test("defaults matching to the requested model while still resolving redirects for forwarding", () => {
+    const context = createModelMappingContext({ globalModelRedirects: [rule("A", "B")] });
+    expect(context.matchProviderModelsAfterMapping).toBe(false);
+    expect(context.resolve(provider, "A").redirectedModel).toBe("B");
+  });
+
+  test("reuses a provider/model resolution without leaking across models or providers", () => {
+    const context = createModelMappingContext({
+      matchProviderModelsAfterMapping: true,
+      globalModelRedirects: [rule("A", "B", { excludedProviderIds: [2] })],
+    });
+    const first = context.resolve(provider, "A");
+    expect(context.resolve(provider, "A")).toBe(first);
+    expect(context.resolve({ ...provider, id: 2 }, "A").redirectedModel).toBe("A");
+    expect(context.resolve(provider, "Z").redirectedModel).toBe("Z");
+    expect(context.resolve(provider, "A").redirectedModel).toBe("B");
+    expect(context.matchProviderModelsAfterMapping).toBe(true);
+  });
+
+  test("raw passthrough uses the actual unchanged model even when mapped matching is enabled", () => {
+    const context = createModelMappingContext(
+      {
+        matchProviderModelsAfterMapping: true,
+        globalModelRedirects: [rule("A", "B")],
+      },
+      false
+    );
+    expect(context.matchProviderModelsAfterMapping).toBe(false);
+    expect(context.resolve(provider, "A")).toMatchObject({
+      originalModel: "A",
+      redirectedModel: "A",
+      steps: [],
+      stopReason: "no_match",
+    });
+  });
 });
 
 describe("resolveModelMapping", () => {

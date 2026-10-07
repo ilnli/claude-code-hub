@@ -11,6 +11,15 @@ describe.each([
   ["action", UpdateSystemSettingsSchema],
   ["REST", SystemSettingsUpdateSchema],
 ] as const)("global model mapping %s validation", (_name, schema) => {
+  it.each([true, false])("preserves the provider matching switch %s", (enabled) => {
+    expect(
+      schema.parse({ matchProviderModelsAfterMapping: enabled }).matchProviderModelsAfterMapping
+    ).toBe(enabled);
+  });
+  it("rejects a non-boolean provider matching switch and preserves omission", () => {
+    expect(schema.safeParse({ matchProviderModelsAfterMapping: "true" }).success).toBe(false);
+    expect(schema.parse({}).matchProviderModelsAfterMapping).toBeUndefined();
+  });
   it("applies a rule to all providers when exclusions are omitted", () => {
     expect(
       schema.parse({
@@ -51,6 +60,13 @@ describe.each([
 
 describe("global mapping settings defaults", () => {
   it("defaults old rows to no mappings and returns persisted exclusions", () => {
+    expect(toSystemSettings(undefined).matchProviderModelsAfterMapping).toBe(false);
+    expect(
+      toSystemSettings({ matchProviderModelsAfterMapping: true }).matchProviderModelsAfterMapping
+    ).toBe(true);
+    expect(
+      toSystemSettings({ matchProviderModelsAfterMapping: false }).matchProviderModelsAfterMapping
+    ).toBe(false);
     expect(toSystemSettings(undefined).globalModelRedirects).toEqual([]);
     expect(toSystemSettings({ id: 1 }).globalModelRedirects).toEqual([]);
     expect(

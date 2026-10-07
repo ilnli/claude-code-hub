@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { Provider } from "@/types/provider";
 
+const settingsMocks = vi.hoisted(() => ({
+  getCachedSystemSettings: vi.fn(),
+}));
+
 const authMocks = vi.hoisted(() => ({
   getSession: vi.fn(),
 }));
@@ -38,6 +42,7 @@ const repositoryMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/auth", () => authMocks);
+vi.mock("@/lib/config/system-settings-cache", () => settingsMocks);
 vi.mock("@/lib/circuit-breaker", () => circuitBreakerMocks);
 vi.mock("@/lib/vendor-type-circuit-breaker", () => vendorCircuitMocks);
 vi.mock("@/lib/endpoint-circuit-breaker", () => ({
@@ -120,6 +125,8 @@ function createProvider(id: number, overrides: Partial<Provider> = {}): Provider
 describe("dispatch simulator", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    settingsMocks.getCachedSystemSettings.mockResolvedValue({ globalModelRedirects: [] });
+    rateLimitMocks.checkCostLimits.mockResolvedValue({ allowed: true });
     endpointSelectorMocks.getEndpointFilterStats.mockResolvedValue({
       total: 2,
       enabled: 2,
@@ -270,5 +277,71 @@ describe("dispatch simulator", () => {
 
     expect(result.ok).toBe(false);
     expect(result.errorCode).toBe("PERMISSION_DENIED");
+  });
+  test.each([true, false, undefined])(
+    "matches the final mapped model only when enabled (%s), always previewing the chain",
+    async (matchProviderModelsAfterMapping) => {
+      const { simulateDispatchDecisionTree } = await import("@/actions/dispatch-simulator");
+      settingsMocks.getCachedSystemSettings.mockResolvedValue({
+        matchProviderModelsAfterMapping,
+        globalModelRedirects: [
+          { matchType: "exact", source: "A", target: "B", excludedProviderIds: [] },
+          { matchType: "exact", source: "B", target: "C", excludedProviderIds: [] },
+        ],
+      });
+      const result = await simulateDispatchDecisionTree(
+        [
+          createProvider(21, { allowedModels: [{ matchType: "exact", pattern: "A" }] }),
+          createProvider(22, { allowedModels: [{ matchType: "exact", pattern: "C" }] }),
+        ],
+        { clientFormat: "claude", modelName: "A", groupTags: ["alpha"] },
+        { systemTimezone: "UTC" }
+      );
+      const expectedProviderId = matchProviderModelsAfterMapping ? 22 : 21;
+      expect(result.steps[4].surviving.map((provider) => provider.id)).toEqual([
+        expectedProviderId,
+      ]);
+      expect(result.steps[4].filteredOut[0].redirectedModel).toBe("C");
+      expect(result.steps[4].filteredOut[0].details).toBe(
+        matchProviderModelsAfterMapping
+          ? "model C did not match allowlist"
+          : "model A did not match allowlist"
+      );
+      expect(result.priorityTiers[0].providers[0].redirectedModel).toBe("C");
+      expect(result.steps[6].surviving[0].redirectedModel).toBe("C");
+      expect(result.steps[7].surviving[0].redirectedModel).toBe("C");
+      expect(settingsMocks.getCachedSystemSettings).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  test("respects provider overrides and per-provider global exclusions during matching and preview", async () => {
+    const { simulateDispatchDecisionTree } = await import("@/actions/dispatch-simulator");
+    settingsMocks.getCachedSystemSettings.mockResolvedValue({
+      matchProviderModelsAfterMapping: true,
+      globalModelRedirects: [
+        { matchType: "exact", source: "A", target: "B", excludedProviderIds: [32] },
+        { matchType: "exact", source: "B", target: "C", excludedProviderIds: [] },
+      ],
+    });
+    const result = await simulateDispatchDecisionTree(
+      [
+        createProvider(31, {
+          allowedModels: [{ matchType: "exact", pattern: "B" }],
+          modelRedirects: [{ matchType: "exact", source: "A", target: "B" }],
+        }),
+        createProvider(32, { allowedModels: [{ matchType: "exact", pattern: "A" }] }),
+        createProvider(33, { allowedModels: [{ matchType: "exact", pattern: "C" }] }),
+      ],
+      { clientFormat: "claude", modelName: "A", groupTags: ["alpha"] },
+      { systemTimezone: "UTC" }
+    );
+    expect(result.steps[4].surviving.map((provider) => provider.id)).toEqual([31, 32, 33]);
+    expect(
+      result.steps[7].surviving.map(({ id, redirectedModel }) => ({ id, redirectedModel }))
+    ).toEqual([
+      { id: 31, redirectedModel: "B" },
+      { id: 32, redirectedModel: "A" },
+      { id: 33, redirectedModel: "C" },
+    ]);
   });
 });

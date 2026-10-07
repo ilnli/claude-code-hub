@@ -75,6 +75,33 @@ afterEach(async () => {
 });
 
 describe("global model redirects", () => {
+  test("defaults matching off, saves the switch with mappings, and reloads the saved switch", async () => {
+    await open();
+    expect(
+      document.querySelector("#match-provider-models-after-mapping")?.getAttribute("aria-checked")
+    ).toBe("false");
+    await click("#match-provider-models-after-mapping");
+    await click("[data-global-redirect-save]");
+    expect(api.save).toHaveBeenLastCalledWith(
+      expect.objectContaining({ matchProviderModelsAfterMapping: true })
+    );
+    api.load.mockResolvedValue({
+      ok: true,
+      data: { globalModelRedirects: [], matchProviderModelsAfterMapping: true },
+    });
+    await click("[data-global-redirect-trigger]");
+    expect(
+      document.querySelector("#match-provider-models-after-mapping")?.getAttribute("aria-checked")
+    ).toBe("true");
+    await input("#global-model-preview", "a");
+    expect(document.querySelector("[data-provider-matching-model]")?.textContent).toContain("a");
+    await click("#match-provider-models-after-mapping");
+    await click("[data-global-redirect-save]");
+    expect(api.save).toHaveBeenLastCalledWith({
+      globalModelRedirects: [],
+      matchProviderModelsAfterMapping: false,
+    });
+  });
   test("saves ordered edits and exclusions, defaulting new rules to all providers", async () => {
     await open();
     await click('[data-global-redirect-exclusions="0"]');
@@ -92,6 +119,7 @@ describe("global model redirects", () => {
     await click('[data-redirect-save="2"]');
     await click("[data-global-redirect-save]");
     expect(api.save).toHaveBeenCalledWith({
+      matchProviderModelsAfterMapping: false,
       globalModelRedirects: [
         { matchType: "exact", source: "b", target: "c", excludedProviderIds: [] },
         { matchType: "exact", source: "a", target: "edited", excludedProviderIds: [2] },
@@ -160,6 +188,7 @@ describe("global model redirects", () => {
     expect(document.querySelectorAll("[data-global-redirect-step]")).toHaveLength(1);
     await click("[data-global-redirect-save]");
     expect(api.save).toHaveBeenCalledWith({
+      matchProviderModelsAfterMapping: false,
       globalModelRedirects: [
         { matchType: "exact", source: "a", target: "b", excludedProviderIds: [] },
       ],
@@ -181,7 +210,10 @@ describe("global model redirects", () => {
     await click("[data-global-redirect-trigger]");
     expect(document.querySelector('[data-redirect-edit="0"]')).toBeNull();
     await click("[data-global-redirect-save]");
-    expect(api.save).toHaveBeenCalledWith({ globalModelRedirects: [] });
+    expect(api.save).toHaveBeenCalledWith({
+      globalModelRedirects: [],
+      matchProviderModelsAfterMapping: false,
+    });
   });
 
   test("renders translated errors when a request throws", async () => {
@@ -221,6 +253,7 @@ describe("global model redirects", () => {
     await click("[data-redirect-add]");
     await click("[data-global-redirect-save]");
     expect(api.save).toHaveBeenCalledWith({
+      matchProviderModelsAfterMapping: false,
       globalModelRedirects: [
         { matchType: "exact", source: "a", target: "beta-edited", excludedProviderIds: [1] },
         { matchType: "exact", source: "a", target: "fallback", excludedProviderIds: [] },

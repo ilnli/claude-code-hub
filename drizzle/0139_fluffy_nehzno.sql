@@ -1,0 +1,1 @@
+ALTER TABLE "system_settings" ADD COLUMN "match_provider_models_after_mapping" boolean DEFAULT false NOT NULL;

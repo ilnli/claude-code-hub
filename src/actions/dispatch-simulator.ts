@@ -10,10 +10,11 @@ import {
 } from "@/app/v1/_lib/proxy/provider-selector";
 import { getSession } from "@/lib/auth";
 import { getCircuitState, isCircuitOpen } from "@/lib/circuit-breaker";
+import { getCachedSystemSettings } from "@/lib/config/system-settings-cache";
 import { PROVIDER_GROUP } from "@/lib/constants/provider.constants";
 import { logger } from "@/lib/logger";
+import { createModelMappingContext, type ModelMappingContext } from "@/lib/model-mapping";
 import { getEndpointFilterStats } from "@/lib/provider-endpoints/endpoint-selector";
-import { getProviderModelRedirectTarget } from "@/lib/provider-model-redirects";
 import { RateLimitService } from "@/lib/rate-limit";
 import { resolveSystemTimezone } from "@/lib/utils/timezone";
 import { isVendorTypeCircuitOpen } from "@/lib/vendor-type-circuit-breaker";
@@ -107,7 +108,8 @@ function buildStep(
 async function buildPriorityTiers(
   providers: Provider[],
   userGroup: string | null,
-  modelName: string
+  modelName: string,
+  mappingContext: ModelMappingContext
 ): Promise<DispatchSimulatorPriorityTier[]> {
   if (providers.length === 0) {
     return [];
@@ -117,7 +119,7 @@ async function buildPriorityTiers(
     providers.map(async (provider) => ({
       provider,
       redirectedModel: modelName
-        ? getProviderModelRedirectTarget(modelName, provider.modelRedirects)
+        ? mappingContext.resolve(provider, modelName).redirectedModel
         : null,
       endpointStats: await getEndpointStats(provider),
     }))
@@ -168,6 +170,7 @@ export async function simulateDispatchDecisionTree(
   const normalizedModelName = input.modelName.trim();
   const groupFilter = getGroupFilterValue(input.groupTags);
   const systemTimezone = options?.systemTimezone ?? (await resolveSystemTimezone());
+  const mappingContext = createModelMappingContext(await getCachedSystemSettings());
   const steps: DispatchSimulatorStep[] = [];
 
   let currentProviders = providers;
@@ -256,7 +259,9 @@ export async function simulateDispatchDecisionTree(
   const allowlistEligible =
     normalizedModelName === ""
       ? currentProviders
-      : currentProviders.filter((provider) => providerSupportsModel(provider, normalizedModelName));
+      : currentProviders.filter((provider) =>
+          providerSupportsModel(provider, normalizedModelName, mappingContext)
+        );
   steps.push(
     buildStep(
       "modelAllowlist",
@@ -271,7 +276,9 @@ export async function simulateDispatchDecisionTree(
             )
             .map((provider) =>
               buildProviderSnapshot(provider, groupFilter, {
-                details: `model ${normalizedModelName} did not match allowlist`,
+                redirectedModel: mappingContext.resolve(provider, normalizedModelName)
+                  .redirectedModel,
+                details: `model ${mappingContext.matchProviderModelsAfterMapping ? mappingContext.resolve(provider, normalizedModelName).redirectedModel : normalizedModelName} did not match allowlist`,
               })
             ),
       groupFilter,
@@ -351,7 +358,8 @@ export async function simulateDispatchDecisionTree(
   const priorityTiers = await buildPriorityTiers(
     currentProviders,
     groupFilter,
-    normalizedModelName
+    normalizedModelName,
+    mappingContext
   );
   const selectedPriority = priorityTiers.find((tier) => tier.isSelected)?.priority ?? null;
   const selectedPriorityProviders = priorityTiers.find((tier) => tier.isSelected)?.providers ?? [];
@@ -376,7 +384,7 @@ export async function simulateDispatchDecisionTree(
       .map((provider) =>
         buildProviderSnapshot(provider, groupFilter, {
           redirectedModel: normalizedModelName
-            ? getProviderModelRedirectTarget(normalizedModelName, provider.modelRedirects)
+            ? mappingContext.resolve(provider, normalizedModelName).redirectedModel
             : null,
         })
       ),
@@ -389,12 +397,12 @@ export async function simulateDispatchDecisionTree(
   const redirectedProviders = currentProviders.map((provider) =>
     buildProviderSnapshot(provider, groupFilter, {
       redirectedModel: normalizedModelName
-        ? getProviderModelRedirectTarget(normalizedModelName, provider.modelRedirects)
+        ? mappingContext.resolve(provider, normalizedModelName).redirectedModel
         : null,
       details:
         normalizedModelName === ""
           ? "no_model_name_provided"
-          : getProviderModelRedirectTarget(normalizedModelName, provider.modelRedirects) !==
+          : mappingContext.resolve(provider, normalizedModelName).redirectedModel !==
               normalizedModelName
             ? "redirect_rule_matched"
             : "no_redirect_rule_matched",
@@ -410,7 +418,9 @@ export async function simulateDispatchDecisionTree(
     note:
       normalizedModelName === ""
         ? "redirect_preview_skipped_for_resource_request"
-        : "redirects_apply_after_provider_selection",
+        : mappingContext.matchProviderModelsAfterMapping
+          ? undefined
+          : "redirects_apply_after_provider_selection",
   });
 
   const endpointAnnotatedProviders = await Promise.all(

@@ -330,6 +330,7 @@ export function toSystemSettings(dbSettings: any): SystemSettings {
     enableResponseInputRectifier: dbSettings?.enableResponseInputRectifier ?? true,
     allowNonConversationEndpointProviderFallback:
       dbSettings?.allowNonConversationEndpointProviderFallback ?? true,
+    matchProviderModelsAfterMapping: dbSettings?.matchProviderModelsAfterMapping ?? false,
     globalModelRedirects: dbSettings?.globalModelRedirects ?? [],
     fakeStreamingWhitelist: normalizeFakeStreamingWhitelist(dbSettings?.fakeStreamingWhitelist),
     enableCodexSessionIdCompletion: dbSettings?.enableCodexSessionIdCompletion ?? true,

@@ -174,6 +174,7 @@ function createFallbackSettings(): SystemSettings {
     enableBillingHeaderRectifier: true,
     enableResponseInputRectifier: true,
     allowNonConversationEndpointProviderFallback: true,
+    matchProviderModelsAfterMapping: false,
     globalModelRedirects: [],
     fakeStreamingWhitelist: DEFAULT_FAKE_STREAMING_WHITELIST.map((entry) => ({
       model: entry.model,
@@ -291,6 +292,14 @@ const RECENT_COLUMN_LADDER: ReadonlyArray<{
   // 本层更新失败（仍有列缺失）时记录的告警
   updateWarn: string;
 }> = [
+  {
+    key: "matchProviderModelsAfterMapping",
+    column: systemSettings.matchProviderModelsAfterMapping,
+    selectWarn:
+      "system_settings missing matchProviderModelsAfterMapping; falling back to older columns.",
+    updateWarn:
+      "system_settings missing matchProviderModelsAfterMapping; retrying update with older columns.",
+  },
   {
     key: "globalModelRedirects",
     column: systemSettings.globalModelRedirects,
@@ -475,6 +484,7 @@ const RECENT_COLUMN_LADDER: ReadonlyArray<{
 // 历史世代字段集（冻结）：passThrough 世代之前的 schema 没有以下五列。
 // 注意：世代字段集相对近代阶梯末层会重新选取更晚引入的列（与历史实现一致）。
 const PASS_THROUGH_ERA_OMIT: readonly string[] = [
+  "matchProviderModelsAfterMapping",
   "globalModelRedirects",
   "clientVersionPolicyInitialized",
   "legacyHedgeMaxInFlight",
@@ -749,6 +759,9 @@ export async function updateSystemSettings(
     };
 
     // 基础配置字段（如果提供）
+    if (payload.matchProviderModelsAfterMapping !== undefined) {
+      updates.matchProviderModelsAfterMapping = payload.matchProviderModelsAfterMapping;
+    }
     if (payload.globalModelRedirects !== undefined) {
       updates.globalModelRedirects = payload.globalModelRedirects;
     }

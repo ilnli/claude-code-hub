@@ -19,6 +19,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Switch } from "@/components/ui/switch";
 import { fetchSystemSettings, saveSystemSettings } from "@/lib/api-client/v1/actions/system-config";
 import { resolveModelMapping } from "@/lib/model-mapping";
 import type { GlobalModelRedirectRule } from "@/types/model-mapping";
@@ -39,6 +40,7 @@ export function GlobalModelRedirectRulesDialog({ providers }: GlobalModelRedirec
   const t = useTranslations("settings.providers.globalModelRedirect");
   const [open, setOpen] = useState(false);
   const [rules, setRules] = useState<EditableRule[] | null>(null);
+  const [matchProviderModelsAfterMapping, setMatchProviderModelsAfterMapping] = useState(false);
   const nextRuleId = useRef(0);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -55,14 +57,15 @@ export function GlobalModelRedirectRulesDialog({ providers }: GlobalModelRedirec
     setError(null);
     try {
       const result = await fetchSystemSettings();
-      if (result.ok)
+      if (result.ok) {
+        setMatchProviderModelsAfterMapping(result.data.matchProviderModelsAfterMapping ?? false);
         setRules(
           (result.data.globalModelRedirects ?? []).map((rule) => ({
             ...rule,
             editorId: String(nextRuleId.current++),
           }))
         );
-      else setError(result.error || t("loadFailed"));
+      } else setError(result.error || t("loadFailed"));
     } catch {
       setError(t("loadFailed"));
     } finally {
@@ -76,6 +79,7 @@ export function GlobalModelRedirectRulesDialog({ providers }: GlobalModelRedirec
     setError(null);
     try {
       const result = await saveSystemSettings({
+        matchProviderModelsAfterMapping,
         globalModelRedirects: rules.map(({ editorId: _editorId, ...rule }) => rule),
       });
       if (result.ok) {
@@ -127,6 +131,26 @@ export function GlobalModelRedirectRulesDialog({ providers }: GlobalModelRedirec
         )}
         {rules && (
           <>
+            <div className="flex items-center justify-between gap-4 rounded-lg border p-4">
+              <div className="space-y-1">
+                <Label htmlFor="match-provider-models-after-mapping">
+                  {t("matchAfterMapping")}
+                </Label>
+                <p
+                  id="match-provider-models-after-mapping-description"
+                  className="text-xs text-muted-foreground"
+                >
+                  {t("matchAfterMappingDescription")}
+                </p>
+              </div>
+              <Switch
+                id="match-provider-models-after-mapping"
+                checked={matchProviderModelsAfterMapping}
+                onCheckedChange={setMatchProviderModelsAfterMapping}
+                disabled={saving}
+                aria-describedby="match-provider-models-after-mapping-description"
+              />
+            </div>
             <ModelRedirectEditor
               value={rules}
               allowDuplicateRules
@@ -199,6 +223,15 @@ export function GlobalModelRedirectRulesDialog({ providers }: GlobalModelRedirec
                 <div data-global-redirect-preview className="space-y-2 text-sm">
                   <p className="break-all">
                     {t("result")} <code>{preview.redirectedModel}</code>
+                  </p>
+                  <p
+                    data-provider-matching-model
+                    className="break-all text-xs text-muted-foreground"
+                  >
+                    {t("providerMatchingModel")}{" "}
+                    <code>
+                      {matchProviderModelsAfterMapping ? preview.redirectedModel : model.trim()}
+                    </code>
                   </p>
                   <ol className="space-y-2">
                     {preview.steps.map((step, index) => (
