@@ -64,6 +64,60 @@ async function drainPrefix(chunks: Uint8Array[]): Promise<string> {
 }
 
 describe("runStreamContentGate", () => {
+  it("hands off a pending read on client disconnect without dropping or duplicating it", async () => {
+    const client = new AbortController();
+    const reading = Promise.withResolvers<void>();
+    let source!: ReadableStreamDefaultController<Uint8Array>;
+    const reader = new ReadableStream<Uint8Array>(
+      {
+        start(controller) {
+          source = controller;
+        },
+        pull() {
+          reading.resolve();
+          return new Promise<void>(() => {});
+        },
+      },
+      { highWaterMark: 0 }
+    ).getReader();
+    const promise = runStreamContentGate(reader, {
+      ...GATE_OPTIONS,
+      captureCommitMarker: true,
+      clientAbortSignal: client.signal,
+    });
+    await reading.promise;
+    client.abort();
+    const result = await promise;
+    expect(result).toMatchObject({ committed: true, clientDetached: true, commitMarker: null });
+    if (!result.committed) throw new Error("expected accounting handoff");
+    source.enqueue(encoder.encode(MESSAGE_STOP));
+    source.close();
+    expect(await result.pendingRead).toEqual({ done: false, value: encoder.encode(MESSAGE_STOP) });
+    expect(await reader.read()).toEqual({ done: true, value: undefined });
+    result.prebufferLease?.release();
+    reader.releaseLock();
+  });
+
+  it("hands off an already disconnected client without reading or leaking the prepared lease", async () => {
+    const client = new AbortController();
+    client.abort();
+    const budget = new StreamGatePrebufferBudget(() => 1024 * 1024);
+    const lease = await budget.acquire(1024);
+    const reader = readerFromChunks([TEXT_DELTA]);
+    const result = await runStreamContentGate(reader, {
+      ...GATE_OPTIONS,
+      clientAbortSignal: client.signal,
+      prebufferLease: lease,
+    });
+    expect(result).toMatchObject({ committed: true, clientDetached: true, prefixChunks: [] });
+    if (!result.committed) throw new Error("expected accounting handoff");
+    expect(await reader.read()).toEqual({ done: false, value: encoder.encode(TEXT_DELTA) });
+    result.prebufferLease?.release();
+    expect(budget.snapshot().reservedBytes).toBe(0);
+    await reader.cancel();
+    reader.releaseLock();
+  });
+
   it("错误状态位于长消息末尾时仍保留原 64 KiB 状态推断语义", async () => {
     const frame = `event: error\ndata: ${JSON.stringify({ error: { message: "x".repeat(12000), status_code: 400 } })}\n\n`;
     const result = await runStreamContentGate(readerFromChunks([frame]), GATE_OPTIONS);

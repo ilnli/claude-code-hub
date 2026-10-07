@@ -5491,7 +5491,8 @@ export class ProxyResponseHandler {
       });
 
       if (isFirstChunk) {
-        session.recordTtft();
+        // Detached metering does not establish client-visible content latency.
+        if (!clientDetachHandled) session.recordTtft();
         isFirstChunk = false;
         if (clearResponseTimeoutOnce()) {
           logger.debug("ResponseHandler: First chunk received, response timeout cleared", {

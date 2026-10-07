@@ -1141,6 +1141,108 @@ describe("ProxyResponseHandler stream client abort finalization", () => {
     );
   });
 
+  it("persists tokens and cost after a precommit client disconnect hands off its pending read", async () => {
+    const { runStreamContentGate } = await import(
+      "@/app/v1/_lib/proxy/stream-gate/stream-content-gate"
+    );
+    const { ProxyForwarder } = await import("@/app/v1/_lib/proxy/forwarder");
+    const config = await import("@/lib/config/system-settings-cache");
+    vi.mocked(config.getCachedSystemSettings).mockResolvedValue({
+      billNonSuccessfulRequests: true,
+    } as never);
+    const client = new AbortController();
+    const session = createSession(client.signal, { model: "gpt-6.1-sol" });
+    Object.assign(session.provider!, { costMultiplier: 0.17 });
+    Object.assign(session, {
+      getResolvedPricingByBillingSource: async () => ({
+        resolvedModelName: "gpt-6.1-sol",
+        resolvedPricingProviderKey: "openai",
+        source: "local_manual",
+        priceData: {
+          input_cost_per_token: 0.000002,
+          output_cost_per_token: 0.00001,
+          cache_read_input_token_cost: 0.0000001,
+        },
+      }),
+    });
+    const reading = Promise.withResolvers<void>();
+    let source!: ReadableStreamDefaultController<Uint8Array>;
+    const reader = new ReadableStream<Uint8Array>(
+      {
+        start(controller) {
+          source = controller;
+        },
+        pull() {
+          reading.resolve();
+          return new Promise<void>(() => {});
+        },
+      },
+      { highWaterMark: 0 }
+    ).getReader();
+    const gatePromise = runStreamContentGate(reader, {
+      family: "openai-responses",
+      providerId: 1,
+      providerName: "test",
+      prebufferByteCap: 1024 * 1024,
+      prebufferEventCap: 64,
+      clientAbortSignal: client.signal,
+    });
+    await reading.promise;
+    client.abort();
+    const gate = await gatePromise;
+    if (!gate.committed) throw gate.error;
+    const forwarder = ProxyForwarder as unknown as {
+      buildBufferedPrefixStream: (
+        chunks: Uint8Array[],
+        reader: ReadableStreamDefaultReader<Uint8Array>,
+        lease: typeof gate.prebufferLease,
+        pendingRead: typeof gate.pendingRead
+      ) => ReadableStream<Uint8Array>;
+    };
+    const body = forwarder.buildBufferedPrefixStream(
+      gate.prefixChunks,
+      reader,
+      gate.prebufferLease,
+      gate.pendingRead
+    );
+    await ProxyResponseHandler.dispatch(
+      session,
+      new Response(body, { headers: { "content-type": "text/event-stream" } })
+    );
+    source.enqueue(
+      new TextEncoder().encode(
+        `event: response.completed\ndata: ${JSON.stringify({
+          type: "response.completed",
+          response: {
+            id: "resp-after-detach",
+            model: "gpt-6.1-sol",
+            status: "completed",
+            usage: {
+              input_tokens: 242837,
+              output_tokens: 9758,
+              input_tokens_details: { cached_tokens: 241513 },
+            },
+          },
+        })}\n\n`
+      )
+    );
+    source.close();
+    await drainAsyncTasks();
+    expect(updateMessageRequestDetailsDurably).toHaveBeenCalledWith(
+      123,
+      expect.objectContaining({
+        outputTokens: 9758,
+        cacheReadInputTokens: 241513,
+      }),
+      expect.anything()
+    );
+    const cost = vi.mocked(updateMessageRequestCostWithBreakdown).mock.calls.at(-1);
+    expect(cost?.[0]).toBe(123);
+    expect(String(cost?.[1])).toBe("0.021144481");
+    expect(updateMessageRequestCostWithBreakdown).toHaveBeenCalledTimes(1);
+    expect(session.recordTtft).not.toHaveBeenCalled();
+  });
+
   it("uses a conservative Replay reservation when environment parsing fails", () => {
     expect(
       resolveReplayDrainReservationBytes(() => {

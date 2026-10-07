@@ -2203,6 +2203,7 @@ export class ProxyForwarder {
                     // 门控等待期沿用供应商静默超时（与提交后 response-handler 的行为对齐）
                     idleTimeoutMs: currentProvider.streamingIdleTimeoutMs,
                     captureCommitMarker: !session.isHighConcurrencyModeEnabled(),
+                    clientAbortSignal: session.clientAbortSignal ?? undefined,
                     prebufferBudget: getStreamGatePrebufferBudget(),
                     prebufferLease: takePreparedGateLease(response),
                     onBudgetWaitStart: () => {
@@ -2220,7 +2221,7 @@ export class ProxyForwarder {
                       }
                     },
                   },
-                  [runtime.responseController?.signal, session.clientAbortSignal]
+                  [runtime.responseController?.signal]
                 );
 
                 if (!gate.committed) {
@@ -2265,7 +2266,7 @@ export class ProxyForwarder {
                 if (gateFirstByteAt !== null) {
                   session.recordFirstByte(gateFirstByteAt);
                 }
-                session.recordTtft();
+                if (!gate.clientDetached) session.recordTtft();
 
                 if (gate.commitMarker) {
                   gateChainAudit = {
@@ -2274,12 +2275,13 @@ export class ProxyForwarder {
                   };
                 }
 
-                logger.info("ProxyForwarder: Stream content gate committed", {
+                logger.info("ProxyForwarder: Stream content gate handed off", {
                   providerId: currentProvider.id,
                   providerName: currentProvider.name,
                   framesSeen: gate.framesSeen,
                   prefixChunks: gate.prefixChunks.length,
                   readerDone: gate.readerDone,
+                  clientDetached: gate.clientDetached === true,
                   ...(gateChainAudit
                     ? {
                         commitEventName: gateChainAudit.eventName,
@@ -2293,7 +2295,8 @@ export class ProxyForwarder {
                   ProxyForwarder.buildBufferedPrefixStream(
                     gate.prefixChunks,
                     gateReader,
-                    gate.prebufferLease
+                    gate.prebufferLease,
+                    gate.pendingRead
                   ),
                   {
                     status: response.status,
@@ -10149,7 +10152,8 @@ export class ProxyForwarder {
   private static buildBufferedPrefixStream(
     prefixChunks: Uint8Array[],
     reader: ReadableStreamDefaultReader<Uint8Array>,
-    prebufferLease: StreamGatePrebufferLease | null = null
+    prebufferLease: StreamGatePrebufferLease | null = null,
+    pendingRead?: Promise<ReadableStreamReadResult<Uint8Array>>
   ): ReadableStream<Uint8Array> {
     let prefixIndex = 0;
     let leaseReleased = false;
@@ -10188,7 +10192,9 @@ export class ProxyForwarder {
           // 下一次 pull 说明最后一个门禁前缀已经离开 response pump 的 pending slot；
           // 此时才释放共享预算，避免慢客户端把已“提交”的前缀重新变成未计量保留。
           releasePrefix();
-          const { done, value } = await reader.read();
+          const read = pendingRead ?? reader.read();
+          pendingRead = undefined;
+          const { done, value } = await read;
           if (done) {
             controller.close();
             return;

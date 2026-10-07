@@ -592,6 +592,91 @@ describe("F1 stream content gate x ProxyForwarder paths", () => {
       envControl.streamGateMode = "enforce";
     });
 
+    test("serial Codex stream retains terminal usage arriving after client abort before content", async () => {
+      const actual = await vi.importActual<typeof import("@/app/v1/_lib/proxy/errors")>(
+        "@/app/v1/_lib/proxy/errors"
+      );
+      mocks.categorizeErrorAsync.mockImplementation(actual.categorizeErrorAsync);
+      const abort = new AbortController();
+      const session = createSession(abort.signal);
+      configureCodexResponsesRequest(session);
+      session.setProvider(
+        createProvider({ providerType: "codex", firstByteTimeoutStreamingMs: 0 })
+      );
+      const encoder = new TextEncoder();
+      const waitingForCompletion = Promise.withResolvers<void>();
+      let source!: ReadableStreamDefaultController<Uint8Array>;
+      let reads = 0;
+      const upstream = new ReadableStream<Uint8Array>(
+        {
+          start(controller) {
+            source = controller;
+          },
+          pull(controller) {
+            if (reads++ === 0) {
+              controller.enqueue(
+                encoder.encode(
+                  sseFrame("response.created", {
+                    type: "response.created",
+                    response: { id: "resp-abort", status: "in_progress" },
+                  })
+                )
+              );
+            } else {
+              waitingForCompletion.resolve();
+              return new Promise<void>(() => {});
+            }
+          },
+        },
+        { highWaterMark: 0 }
+      );
+      spyOnDoForward().mockResolvedValueOnce(
+        new Response(upstream, {
+          headers: { "content-type": "text/event-stream" },
+        })
+      );
+      const resultPromise = ProxyForwarder.send(session).catch((error: Error) => error);
+      await waitingForCompletion.promise;
+      abort.abort();
+      source.enqueue(
+        encoder.encode(
+          sseFrame("response.completed", {
+            type: "response.completed",
+            response: {
+              id: "resp-abort",
+              status: "completed",
+              model: "gpt-6.1-sol",
+              usage: {
+                input_tokens: 242837,
+                output_tokens: 9758,
+                input_tokens_details: { cached_tokens: 241513 },
+              },
+            },
+          })
+        )
+      );
+      source.close();
+
+      const result = await resultPromise;
+      expect(result).toBeInstanceOf(Response);
+      const { parseUsageFromResponseText, resolveBillableUsageMetricsForCost } = await import(
+        "@/app/v1/_lib/proxy/response-handler"
+      );
+      const config = await import("@/lib/config/system-settings-cache");
+      vi.spyOn(config, "getCachedSystemSettings").mockResolvedValue({
+        billNonSuccessfulRequests: true,
+      } as never);
+      const { usageMetrics } = parseUsageFromResponseText(
+        await (result as Response).text(),
+        "codex"
+      );
+      expect(usageMetrics).toMatchObject({ output_tokens: 9758, cache_read_input_tokens: 241513 });
+      expect(
+        await resolveBillableUsageMetricsForCost(session, session.provider, usageMetrics, 499)
+      ).toMatchObject({ output_tokens: 9758 });
+      expect(mocks.pickRandomProviderWithExclusion).not.toHaveBeenCalled();
+    });
+
     test("serial client abort before content persists 499 instead of 500", async () => {
       const actual = await vi.importActual<typeof import("@/app/v1/_lib/proxy/errors")>(
         "@/app/v1/_lib/proxy/errors"

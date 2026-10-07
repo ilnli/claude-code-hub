@@ -226,6 +226,8 @@ export interface StreamGateOptions extends StreamGateCaps {
   prebufferLease?: StreamGatePrebufferLease;
   /** 等待共享预算时使用与上游请求相同的取消信号。 */
   abortSignal?: AbortSignal;
+  /** Hand off the established stream for detached metering when this client disconnects. */
+  clientAbortSignal?: AbortSignal;
   /** 开始等待本地预算；竞速路径用它暂停本地 hedge 阈值。 */
   onBudgetWaitStart?: () => void;
   /** 本地预算获得或等待失败；恢复本地 hedge 阈值。 */
@@ -255,6 +257,9 @@ export type StreamGateResult =
       commitMarker: StreamGateCommitMarker | null;
       /** 前缀被下游消费或放弃后释放；所有权随 committed 结果转移。 */
       prebufferLease: StreamGatePrebufferLease | null;
+      /** Ownership handoff for accounting, without a valid-content commitment. */
+      clientDetached?: true;
+      pendingRead?: Promise<ReadableStreamReadResult<Uint8Array>>;
     }
   | { committed: false; error: Error };
 
@@ -263,6 +268,7 @@ export type StreamGateResult =
  *
  * 提交时返回缓冲前缀（含触发提交的 content 帧所在 chunk）与 framesSeen；
  * reader 所有权归还调用方（committed 且 readerDone=false 时后续字节仍在 reader 上）。
+ * 客户端断开时也转移所有权供后台计费；调用方须先消费 pendingRead，再继续读取 reader。
  * 失败时错误对象已按语义构造，reader 由调用方负责 cancel。
  */
 export async function runStreamContentGate(
@@ -320,7 +326,12 @@ export async function runStreamContentGate(
     bufferedBytes - Math.min(echoExcludedBytes, options.prebufferByteCap) >
     options.prebufferByteCap;
 
-  const commit = (eventName: string | null, readerDone: boolean): StreamGateResult => {
+  const commit = (
+    eventName: string | null,
+    readerDone: boolean,
+    clientDetached = false,
+    pendingRead?: Promise<ReadableStreamReadResult<Uint8Array>>
+  ): StreamGateResult => {
     const retainedPrefixBytes = store?.retainedByteLength ?? buffered.retainedByteLength;
     const prefixChunks = store ? store.takeChunks() : buffered.take();
     // 读取期间需要覆盖 parser、输入副本和前缀的最坏峰值；提交后 parser
@@ -354,14 +365,20 @@ export async function runStreamContentGate(
       prefixChunks,
       framesSeen,
       readerDone,
-      commitMarker: options.captureCommitMarker
-        ? { frameIndex: framesSeen, chunkIndex, eventName, bufferedBytes, echoExcludedBytes }
-        : null,
+      commitMarker:
+        options.captureCommitMarker && !clientDetached
+          ? { frameIndex: framesSeen, chunkIndex, eventName, bufferedBytes, echoExcludedBytes }
+          : null,
       prebufferLease,
+      ...(clientDetached ? { clientDetached: true as const, pendingRead } : {}),
     };
   };
 
   try {
+    if (options.clientAbortSignal?.aborted) {
+      prebufferLease = options.prebufferLease ?? null;
+      return commit(null, false, true);
+    }
     if (options.prebufferLease) {
       prebufferLease = options.prebufferLease;
       store = new ByteStore(prebufferLease, { signal: options.abortSignal });
@@ -397,9 +414,16 @@ export async function runStreamContentGate(
     while (true) {
       let readResult: ReadableStreamReadResult<Uint8Array>;
       try {
-        const raced = await readWithIdleTimeout(reader, options.idleTimeoutMs);
+        const raced = await readWithIdleTimeout(
+          reader,
+          options.idleTimeoutMs,
+          options.clientAbortSignal
+        );
         if (raced === IDLE_TIMEOUT) {
           return failure("idle_timeout");
+        }
+        if ("clientDetached" in raced) {
+          return commit(null, false, true, raced.pendingRead);
         }
         readResult = raced;
       } catch (readError) {
@@ -561,22 +585,37 @@ const IDLE_TIMEOUT = Symbol("stream_gate_idle_timeout");
  */
 async function readWithIdleTimeout(
   reader: ReadableStreamDefaultReader<Uint8Array>,
-  idleTimeoutMs: number | undefined
-): Promise<ReadableStreamReadResult<Uint8Array> | typeof IDLE_TIMEOUT> {
-  if (!idleTimeoutMs || idleTimeoutMs <= 0) {
+  idleTimeoutMs: number | undefined,
+  clientAbortSignal?: AbortSignal
+): Promise<
+  | ReadableStreamReadResult<Uint8Array>
+  | typeof IDLE_TIMEOUT
+  | { clientDetached: true; pendingRead?: Promise<ReadableStreamReadResult<Uint8Array>> }
+> {
+  if (clientAbortSignal?.aborted) return { clientDetached: true };
+  if ((!idleTimeoutMs || idleTimeoutMs <= 0) && !clientAbortSignal) {
     return reader.read();
   }
   const readPromise = reader.read();
   let timer: NodeJS.Timeout | undefined;
+  let onClientAbort: (() => void) | undefined;
   try {
     return await Promise.race([
       readPromise,
       new Promise<typeof IDLE_TIMEOUT>((resolve) => {
-        timer = setTimeout(() => resolve(IDLE_TIMEOUT), idleTimeoutMs);
+        if (idleTimeoutMs && idleTimeoutMs > 0) {
+          timer = setTimeout(() => resolve(IDLE_TIMEOUT), idleTimeoutMs);
+        }
+      }),
+      new Promise<{ clientDetached: true; pendingRead: typeof readPromise }>((resolve) => {
+        onClientAbort = () => resolve({ clientDetached: true, pendingRead: readPromise });
+        clientAbortSignal?.addEventListener("abort", onClientAbort, { once: true });
+        if (clientAbortSignal?.aborted) onClientAbort();
       }),
     ]);
   } finally {
     clearTimeout(timer);
+    if (onClientAbort) clientAbortSignal?.removeEventListener("abort", onClientAbort);
     readPromise.catch(() => undefined);
   }
 }
