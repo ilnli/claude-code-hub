@@ -152,6 +152,16 @@ const descendantsV2Key = (scope: string, identityFp: string) =>
 const legacyGenerationKey = (scope: string) => `cch:pfx:{${scope}}:generation`;
 
 describe("AffinityStore.lookup", () => {
+  it("skips failed providers and returns the next deepest cached provider", async () => {
+    const { client } = createLuaFakeRedis({
+      [key("s1", "deep")]: "1|42",
+      [key("s1", "mid")]: "1|42",
+      [key("s1", "shallow")]: "1|7",
+    });
+    const result = await makeStore(client).lookup("s1", ["deep", "mid", "shallow"], 600, [42]);
+    expect(result?.hint).toEqual({ providerId: 7, matchedIndex: 2, matchedFp: "shallow" });
+  });
+
   it("returns the deepest active binding (MGET-style deepest-first scan)", async () => {
     const { client } = createLuaFakeRedis({
       [key("s1", "deep")]: "1|42",

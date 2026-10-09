@@ -82,23 +82,27 @@ export function resolveModelMapping(
   };
   if (!model) return result;
 
-  // Provider rules keep their single-match behavior and override the entire global chain.
-  const providerRule = findMatchingProviderModelRedirectRule(model, provider.modelRedirects);
-  if (providerRule) {
-    result.redirectedModel = resolveProviderModelRedirectTarget(model, providerRule);
-    result.steps.push({
-      source: "provider",
-      inputModel: model,
-      outputModel: result.redirectedModel,
-      rule: providerRule,
-      ruleIndex: provider.modelRedirects!.indexOf(providerRule),
-    });
-    result.stopReason = "provider_rule";
-    return result;
-  }
-
   const visited = new Set([model]);
   while (true) {
+    // A provider match wins at every step and terminates the mapping chain.
+    const providerRule = findMatchingProviderModelRedirectRule(
+      result.redirectedModel,
+      provider.modelRedirects
+    );
+    if (providerRule) {
+      const inputModel = result.redirectedModel;
+      result.redirectedModel = resolveProviderModelRedirectTarget(inputModel, providerRule);
+      result.steps.push({
+        source: "provider",
+        inputModel,
+        outputModel: result.redirectedModel,
+        rule: providerRule,
+        ruleIndex: provider.modelRedirects!.indexOf(providerRule),
+      });
+      result.stopReason = "provider_rule";
+      return result;
+    }
+
     const ruleIndex = globalRules.findIndex(
       (rule) =>
         !rule.excludedProviderIds.includes(provider.id) &&

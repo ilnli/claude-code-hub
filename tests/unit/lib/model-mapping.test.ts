@@ -98,12 +98,30 @@ describe("resolveModelMapping", () => {
     expect(result.steps).toHaveLength(1);
   });
 
-  test("global targets do not enter unrelated provider rules", () => {
+  test("a provider rule takes precedence when reached through the global chain", () => {
     const result = resolveModelMapping("A", { ...provider, modelRedirects: [rule("B", "D")] }, [
       rule("A", "B"),
       rule("B", "C"),
     ]);
-    expect(result.redirectedModel).toBe("C");
+    expect(result.redirectedModel).toBe("D");
+    expect(result.stopReason).toBe("provider_rule");
+    expect(result.steps).toMatchObject([
+      { source: "global", inputModel: "A", outputModel: "B" },
+      { source: "provider", inputModel: "B", outputModel: "D" },
+    ]);
+  });
+
+  test("global chains can end in a provider regex mapping without restarting the chain", () => {
+    const result = resolveModelMapping(
+      "A",
+      {
+        ...provider,
+        modelRedirects: [rule("^alias-(.+)$", "upstream-$1", { matchType: "regex" })],
+      },
+      [rule("A", "B"), rule("B", "alias-fast"), rule("upstream-fast", "unused")]
+    );
+    expect(result.redirectedModel).toBe("upstream-fast");
+    expect(result.steps.map((step) => step.source)).toEqual(["global", "global", "provider"]);
   });
 
   test("exclusions apply per rule and at every step", () => {

@@ -128,6 +128,7 @@ function createRawPassthroughSession(bodyText: string, extraHeaders?: HeadersIni
     cachedBillingModelSource: undefined,
     forwardedRequestBody: null,
     endpointPolicy: resolveEndpointPolicy("/v1/responses/compact"),
+    managedEndpoint: "/v1/responses/compact",
     setCacheTtlResolved: vi.fn(),
     getCacheTtlResolved: vi.fn(() => null),
     getCurrentModel: vi.fn(() => "gpt-5.5"),
@@ -161,12 +162,91 @@ function readBodyText(body: BodyInit | undefined): string | null {
 describe("ProxyForwarder raw passthrough regression", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.getCachedSystemSettings.mockResolvedValue({
+      enableClaudeMetadataUserIdInjection: false,
+      enableBillingHeaderRectifier: false,
+      globalModelRedirects: [],
+    });
     clearResponsesWsUnsupportedCache();
     mocks.evaluateResponsesWsEligibility.mockResolvedValue({
       isWebsocketClient: false,
       eligible: false,
     });
     mocks.tryResponsesWebsocketUpstream.mockReset();
+  });
+
+  it.each([
+    ["v1", "/v1/responses/compact", "provider"],
+    ["v2", "/v1/responses", "provider"],
+    ["v1", "/v1/responses/compact", "global"],
+    ["v2", "/v1/responses", "global"],
+  ])("applies %s compaction model mapping from %s (%s)", async (_version, path, source) => {
+    const input = [
+      { type: "compaction_trigger" },
+      { type: "compaction", encrypted_content: "opaque" },
+    ];
+    const session = createRawPassthroughSession(
+      JSON.stringify({ model: "gpt-5.5", stream: true, input }),
+      { "content-encoding": "snappy" }
+    );
+    session.requestUrl = new URL(`https://proxy.example.com${path}`);
+    const provider = createProvider();
+    if (source === "provider") {
+      provider.modelRedirects = [{ matchType: "exact", source: "gpt-5.5", target: "mapped-model" }];
+    } else {
+      mocks.getCachedSystemSettings.mockResolvedValue({
+        enableClaudeMetadataUserIdInjection: false,
+        enableBillingHeaderRectifier: false,
+        globalModelRedirects: [
+          {
+            matchType: "exact",
+            source: "gpt-5.5",
+            target: "mapped-model",
+            excludedProviderIds: [],
+          },
+        ],
+      });
+    }
+    let forwardedBody: BodyInit | undefined;
+    let forwardedHeaders = new Headers();
+    vi.spyOn(ProxyForwarder as any, "fetchWithoutAutoDecode").mockImplementationOnce(
+      async (_url: string, init: RequestInit) => {
+        forwardedBody = init.body ?? undefined;
+        forwardedHeaders = new Headers(init.headers);
+        return new Response("{}", { headers: { "content-type": "application/json" } });
+      }
+    );
+
+    await (ProxyForwarder as any).doForward(session, provider, provider.url);
+
+    expect(JSON.parse(readBodyText(forwardedBody)!)).toEqual({
+      model: "mapped-model",
+      stream: true,
+      input,
+    });
+    expect(session.getOriginalModel()).toBe("gpt-5.5");
+    expect(forwardedHeaders.has("content-encoding")).toBe(false);
+    expect(forwardedHeaders.has("content-length")).toBe(false);
+  });
+
+  it("reapplies compaction mappings from the original model on provider fallback", async () => {
+    const session = createRawPassthroughSession('{"model":"gpt-5.5","input":[]}');
+    const providers = ["first-model", "second-model", null].map((target, index) => ({
+      ...createProvider(),
+      id: index + 1,
+      modelRedirects: target ? [{ matchType: "exact" as const, source: "gpt-5.5", target }] : null,
+    }));
+    const models: string[] = [];
+    const fetch = vi.spyOn(ProxyForwarder as any, "fetchWithoutAutoDecode");
+    for (const provider of providers) {
+      fetch.mockImplementationOnce(async (_url: string, init: RequestInit) => {
+        models.push(JSON.parse(readBodyText(init.body ?? undefined)!).model);
+        return new Response("{}", { headers: { "content-type": "application/json" } });
+      });
+      await (ProxyForwarder as any).doForward(session, provider, provider.url);
+    }
+    expect(models).toEqual(["first-model", "second-model", "gpt-5.5"]);
+    expect(session.getOriginalModel()).toBe("gpt-5.5");
   });
 
   it("forwards with the mapping snapshot used by selection even after settings change", async () => {
@@ -215,7 +295,7 @@ describe("ProxyForwarder raw passthrough regression", () => {
   });
 
   it.each([false, true])(
-    "loads global mappings only for preprocessed requests (raw=%s)",
+    "chains global and provider mappings for normal and compaction requests (raw=%s)",
     async (raw) => {
       const originalBody = '{"model":"gpt-5.5","input":[]}';
       const session = createRawPassthroughSession(originalBody);
@@ -255,8 +335,11 @@ describe("ProxyForwarder raw passthrough regression", () => {
         ) => Promise<Response>;
       };
       const provider = createProvider();
+      provider.modelRedirects = [
+        { matchType: "exact", source: "intermediate", target: "upstream-model" },
+      ];
       await doForward(session, provider, provider.url);
-      expect(JSON.parse(readBodyText(forwardedBody)!).model).toBe(raw ? "gpt-5.5" : "final");
+      expect(JSON.parse(readBodyText(forwardedBody)!).model).toBe("upstream-model");
       expect(session.getOriginalModel()).toBe("gpt-5.5");
     }
   );

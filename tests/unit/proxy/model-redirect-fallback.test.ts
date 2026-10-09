@@ -198,6 +198,35 @@ describe("Global model mapping during forwarding", () => {
     expect(ModelRedirector.getRedirectedModel("A", provider, rules)).toBe("D");
   });
 
+  test("fallback forwards each provider target after the global chain and retains original billing", () => {
+    const session = createSession("A");
+    const first = createProvider({
+      modelRedirects: [{ matchType: "exact", source: "C", target: "first-upstream" }],
+    });
+    const second = createProvider({
+      id: 2,
+      modelRedirects: [{ matchType: "exact", source: "B", target: "second-upstream" }],
+    });
+    ModelRedirector.apply(session, first, rules);
+    expect(JSON.parse(new TextDecoder().decode(session.request.buffer)).model).toBe(
+      "first-upstream"
+    );
+    ModelRedirector.apply(session, second, rules);
+    expect(JSON.parse(new TextDecoder().decode(session.request.buffer)).model).toBe(
+      "second-upstream"
+    );
+    expect(session.getOriginalModel()).toBe("A");
+    expect(session.getCurrentModelRedirect(second.id)).toMatchObject({
+      originalModel: "A",
+      billingModel: "A",
+      redirectedModel: "second-upstream",
+      steps: [
+        { source: "global", inputModel: "A", outputModel: "B" },
+        { source: "provider", inputModel: "B", outputModel: "second-upstream" },
+      ],
+    });
+  });
+
   test("updates Gemini paths with the final global target literally", () => {
     const session = createSession("A");
     session.requestUrl = new URL("https://example.com/v1beta/models/A:generateContent?alt=sse");

@@ -203,7 +203,8 @@ export class AffinityStore {
   async lookup(
     scopeTag: string,
     fpsDeepestFirst: string[],
-    slidingTtlSeconds: number
+    slidingTtlSeconds: number,
+    excludeProviderIds: readonly number[] = []
   ): Promise<AffinityLookupResult | null> {
     if (!scopeTag || fpsDeepestFirst.length === 0) return null;
     const redis = this.getReadyRedis();
@@ -233,6 +234,7 @@ export class AffinityStore {
         const parts = value.split("|");
         const providerId = Number.parseInt(parts[1] ?? "", 10);
         if (!Number.isFinite(providerId) || providerId <= 0) continue;
+        if (excludeProviderIds.includes(providerId)) continue;
 
         let identityFp: string;
         let generation: string;

@@ -208,6 +208,68 @@ beforeEach(() => {
 });
 
 describe("ensure() nomination priority", () => {
+  test.each([false, true])(
+    "compaction exhausts cached providers before random fallback (concurrency rejection=%s)",
+    async (concurrencyRejected) => {
+      settingsControl.ignoreClientSessionId = false;
+      sessionManagerMocks.SessionManager.getSessionProvider.mockResolvedValue(91);
+      storeMocks.lookup.mockImplementation(async (...args: unknown[]) => {
+        const excluded = (args[3] ?? []) as number[];
+        const providerId = [42, 43].find((id) => !excluded.includes(id));
+        return {
+          generation: "4",
+          identityFp: "rootfp",
+          hint: providerId ? { providerId, matchedFp: "deepfp", matchedIndex: 0 } : null,
+        };
+      });
+      providerRepositoryMocks.findProviderById.mockImplementation(async (id: number) =>
+        makeProvider(id, { providerType: "codex" })
+      );
+      const session = makeSession({
+        sessionId: "sess_compact",
+        originalFormat: "response",
+        request: {
+          message: {
+            model: "gpt-5.5",
+            input: [
+              { type: "message", role: "user", content: "compact this conversation" },
+              { type: "compaction_trigger" },
+            ],
+          },
+        },
+        getEndpointPolicy: () => ({ kind: "raw_passthrough" }),
+        isExplicitCompactionRequest: () => true,
+        shouldReuseProvider: () => true,
+        getOriginalModel: () => "gpt-5.5",
+        getProvidersSnapshot: vi.fn(async () => [makeProvider(55, { providerType: "codex" })]),
+      });
+
+      if (concurrencyRejected) {
+        rateLimitMocks.RateLimitService.checkAndTrackProviderSession.mockResolvedValueOnce({
+          allowed: false,
+          count: 1,
+          tracked: false,
+          referenced: false,
+        });
+      }
+      await ProxyProviderResolver.ensure(session);
+      if (concurrencyRejected) {
+        expect(session.provider.id).toBe(43);
+        return;
+      }
+      const selected = [session.provider.id];
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const provider = await ProxyProviderResolver.pickRandomProviderWithExclusion(
+          session,
+          selected
+        );
+        if (!provider) break;
+        selected.push(provider.id);
+      }
+      expect(selected).toEqual([42, 43, 91, 55]);
+    }
+  );
+
   test("returns a generic error without retry diagnostics when no provider remains", async () => {
     rateLimitMocks.RateLimitService.checkAndTrackProviderSession.mockResolvedValue({
       allowed: false,

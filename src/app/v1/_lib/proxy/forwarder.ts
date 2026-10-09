@@ -151,7 +151,7 @@ import {
   rectifyGeminiFunctionIds,
 } from "./gemini-function-id-rectifier";
 import { LocalAdmissionClock } from "./local-admission-clock";
-import { getRequestModelMappingContext } from "./model-mapping-context";
+import { getRequestModelMappingContext, shouldApplyModelMapping } from "./model-mapping-context";
 import { ModelRedirector } from "./model-redirector";
 import { nodeStreamToWebStreamSafe } from "./node-stream-to-web";
 import { ensureOpenAIChatStreamUsageOption } from "./openai-chat-usage-options";
@@ -3703,8 +3703,9 @@ export class ProxyForwarder {
       session.setContext1mApplied(true);
     }
 
-    // Apply model redirect (if configured) - skip for raw passthrough endpoints
-    if (!ProxyForwarder.getEndpointPolicy(session).bypassForwarderPreprocessing) {
+    // Compaction preserves its payload but still uses the selected provider's model mapping.
+    const originalRequestBuffer = session.request.buffer;
+    if (shouldApplyModelMapping(session, ProxyForwarder.getEndpointPolicy(session))) {
       const mappingContext = await getRequestModelMappingContext(session);
       const wasRedirected = ModelRedirector.apply(session, provider, mappingContext);
       if (wasRedirected) {
@@ -4299,7 +4300,8 @@ export class ProxyForwarder {
 
     if (
       requestBody !== undefined &&
-      !ProxyForwarder.getEndpointPolicy(session).bypassForwarderPreprocessing &&
+      (!ProxyForwarder.getEndpointPolicy(session).bypassForwarderPreprocessing ||
+        session.request.buffer !== originalRequestBuffer) &&
       processedHeaders.has("content-encoding")
     ) {
       const previousContentEncoding = processedHeaders.get("content-encoding");

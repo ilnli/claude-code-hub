@@ -404,8 +404,13 @@ export class ProxyProviderResolver {
           excludedProviders.push(session.provider.id);
 
           // === 重试选择 ===
-          const { provider: fallbackProvider, context: retryContext } =
-            await ProxyProviderResolver.pickRandomProvider(session, excludedProviders);
+          const cachedProvider = await ProxyProviderResolver.pickCompactionReusableProvider(
+            session,
+            excludedProviders
+          );
+          const { provider: fallbackProvider, context: retryContext } = cachedProvider
+            ? { provider: cachedProvider, context: undefined }
+            : await ProxyProviderResolver.pickRandomProvider(session, excludedProviders);
 
           if (!fallbackProvider) {
             // 无其他可用供应商，退出循环
@@ -565,8 +570,35 @@ export class ProxyProviderResolver {
     session: ProxySession,
     excludeIds: number[]
   ): Promise<Provider | null> {
+    const cachedProvider = await ProxyProviderResolver.pickCompactionReusableProvider(
+      session,
+      excludeIds
+    );
+    if (cachedProvider) return cachedProvider;
     const { provider } = await ProxyProviderResolver.pickRandomProvider(session, excludeIds);
     return provider;
+  }
+
+  private static async pickCompactionReusableProvider(
+    session: ProxySession,
+    excludeIds: number[]
+  ): Promise<Provider | null> {
+    if (!session.isExplicitCompactionRequest?.()) return null;
+    const affinityProvider = await ProxyProviderResolver.tryPrefixAffinityNomination(
+      session,
+      excludeIds
+    );
+    if (affinityProvider) return affinityProvider;
+
+    const reusedProvider = await ProxyProviderResolver.findReusable(session, excludeIds);
+    if (reusedProvider) {
+      session.addProviderToChain(reusedProvider, {
+        reason: "session_reuse",
+        selectionMethod: "session_reuse",
+        circuitState: getCircuitState(reusedProvider.id),
+      });
+    }
+    return reusedProvider;
   }
 
   /**
@@ -620,91 +652,103 @@ export class ProxyProviderResolver {
    * validateAffinityCandidate），任一不过即静默回落加权随机——亲和永远只是
    * 提名，不绕过任何硬性约束。
    */
-  private static async tryPrefixAffinityNomination(session: ProxySession): Promise<void> {
+  private static async tryPrefixAffinityNomination(
+    session: ProxySession,
+    excludeIds: number[] = []
+  ): Promise<Provider | null> {
     try {
       const affinity = session.affinity;
-      if (!affinity) return;
+      if (!affinity) return null;
+      if (!isAffinityRoutingEnabledWith(await getProxyRuntimeSettings())) return null;
 
-      const lookup = await ProxyProviderResolver.lookupAffinityState(session);
-      if (!lookup) return;
+      const excluded = [...excludeIds];
+      while (true) {
+        const lookup = await ProxyProviderResolver.lookupAffinityState(session, excluded);
+        if (!lookup) return null;
 
-      const hint = lookup.hint;
-      if (!hint) return;
+        const hint = lookup.hint;
+        if (!hint || excluded.includes(hint.providerId)) return null;
 
-      affinity.matchedFp = hint.matchedFp;
+        affinity.matchedFp = hint.matchedFp;
 
-      const provider = await ProxyProviderResolver.validateAffinityCandidate(
-        session,
-        hint.providerId
-      );
-      if (!provider) {
-        // 候选不过硬校验：软回落，不写墓碑（可能只是临时熔断/调度窗口外）
-        logger.debug("ProviderSelector: Affinity candidate rejected by hard validation", {
-          providerId: hint.providerId,
-          matchedIndex: hint.matchedIndex,
+        const provider = await ProxyProviderResolver.validateAffinityCandidate(
+          session,
+          hint.providerId
+        );
+        if (!provider) {
+          // 候选不过硬校验：软回落，不写墓碑（可能只是临时熔断/调度窗口外）
+          logger.debug("ProviderSelector: Affinity candidate rejected by hard validation", {
+            providerId: hint.providerId,
+            matchedIndex: hint.matchedIndex,
+          });
+          if (!session.isExplicitCompactionRequest?.()) return null;
+          excluded.push(hint.providerId);
+          continue;
+        }
+
+        // 命中边界详情：随决策链落库，供请求详情展示「具体匹配到哪个前缀」
+        const matchedBoundary =
+          affinity.chain.tail.find((boundary) => boundary.fp === hint.matchedFp) ?? null;
+
+        affinity.nominatedProviderId = provider.id;
+        session.setProvider(provider);
+        session.addProviderToChain(provider, {
+          reason: "affinity_hit",
+          selectionMethod: "prefix_affinity",
+          circuitState: getCircuitState(provider.id),
+          affinity: {
+            matchedDepth: matchedBoundary?.depth ?? null,
+            matchedPrefixBytes: matchedBoundary?.prefixBytes ?? null,
+            matchedFp: hint.matchedFp,
+          },
+          decisionContext: {
+            totalProviders: 0,
+            enabledProviders: 0,
+            targetType: provider.providerType as NonNullable<
+              ProviderChainItem["decisionContext"]
+            >["targetType"],
+            requestedModel: session.getOriginalModel() || "",
+            groupFilterApplied: false,
+            beforeHealthCheck: 0,
+            afterHealthCheck: 0,
+            priorityLevels: [provider.priority || 0],
+            selectedPriority: provider.priority || 0,
+            candidatesAtPriority: [
+              {
+                id: provider.id,
+                name: provider.name,
+                weight: provider.weight,
+                costMultiplier: provider.costMultiplier,
+              },
+            ],
+            sessionId: session.sessionId || undefined,
+          },
         });
-        return;
-      }
-
-      // 命中边界详情：随决策链落库，供请求详情展示「具体匹配到哪个前缀」
-      const matchedBoundary =
-        affinity.chain.tail.find((boundary) => boundary.fp === hint.matchedFp) ?? null;
-
-      affinity.nominatedProviderId = provider.id;
-      session.setProvider(provider);
-      session.addProviderToChain(provider, {
-        reason: "affinity_hit",
-        selectionMethod: "prefix_affinity",
-        circuitState: getCircuitState(provider.id),
-        affinity: {
+        logger.info("ProviderSelector: Prefix affinity nomination accepted", {
+          providerId: provider.id,
+          providerName: provider.name,
+          matchedIndex: hint.matchedIndex,
           matchedDepth: matchedBoundary?.depth ?? null,
-          matchedPrefixBytes: matchedBoundary?.prefixBytes ?? null,
-          matchedFp: hint.matchedFp,
-        },
-        decisionContext: {
-          totalProviders: 0,
-          enabledProviders: 0,
-          targetType: provider.providerType as NonNullable<
-            ProviderChainItem["decisionContext"]
-          >["targetType"],
-          requestedModel: session.getOriginalModel() || "",
-          groupFilterApplied: false,
-          beforeHealthCheck: 0,
-          afterHealthCheck: 0,
-          priorityLevels: [provider.priority || 0],
-          selectedPriority: provider.priority || 0,
-          candidatesAtPriority: [
-            {
-              id: provider.id,
-              name: provider.name,
-              weight: provider.weight,
-              costMultiplier: provider.costMultiplier,
-            },
-          ],
-          sessionId: session.sessionId || undefined,
-        },
-      });
-      logger.info("ProviderSelector: Prefix affinity nomination accepted", {
-        providerId: provider.id,
-        providerName: provider.name,
-        matchedIndex: hint.matchedIndex,
-        matchedDepth: matchedBoundary?.depth ?? null,
-      });
+        });
+        return provider;
+      }
     } catch (error) {
       // 亲和路径任何异常都不影响主选路
       logger.warn("ProviderSelector: Prefix affinity nomination failed, falling back", {
         error: error instanceof Error ? error.message : String(error),
       });
+      return null;
     }
   }
 
   private static async lookupAffinityState(
-    session: ProxySession
+    session: ProxySession,
+    excludeIds: number[] = []
   ): Promise<AffinityLookupResult | null> {
     const affinity = session.affinity;
     if (!affinity) return null;
 
-    if (affinity.lookup) {
+    if (affinity.lookup && excludeIds.length === 0) {
       affinity.identityFp = affinity.lookup.identityFp;
       affinity.generation = affinity.lookup.generation;
       return affinity.lookup;
@@ -713,7 +757,8 @@ export class ProxyProviderResolver {
     const lookup = await getAffinityStore().lookup(
       affinity.scopeTag,
       fingerprintsDeepestFirst(affinity.chain),
-      getEnvConfig().PREFIX_AFFINITY_TTL_SECONDS
+      getEnvConfig().PREFIX_AFFINITY_TTL_SECONDS,
+      excludeIds
     );
     if (!lookup) return null;
 
@@ -839,7 +884,10 @@ export class ProxyProviderResolver {
   /**
    * 查找可复用的供应商（基于 session）
    */
-  private static async findReusable(session: ProxySession): Promise<Provider | null> {
+  private static async findReusable(
+    session: ProxySession,
+    excludeIds: number[] = []
+  ): Promise<Provider | null> {
     if (!session.shouldReuseProvider() || !session.sessionId) {
       return null;
     }
@@ -873,6 +921,7 @@ export class ProxyProviderResolver {
       });
       return null;
     }
+    if (excludeIds.includes(providerId)) return null;
 
     // 验证 provider 可用性
     const provider = await findProviderById(providerId);

@@ -1,6 +1,6 @@
 {
   "title": "Global model mappings",
-  "description": "Provider mappings take priority and stop after one match. Otherwise, global rules run in order and keep mapping each result until no rule matches.",
+  "description": "At each step, a matching provider rule takes priority and ends the mapping. Otherwise, apply the first matching global rule, then check provider rules again using the result. Continue until no rule matches.",
   "loading": "Loading rules…",
   "retry": "Retry",
   "loadFailed": "Could not load model mappings.",
@@ -24,7 +24,7 @@
   "exclusionsHint": "Applies to all providers, including future providers, except those selected here.",
   "stopReasons": {
     "no_match": "No further matching rule.",
-    "provider_rule": "Provider rule matched; global rules skipped.",
+    "provider_rule": "Provider rule matched; mapping complete.",
     "unchanged": "The matched rule leaves the model unchanged.",
     "cycle": "Cycle detected; kept the last safe model.",
     "step_limit": "Mapping step limit reached; kept the last safe model.",

@@ -120,7 +120,12 @@ describe("mapped provider allowlist matching", () => {
     "%s uses mapped whitelist matching and preserves the original request model",
     async (method) => {
       const { ProxyProviderResolver } = await import("@/app/v1/_lib/proxy/provider-selector");
-      const provider = createProvider({ id: 88, providerType: "claude", allowedModels: ["C"] });
+      const provider = createProvider({
+        id: 88,
+        providerType: "claude",
+        allowedModels: ["upstream-C"],
+        modelRedirects: [{ matchType: "exact", source: "C", target: "upstream-C" }],
+      });
       sessionManagerMocks.SessionManager.getSessionProvider.mockResolvedValue(88);
       providerRepositoryMocks.findProviderById.mockResolvedValue(provider);
       vi.spyOn(ProxyProviderResolver as any, "filterByLimits").mockImplementation(

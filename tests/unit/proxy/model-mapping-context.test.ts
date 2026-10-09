@@ -13,6 +13,7 @@ const provider = { id: 1, modelRedirects: null };
 const session = (path = "/v1/messages") =>
   ({
     getEndpointPolicy: () => resolveEndpointPolicy(path),
+    getManagedEndpoint: () => path,
   }) as ProxySession;
 
 beforeEach(() => {
@@ -45,10 +46,19 @@ describe("request model mapping settings snapshot", () => {
   });
 
   test("raw passthrough does not match a mapping that will never be applied", async () => {
-    const context = await getRequestModelMappingContext(session("/v1/responses/compact"));
+    const context = await getRequestModelMappingContext(session("/v1/messages/count_tokens"));
     expect(context.matchProviderModelsAfterMapping).toBe(false);
     expect(context.resolve(provider, "A").redirectedModel).toBe("A");
   });
+
+  test.each(["/v1/responses/compact", "/v1/responses/compact/", "/V1/RESPONSES/COMPACT"])(
+    "compaction selection matches the forwarded model for %s",
+    async (path) => {
+      const context = await getRequestModelMappingContext(session(path));
+      expect(context.matchProviderModelsAfterMapping).toBe(true);
+      expect(context.resolve(provider, "A").redirectedModel).toBe("B");
+    }
+  );
 
   test("can resolve settings without a session for non-request callers", async () => {
     const context = await getRequestModelMappingContext();
